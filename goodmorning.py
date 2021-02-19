@@ -28,7 +28,7 @@ _TZ = 'Asia/Shanghai'
 ACCESSKEY = config.get('setting', 'AccessKey')
 SECRETKEY = config.get('setting', 'SecretKey')
 TIME = config.getint('setting', 'Time')
-TIME = 24 if TIME is 8 else (TIME - 8) % 24
+TIME = 24 if TIME == 8 else (TIME - 8) % 24
 START_PERCENT = config.getfloat('setting', 'StartPrecent')
 BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
 SELL_RATE = config.getfloat('setting', 'SellRate')
