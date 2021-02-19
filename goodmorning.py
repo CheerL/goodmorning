@@ -27,8 +27,7 @@ _TZ = 'Asia/Shanghai'
 
 ACCESSKEY = config.get('setting', 'AccessKey')
 SECRETKEY = config.get('setting', 'SecretKey')
-TIME = config.getint('setting', 'Time')
-TIME = 24 if TIME == 8 else (TIME - 8) % 24
+TIME = config.getfloat('setting', 'Time')
 START_PERCENT = config.getfloat('setting', 'StartPrecent')
 BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
 SELL_RATE = config.getfloat('setting', 'SellRate')
@@ -98,12 +97,12 @@ symbols_info = generic_client.get_exchange_symbols()
 
 def main():
     day_time = time.time() // _DAY_SECOND * _DAY_SECOND
-    target_time = day_time + round(TIME * _HOUR_SECOND)
-    logger.debug(f'Target time is {strftime(target_time)}')
-    
+    target_time = day_time + round((TIME - 8) * _HOUR_SECOND)
     if time.time() > target_time:
-        logger.error(f'Start time is late than target time, exit')
-        return 
+        target_time += _DAY_SECOND
+
+    logger.debug(f'Target time is {strftime(target_time)}')
+
 
     while True:
         if time.time() > target_time - 5:
