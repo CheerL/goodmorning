@@ -27,7 +27,7 @@ _TZ = 'Asia/Shanghai'
 
 ACCESSKEY = config.get('setting', 'AccessKey')
 SECRETKEY = config.get('setting', 'SecretKey')
-TIME = config.getfloat('setting', 'Time')
+TIME = config.get('setting', 'Time')
 START_PERCENT = config.getfloat('setting', 'StartPrecent')
 BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
 SELL_RATE = config.getfloat('setting', 'SellRate')
@@ -39,6 +39,20 @@ def strftime(timestamp, tz_name=_TZ, fmt='%Y-%m-%d %H:%M:%S'):
     )
     return utc_time.astimezone(tz).strftime(fmt)
 
+
+def get_target_time():
+    now = time.time()
+    day_time = now // _DAY_SECOND * _DAY_SECOND
+    target_list = [
+        day_time + round((float(t) - 8) % 24 * _HOUR_SECOND)
+        for t in TIME.split(',')
+    ]
+    target_list = sorted([
+        t + _DAY_SECOND if now > t else t
+        for t in target_list
+    ])
+    target_time = target_list[0]
+    return target_time
 
 def get_spot_account_id(account_client):
     accounts = account_client.get_accounts()
@@ -90,11 +104,7 @@ account_id = get_spot_account_id(account_client)
 symbols_info = generic_client.get_exchange_symbols()
 
 def main():
-    day_time = time.time() // _DAY_SECOND * _DAY_SECOND
-    target_time = day_time + round((TIME - 8) % 24 * _HOUR_SECOND)
-    if time.time() > target_time:
-        target_time += _DAY_SECOND
-
+    target_time = get_target_time()
     logger.debug(f'Target time is {strftime(target_time)}')
 
 
