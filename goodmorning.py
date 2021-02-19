@@ -138,8 +138,7 @@ def main():
         symbols_info
     ))
     currency = symbol_info.base_currency
-    logger.debug(f'Find target, {currency.upper()} increase {round(target[2] * 100, 2)}%')
-
+    logger.debug(f'Find target: {currency.upper()}, initial price {initial_price[symbol]}, now price {target[1]} , increase {round(target[2] * 100, 2)}%')
 
     buy_amount = check_amount(max(
         BUY_AMOUNT,
@@ -156,7 +155,7 @@ def main():
         try:
             balance = get_currency(account_client, account_id, currency)
             if balance > 0:
-                logger.debug(f'Get {balance} {currency.upper()}')
+                logger.debug(f'Get {balance} {currency.upper()} with average price {buy_amount / balance}')
                 break
         except:
             pass
@@ -179,7 +178,7 @@ def main():
     sell_order = trade_client.get_order(sell_id)
     if sell_order.state != 'filled':
         trade_client.cancel_order(symbol, sell_id)
-        logger.warning('Sell order doesnt deal, cancel it')
+        logger.warning('Sell order doesn\'t deal in 2mins, cancel it')
         time.sleep(5)
 
         left_balance = get_currency(account_client, account_id, currency)
