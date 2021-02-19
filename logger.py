@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 
 def create_logger(name, log_file=None):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s-%(levelname)s: %(message)s")
     consoleHandler = logging.StreamHandler()
     consoleHandler.setFormatter(formatter)

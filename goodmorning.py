@@ -97,7 +97,7 @@ symbols_info = generic_client.get_exchange_symbols()
 
 def main():
     day_time = time.time() // _DAY_SECOND * _DAY_SECOND
-    target_time = day_time + round((TIME - 8) * _HOUR_SECOND)
+    target_time = day_time + round((TIME - 8) % 24 * _HOUR_SECOND)
     if time.time() > target_time:
         target_time += _DAY_SECOND
 
