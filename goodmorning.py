@@ -79,12 +79,6 @@ def get_currency(account_client, account_id, currency):
 
 def check_amount(amount, symbol_info):
     precision_num = 10 ** symbol_info.amount_precision
-    amount = max(
-        amount,
-        symbol_info.min_order_amt,
-        symbol_info.limit_order_min_order_amt,
-        symbol_info.sell_market_min_order_amt
-    )
     return math.floor(amount * precision_num) / precision_num
 
 
@@ -137,7 +131,10 @@ def main():
     logger.debug(f'Find target, {currency.upper()} increase {round(target[2] * 100, 2)}%')
 
 
-    buy_amount = check_amount(BUY_AMOUNT, symbol_info)
+    buy_amount = check_amount(max(
+        BUY_AMOUNT,
+        symbol_info.min_order_value
+    ), symbol_info)
     buy_id = trade_client.create_spot_order(
         symbol=symbol, account_id=account_id,
         order_type=OrderType.BUY_MARKET,
@@ -156,7 +153,11 @@ def main():
 
     base_price = initial_price[symbol]
     sell_price = round(base_price * SELL_RATE, symbol_info.price_precision)
-    sell_amount = check_amount(balance,symbol_info)
+    sell_amount = check_amount(max(
+        balance,
+        symbol_info.min_order_amt,
+        symbol_info.limit_order_min_order_amt
+    ), symbol_info)
     sell_id = trade_client.create_spot_order(
         symbol=symbol, account_id=account_id,
         order_type=OrderType.SELL_LIMIT,
@@ -172,7 +173,11 @@ def main():
         time.sleep(5)
 
         left_balance = get_currency(account_client, account_id, currency)
-        left_sell_amount = check_amount(left_balance, symbol_info)
+        left_sell_amount = check_amount(max(
+            left_balance,
+            symbol_info.min_order_amt,
+            symbol_info.sell_market_min_order_amt
+        ), symbol_info)
         trade_client.create_spot_order(
             symbol=symbol, account_id=account_id,
             order_type=OrderType.SELL_MARKET,
