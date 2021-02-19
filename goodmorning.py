@@ -25,13 +25,12 @@ _HOUR_SECOND = 60 * 60
 _DAY_SECOND = 24 * _HOUR_SECOND
 _TZ = 'Asia/Shanghai'
 
-ACCESSKEY = config.get('key', 'AccessKey')
-SECRETKEY = config.get('key', 'SecretKey')
-
-TIME = 16
-START_PERCENT = 0.05
-BUY_AMOUNT = 1.0
-SELL_RATE = 1.4
+ACCESSKEY = config.get('setting', 'AccessKey')
+SECRETKEY = config.get('setting', 'SecretKey')
+TIME = config.getint('setting', 'Time')
+START_PERCENT = config.getfloat('setting', 'StartPrecent')
+BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
+SELL_RATE = config.getfloat('setting', 'SellRate')
 
 def strftime(timestamp, tz_name=_TZ, fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
@@ -96,14 +95,14 @@ trade_client = TradeClient(api_key=ACCESSKEY, secret_key=SECRETKEY, init_log=Tru
 account_id = get_spot_account_id(account_client)
 symbols_info = generic_client.get_exchange_symbols()
 
-if __name__ == '__main__':
+def main():
     day_time = time.time() // _DAY_SECOND * _DAY_SECOND
     target_time = day_time + round(TIME * _HOUR_SECOND)
     logger.debug(f'Target time is {strftime(target_time)}')
     
     if time.time() > target_time:
-        logger.error(f'Start time is late than target time, exit', LogLevel.ERROR)
-        exit
+        logger.error(f'Start time is late than target time, exit')
+        return 
 
     while True:
         if time.time() > target_time - 5:
@@ -183,5 +182,6 @@ if __name__ == '__main__':
 
     logger.debug('Exit')
 
-
+if __name__ == '__main__':
+    main()
 
