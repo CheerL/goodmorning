@@ -102,7 +102,7 @@ class MarketClient(_MarketClient):
 
         return targets
 
-    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=1):
+    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=1, unstop=False):
         targets = []
         while True:
             try:
@@ -117,7 +117,7 @@ class MarketClient(_MarketClient):
                         targets.append(self.symbols_info[symbol])
                         logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
                     break
-                elif now > target_time + 2.5 * interval:
+                elif not unstop and now > target_time + 2.5 * interval:
                     logger.warning(f'Fail to find target in {2.5 * interval}s')
                     break
                 else:

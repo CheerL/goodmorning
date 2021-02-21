@@ -19,13 +19,13 @@ def main():
 
     if target_time % (24*60*60) == 16*60*60 or MODEL == 'midnight':
         logger.info('Midnight model')
-        targets_1, base_price = market_client.get_target_by_batch(target_time, base_price)
+        targets_1, base_price = market_client.get_target_by_batch(target_time, base_price, unstop=True)
         if targets_1:
             for user in users:
                 user.buy(targets_1, [user.buy_amount for _ in targets_1])
-        buy_time = time.time()
+        buy_time_1 = time.time()
 
-        targets_2, base_price = market_client.get_target_by_batch(buy_time, base_price)
+        targets_2, base_price = market_client.get_target_by_batch(buy_time_1, base_price)
         
         if targets_2:
             for user in users:
@@ -40,6 +40,7 @@ def main():
                 user.buy(targets_3, [user.buy_amount for _ in targets_3])
 
         targets = targets + targets_3
+        buy_time = buy_time_2
         if not targets:
             logger.warning('No targets in 3 tries, exit')
             return
