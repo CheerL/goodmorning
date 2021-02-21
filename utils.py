@@ -214,11 +214,11 @@ def get_target_time():
 def initial():
     ACCESSKEY = config.get('setting', 'AccessKey')
     SECRETKEY = config.get('setting', 'SecretKey')
-    BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
+    BUY_AMOUNT = config.get('setting', 'BuyAmount')
     market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
-    buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.splits(',')]
+    buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
     
     users = [
         User(

@@ -16,6 +16,8 @@ def main():
     base_price, base_price_time = market_client.get_base_price(target_time)
 
     targets = market_client.get_target(target_time, base_price, base_price_time)
+    if not targets:
+        return
 
     for user in users:
         user.buy(targets)
