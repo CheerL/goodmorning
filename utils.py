@@ -28,6 +28,8 @@ AFTER = config.getint('setting', 'After')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
 
 class MarketClient(_MarketClient):
+    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         generic_client = GenericClient()
@@ -36,7 +38,7 @@ class MarketClient(_MarketClient):
         self.symbols_info = {
             info.symbol: info
             for info in generic_client.get_exchange_symbols()
-            if info.symbol.endswith('usdt')
+            if info.symbol.endswith('usdt') and info.symbol not in self.exclude_list
         }
 
     def get_price(self):
