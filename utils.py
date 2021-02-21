@@ -104,13 +104,11 @@ class MarketClient(_MarketClient):
 
         return targets
 
-    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=1, unstop=False):
+    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=2.5, unstop=False):
         targets = []
         while True:
             try:
                 now = time.time()
-                if now < target_time + interval:
-                    continue
 
                 increase, price = self.get_increase(base_price)
                 big_increase = [item for item in increase if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)][:batch_size]
@@ -119,8 +117,8 @@ class MarketClient(_MarketClient):
                         targets.append(self.symbols_info[symbol])
                         logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
                     break
-                elif not unstop and now > target_time + 2.5 * interval:
-                    logger.warning(f'Fail to find target in {2.5 * interval}s')
+                elif not unstop and now > target_time + interval:
+                    logger.warning(f'Fail to find target in {interval}s')
                     break
                 else:
                     logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
