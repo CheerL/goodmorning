@@ -37,6 +37,8 @@ def main():
                 user.buy(targets_3, [user.buy_amount for _ in targets_3])
 
         targets = list(set(targets_1+targets_2+targets_3))
+        if not targets:
+            return
     else:
         logger.info('General model')
         targets = market_client.get_target(target_time, base_price, base_price_time)
