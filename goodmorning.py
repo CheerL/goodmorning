@@ -38,6 +38,7 @@ def main():
 
         targets = list(set(targets_1+targets_2+targets_3))
         if not targets:
+            logger.warning('No targets in 3 tries, exit')
             return
     else:
         logger.info('General model')
