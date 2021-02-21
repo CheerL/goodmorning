@@ -10,7 +10,7 @@ BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
 SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 BEFORE = config.getint('setting', 'Before')
 AFTER = config.getint('setting', 'After')
-MAX_AFTER = config.getint('setting, MaxAfter')
+MAX_AFTER = config.getint('setting', 'MaxAfter')
 
 def get_price(market_client):
     market_data = market_client.get_market_tickers()
@@ -44,8 +44,8 @@ def main():
     symbols_info, market_client, users = get_info()
     targets = []
 
-    target_time = get_target_time()
-    # target_time = time.time() + 5
+    # target_time = get_target_time()
+    target_time = time.time() + 5
     logger.debug(f'Target time is {strftime(target_time)}')
 
     while True:
@@ -54,26 +54,33 @@ def main():
             logger.info('Wait 5mins')
             time.sleep(300)
         else:
-            initial_price = get_price(market_client)
+            base_price = get_price(market_client)
             if now > target_time - BEFORE:
-                logger.debug(f'Get initial price successfully/')
+                base_price_time = now
+                logger.debug(f'Get base price successfully/')
                 break
             else:
                 time.sleep(1)
 
     while True:
         try:
-            increase, price = get_increase(market_client, initial_price)
-            if increase[0][2] > BOOT_PRECENT:
-                symbol, now_price, target_increase = increase[0]
-                targets.append(symbols_info[symbol])
-                logger.debug(f'Find target: {symbol.upper()}, initial price {initial_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
+            now = time.time()
+            increase, price = get_increase(market_client, base_price)
+            big_increase = [item for item in increase if item[2] > BOOT_PRECENT]
+            if big_increase:
+                for symbol, now_price, target_increase in big_increase:
+                    targets.append(symbols_info[symbol])
+                    logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
                 break
-            elif time.time() > target_time + AFTER:
-                logger.warning(f'Fail to find target in {AFTER}s, exit')
+            elif now > target_time + MAX_AFTER:
+                logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
                 return
             else:
                 logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
+                if now - base_price_time > AFTER:
+                    base_price_time = now
+                    base_price = price
+                    logger.info('User now base price')
                 time.sleep(0.1)
         except:
             pass
