@@ -26,17 +26,20 @@ def main():
         buy_time = time.time()
 
         targets_2, base_price = market_client.get_target_by_batch(buy_time, base_price)
+        
         if targets_2:
             for user in users:
                 user.buy(targets_2, [user.buy_amount for _ in targets_2])
         buy_time_2 = time.time()
+        targets = list(set(targets_1+targets_2))
 
-        targets_3, base_price = market_client.get_target_by_batch(buy_time_2, base_price)
+        targets_3, _ = market_client.get_target_by_batch(buy_time_2, base_price)
+        targets_3 = [target for target in targets_3 if target not in targets]
         if targets_3:
             for user in users:
                 user.buy(targets_3, [user.buy_amount for _ in targets_3])
 
-        targets = list(set(targets_1+targets_2+targets_3))
+        targets = targets + targets_3
         if not targets:
             logger.warning('No targets in 3 tries, exit')
             return

@@ -130,7 +130,7 @@ class MarketClient(_MarketClient):
 
     @staticmethod
     def _precent_modify(t):
-        return max(min(0.5 * t, 1), 0.5)
+        return max(min(0.5 * t, 0.9), 0.5)
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount):
