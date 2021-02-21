@@ -102,8 +102,38 @@ class MarketClient(_MarketClient):
 
         return targets
 
+    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=1):
+        targets = []
+        while True:
+            try:
+                now = time.time()
+                if now < target_time + interval:
+                    continue
+
+                increase, price = self.get_increase(base_price)
+                big_increase = [item for item in increase if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)][:batch_size]
+                if big_increase:
+                    for symbol, now_price, target_increase in big_increase:
+                        targets.append(self.symbols_info[symbol])
+                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
+                    break
+                elif now > target_time + 2.5 * interval:
+                    logger.warning(f'Fail to find target in {2.5 * interval}s')
+                    return
+                else:
+                    logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
+                    time.sleep(0.05)
+            except:
+                pass
+
+        return targets, price
+
+    @staticmethod
+    def _precent_modify(t):
+        return max(min(0.5 * t, 1), 0.5)
+
 class User:
-    def __init__(self, access_key, buy_amount, secret_key):
+    def __init__(self, access_key, secret_key, buy_amount):
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         self.access_key = access_key
@@ -126,7 +156,7 @@ class User:
         precision_num = 10 ** symbol_info.amount_precision
         return math.floor(amount * precision_num) / precision_num
 
-    def buy(self, targets):
+    def buy(self, targets, amounts):
         self.buy_order_list = [{
             "symbol": target.symbol,
             "account_id": self.account_id,
@@ -134,10 +164,10 @@ class User:
             "source": OrderSource.API,
             "price": 1,
             "amount": self._check_amount(max(
-                self.buy_amount,
+                amount,
                 target.min_order_value
             ), target)}
-            for target in targets
+            for target, amount in zip(targets, amounts)
         ]
 
         self.buy_order_id = self.trade_client.batch_create_order(self.buy_order_list)
@@ -145,7 +175,7 @@ class User:
         for order in self.buy_order_list:
             logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
 
-    def sell(self, targets):
+    def sell(self, targets, amounts):
         self.sell_order_list = [{
             "symbol": target.symbol,
             "account_id": self.account_id,
@@ -153,11 +183,11 @@ class User:
             "source": OrderSource.API,
             "price": 1,
             "amount": self._check_amount(max(
-                self.balance[target.base_currency] / 2,
+                amount,
                 target.min_order_amt,
                 target.sell_market_min_order_amt
             ), target)}
-            for target in targets
+            for target, amount in zip(targets, amounts)
         ]
 
         self.sell_order_id = self.trade_client.batch_create_order(self.sell_order_list)
@@ -165,14 +195,16 @@ class User:
         for order in self.sell_order_list:
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
-
-    def check_balance(self, targets):
+    def get_balance(self, targets):
         target_currencies = [target.base_currency for target in targets]
         self.balance = {
             currency.currency: float(currency.balance)
             for currency in self.account_client.get_balance(self.account_id)
             if currency.currency in target_currencies and currency.type == 'trade'
         }
+
+    def check_balance(self, targets):
+        self.get_balance(targets)
 
         logger.debug(f'User {self.account_id} balance report')
         for target, order in zip(targets, self.buy_order_list):
@@ -181,6 +213,8 @@ class User:
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {order["amount"] / target_balance}')
             else:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
+
+
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
     utc_time = pytz.utc.localize(
@@ -195,20 +229,25 @@ def get_target_time():
 
     if TIME.startswith('*/'):
         TIME = int(TIME[2:])
-        return (now // (TIME * 60) + 1) * (TIME * 60)
+        target_time = (now // (TIME * 60) + 1) * (TIME * 60)
+    elif TIME.startswith('+'):
+        TIME = int(TIME[1:])
+        target_time = now + TIME
+    else:
+        hour_second = 60 * 60
+        day_second = 24 * hour_second
+        day_time = now // day_second * day_second
+        target_list = [
+            day_time + round((float(t) - 8) % 24 * hour_second)
+            for t in TIME.split(',')
+        ]
+        target_list = sorted([
+            t + day_second if now > t else t
+            for t in target_list
+        ])
+        target_time = target_list[0]
 
-    hour_second = 60 * 60
-    day_second = 24 * hour_second
-    day_time = now // day_second * day_second
-    target_list = [
-        day_time + round((float(t) - 8) % 24 * hour_second)
-        for t in TIME.split(',')
-    ]
-    target_list = sorted([
-        t + day_second if now > t else t
-        for t in target_list
-    ])
-    target_time = target_list[0]
+    logger.debug(f'Target time is {strftime(target_time)}')
     return target_time
 
 def initial():
@@ -219,14 +258,8 @@ def initial():
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
-    
-    users = [
-        User(
-            access_key=access_key,
-            secret_key=secret_key,
-            buy_amount=buy_amount,
-        )
-        for access_key, secret_key, buy_amount in zip(access_keys, secret_keys, buy_amounts)
-    ]
 
-    return market_client, users
+    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts)]
+    target_time = get_target_time()
+
+    return users, market_client, target_time
