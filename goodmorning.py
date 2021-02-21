@@ -2,7 +2,7 @@ from utils import logger, config, initial
 import time
 
 SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
-MODEL = config.get('setting', 'model')
+MIDNIGHT = config.getboolean('setting', 'Midnight')
 
 def sell_half_after(users, targets, buy_time, t):
     while time.time() < buy_time + t:
@@ -17,15 +17,15 @@ def main():
     users, market_client, target_time = initial()
     base_price, base_price_time = market_client.get_base_price(target_time)
 
-    if target_time % (24*60*60) == 16*60*60 or MODEL == 'midnight':
+    if MIDNIGHT or target_time % (24*60*60) == 16*60*60:
         logger.info('Midnight model')
-        targets_1, base_price = market_client.get_target_by_batch(target_time, base_price, unstop=True)
+        targets_1, base_price = market_client.get_target_midnight(target_time, base_price, unstop=True)
         if targets_1:
             for user in users:
                 user.buy(targets_1, [user.buy_amount for _ in targets_1])
         buy_time_1 = time.time()
 
-        targets_2, base_price = market_client.get_target_by_batch(buy_time_1, base_price)
+        targets_2, base_price = market_client.get_target_midnight(buy_time_1, base_price)
         
         if targets_2:
             for user in users:
@@ -33,7 +33,7 @@ def main():
         buy_time_2 = time.time()
         targets = list(set(targets_1+targets_2))
 
-        targets_3, _ = market_client.get_target_by_batch(buy_time_2, base_price)
+        targets_3, _ = market_client.get_target_midnight(buy_time_2, base_price)
         targets_3 = [target for target in targets_3 if target not in targets]
         if targets_3:
             for user in users:

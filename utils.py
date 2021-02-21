@@ -26,6 +26,8 @@ BEFORE = config.getint('setting', 'Before')
 BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
 AFTER = config.getint('setting', 'After')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
+MIDNIGHT_BATCHSIZE = config.getint('setting', 'MidnightBatchsize')
+MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
@@ -104,7 +106,7 @@ class MarketClient(_MarketClient):
 
         return targets
 
-    def get_target_by_batch(self, target_time, base_price, batch_size=2, interval=2.5, unstop=False):
+    def get_target_midnight(self, target_time, base_price, batch_size=MIDNIGHT_BATCHSIZE, interval=MIDNIGHT_INTERVAL, unstop=False):
         targets = []
         while True:
             try:
