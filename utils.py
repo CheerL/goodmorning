@@ -89,7 +89,7 @@ class MarketClient(_MarketClient):
                     break
                 elif now > target_time + MAX_AFTER:
                     logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
-                    return
+                    break
                 else:
                     logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
                     if now - base_price_time > AFTER:
@@ -119,7 +119,7 @@ class MarketClient(_MarketClient):
                     break
                 elif now > target_time + 2.5 * interval:
                     logger.warning(f'Fail to find target in {2.5 * interval}s')
-                    return
+                    break
                 else:
                     logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
                     time.sleep(0.05)
