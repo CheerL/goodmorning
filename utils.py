@@ -9,7 +9,7 @@ from collections import namedtuple
 import pytz
 from huobi.client.account import AccountClient
 from huobi.client.generic import GenericClient
-from huobi.client.market import MarketClient
+from huobi.client.market import MarketClient as _MarketClient
 from huobi.client.trade import TradeClient
 from huobi.constant import *
 from huobi.utils import *
@@ -22,14 +22,165 @@ logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 
-class User:
-    def __init__(self, account_client, trade_client, account_id, access_key, secret_key, balance):
-        self.account_client = account_client
-        self.trade_client = trade_client
-        self.account_id = account_id
-        self.access_key = access_key
-        self.sercet_key = secret_key = 40
+BEFORE = config.getint('setting', 'Before')
+BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
+AFTER = config.getint('setting', 'After')
+MAX_AFTER = config.getint('setting', 'MaxAfter')
 
+class MarketClient(_MarketClient):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        generic_client = GenericClient()
+
+        self.targets = []
+        self.symbols_info = {
+            info.symbol: info
+            for info in generic_client.get_exchange_symbols()
+            if info.symbol.endswith('usdt')
+        }
+
+    def get_price(self):
+        market_data = self.get_market_tickers()
+        price = {
+            pair.symbol: pair.close
+            for pair in market_data
+            if pair.symbol.endswith('usdt')
+        }
+        return price
+
+    def get_base_price(self, target_time):
+        while True:
+            now = time.time()
+            if now < target_time - 310:
+                logger.info('Wait 5mins')
+                time.sleep(300)
+            else:
+                base_price = self.get_price()
+                if now > target_time - BEFORE:
+                    base_price_time = now
+                    logger.debug(f'Get base price successfully')
+                    break
+                else:
+                    time.sleep(1)
+        
+        return base_price, base_price_time
+
+    def get_increase(self, initial_price):
+        price = self.get_price()
+        increase = [
+            (symbol, close, (close - initial_price[symbol]) / initial_price[symbol])
+            for symbol, close in price.items()
+            if symbol in initial_price and symbol.endswith('usdt')
+        ]
+        increase = sorted(increase, key=lambda pair: pair[2], reverse=True)
+        return increase, price
+
+    def get_target(self, target_time, base_price, base_price_time):
+        targets = []
+        while True:
+            try:
+                now = time.time()
+                increase, price = self.get_increase(base_price)
+                big_increase = [item for item in increase if item[2] > BOOT_PRECENT]
+                if big_increase:
+                    for symbol, now_price, target_increase in big_increase:
+                        targets.append(self.symbols_info[symbol])
+                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
+                    break
+                elif now > target_time + MAX_AFTER:
+                    logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
+                    return
+                else:
+                    logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
+                    if now - base_price_time > AFTER:
+                        base_price_time = now
+                        base_price = price
+                        logger.info('User now base price')
+                    time.sleep(0.1)
+            except:
+                pass
+
+        return targets
+
+class User:
+    def __init__(self, access_key, buy_amount, secret_key):
+        self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
+        self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
+        self.access_key = access_key
+        self.sercet_key = secret_key
+        self.buy_amount = buy_amount
+
+        self.account_id = next(filter(
+            lambda account: account.type=='spot' and account.state =='working',
+            self.account_client.get_accounts()
+        )).id
+
+        self.balance = {}
+        self.buy_order_list = None
+        self.buy_order_id = None
+        self.sell_order_list = None
+        self.sell_order_id = None
+
+    @staticmethod
+    def _check_amount(amount, symbol_info):
+        precision_num = 10 ** symbol_info.amount_precision
+        return math.floor(amount * precision_num) / precision_num
+
+    def buy(self, targets):
+        self.buy_order_list = [{
+            "symbol": target.symbol,
+            "account_id": self.account_id,
+            "order_type": OrderType.BUY_MARKET,
+            "source": OrderSource.API,
+            "price": 1,
+            "amount": self._check_amount(max(
+                self.buy_amount,
+                target.min_order_value
+            ), target)}
+            for target in targets
+        ]
+
+        self.buy_order_id = self.trade_client.batch_create_order(self.buy_order_list)
+        logger.debug(f'User {self.account_id} buy report')
+        for order in self.buy_order_list:
+            logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
+
+    def sell(self, targets):
+        self.sell_order_list = [{
+            "symbol": target.symbol,
+            "account_id": self.account_id,
+            "order_type": OrderType.SELL_MARKET,
+            "source": OrderSource.API,
+            "price": 1,
+            "amount": self._check_amount(max(
+                self.balance[target.base_currency] / 2,
+                target.min_order_amt,
+                target.sell_market_min_order_amt
+            ), target)}
+            for target in targets
+        ]
+
+        self.sell_order_id = self.trade_client.batch_create_order(self.sell_order_list)
+        logger.debug(f'User {self.account_id} sell report')
+        for order in self.sell_order_list:
+            logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
+
+
+    def check_balance(self, targets):
+        target_currencies = [target.base_currency for target in targets]
+        self.balance = {
+            currency.currency: float(currency.balance)
+            for currency in self.account_client.get_balance(self.account_id)
+            if currency.currency in target_currencies and currency.type == 'trade'
+        }
+
+        logger.debug(f'User {self.account_id} balance report')
+        for target, order in zip(targets, self.buy_order_list):
+            target_balance = self.balance[target.base_currency]
+            if target_balance > 10 ** -target.amount_precision:
+                logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {order["amount"] / target_balance}')
+            else:
+                logger.debug(f'Get 0 {target.base_currency.upper()}')
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
     utc_time = pytz.utc.localize(
@@ -60,39 +211,22 @@ def get_target_time():
     target_time = target_list[0]
     return target_time
 
-def check_amount(amount, symbol_info):
-    precision_num = 10 ** symbol_info.amount_precision
-    return math.floor(amount * precision_num) / precision_num
-
-def get_info():
+def initial():
     ACCESSKEY = config.get('setting', 'AccessKey')
     SECRETKEY = config.get('setting', 'SecretKey')
-    generic_client = GenericClient()
+    BUY_AMOUNT = config.getfloat('setting', 'BuyAmount')
     market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
+    buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.splits(',')]
     
     users = [
         User(
-            account_client=AccountClient(api_key=access_key, secret_key=secret_key),
-            trade_client=TradeClient(api_key=access_key, secret_key=secret_key),
             access_key=access_key,
             secret_key=secret_key,
-            account_id=None,
-            balance=None
+            buy_amount=buy_amount,
         )
-        for access_key, secret_key in zip(access_keys, secret_keys)
+        for access_key, secret_key, buy_amount in zip(access_keys, secret_keys, buy_amounts)
     ]
-    for user in users:
-        accounts = user.account_client.get_accounts()
-        user.account_id = next(filter(
-            lambda account: account.type=='spot' and account.state =='working',
-            accounts
-        )).id
 
-    symbols_info = {
-        info.symbol: info
-        for info in generic_client.get_exchange_symbols()
-        if info.symbol.endswith('usdt')
-    }
-    return symbols_info, market_client, users
+    return market_client, users
