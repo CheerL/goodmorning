@@ -27,21 +27,22 @@ def main():
     while time.time() < target_time - 10:
         time.sleep(1)
 
-    price_list = []
-    time_list = []
+    # price_list = []
+    # time_list = []
     while True:
         now = time.time()
         if now > target_time + 300:
             break
 
         price = market_client.get_price()
-        price_list.append(price)
-        time_list.append(now)
-
-    for now, price in zip(time_list, price_list):
+        # price_list.append(price)
+        # time_list.append(now)
         for symbol, (close, vol) in price.items():
             cursor.execute(f'INSERT into market (symbol, time, price, vol) values (\'{symbol}\', \'{now}\', \'{close}\', \'{vol}\')')
 
+
+    # for now, price in zip(time_list, price_list):
+        
     cursor.close()
     conn.commit()
     conn.close()
