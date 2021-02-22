@@ -302,12 +302,16 @@ def initial():
     ACCESSKEY = config.get('setting', 'AccessKey')
     SECRETKEY = config.get('setting', 'SecretKey')
     BUY_AMOUNT = config.get('setting', 'BuyAmount')
+    TEST = config.getboolean('setting', 'Test')
     market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
 
     users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts)]
+    if TEST:
+        users = users[:1]
+
     target_time = get_target_time()
 
     return users, market_client, target_time
