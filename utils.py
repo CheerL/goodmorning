@@ -220,7 +220,7 @@ class User:
             client_id = (symbol + stop_price + str(time.time())).replace('.', '_')
             sell_order_id = self.algo_client.create_order(
                 account_id=self.account_id, symbol=symbol, order_side=OrderSide.SELL,
-                order_type=OrderType.SELL_MARKET, stop_price=stop_price, order_size=amount,
+                order_type='market', stop_price=stop_price, order_size=amount,
                 client_order_id=client_id
             )
             order = {
