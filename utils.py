@@ -217,7 +217,7 @@ class User:
                 target.min_order_amt,
                 target.sell_market_min_order_amt
             ), target))
-            client_id = symbol + stop_price + str(time.time)
+            client_id = (symbol + stop_price + str(time.time)).replace('.', '_')
             sell_order_id = self.algo_client.create_order(
                 account_id=self.account_id, symbol=symbol, order_side=OrderSide.SELL,
                 order_type=OrderType.SELL_MARKET, stop_price=stop_price, order_size=amount,
