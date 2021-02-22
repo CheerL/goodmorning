@@ -15,7 +15,7 @@ def main():
             symbol varchar(20),
             time varchar(30),
             price varchar(30),
-            amount varchar(30)
+            vol varchar(30)
         )
         ''')
     else:
@@ -31,7 +31,7 @@ def main():
     time_list = []
     while True:
         now = time.time()
-        if now > target_time + 10:
+        if now > target_time + 300:
             break
 
         price = market_client.get_price()
@@ -39,8 +39,8 @@ def main():
         time_list.append(now)
 
     for now, price in zip(time_list, price_list):
-        for symbol, (close, amount) in price.items():
-            cursor.execute(f'INSERT into market (symbol, time, price, amount) values (\'{symbol}\', \'{now}\', \'{close}\', \'{amount}\')')
+        for symbol, (close, vol) in price.items():
+            cursor.execute(f'INSERT into market (symbol, time, price, vol) values (\'{symbol}\', \'{now}\', \'{close}\', \'{vol}\')')
 
     cursor.close()
     conn.commit()
@@ -48,5 +48,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
