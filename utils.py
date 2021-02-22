@@ -233,8 +233,11 @@ class User:
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
     def cancel_algo(self):
-        self.algo_client.cancel_orders([order['id'] for order in self.sell_order_list])
-        logger.info('Cancel all algo orders')
+        try:
+            self.algo_client.cancel_orders([order['id'] for order in self.sell_order_list])
+            logger.info('Cancel all algo orders')
+        except:
+            pass
 
     def get_balance(self, targets):
         target_currencies = [target.base_currency for target in targets]
