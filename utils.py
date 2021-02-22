@@ -26,8 +26,9 @@ config.read(CONFIG_PATH)
 BEFORE = config.getint('setting', 'Before')
 BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
 AFTER = config.getint('setting', 'After')
+BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
-MIDNIGHT_BATCHSIZE = config.getint('setting', 'MidnightBatchsize')
+MIN_VOL = config.getfloat('setting', 'MinVol')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
 
 class MarketClient(_MarketClient):
@@ -87,39 +88,44 @@ class MarketClient(_MarketClient):
     def get_target(self, target_time, base_price, base_price_time):
         targets = []
         while True:
-            try:
-                now = time.time()
-                increase, price = self.get_increase(base_price)
-                big_increase = [item for item in increase if item[2] > BOOT_PRECENT]
-                if big_increase:
-                    for symbol, now_price, target_increase, vol in big_increase:
-                        self.price_record.setdefault(symbol, base_price[symbol][0])
-                        targets.append(self.symbols_info[symbol])
-                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
-                    break
-                elif now > target_time + MAX_AFTER:
-                    logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
-                    break
-                else:
-                    logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}% {data[3]}USDT' for index, data in enumerate(increase[:3])]))
-                    if now - base_price_time > AFTER:
-                        base_price_time = now
-                        base_price = price
-                        logger.info('User now base price')
-                    time.sleep(0.1)
-            except:
-                pass
+            now = time.time()
+            increase, price = self.get_increase(base_price)
+            big_increase = [
+                item for item in increase
+                if item[2] > BOOT_PRECENT
+                and item[3] > MIN_VOL
+            ][:BATCH_SIZE]
+            if big_increase:
+                for symbol, now_price, target_increase, vol in big_increase:
+                    self.price_record.setdefault(symbol, base_price[symbol][0])
+                    targets.append(self.symbols_info[symbol])
+                    logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
+                break
+            elif now > target_time + MAX_AFTER:
+                logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
+                break
+            else:
+                logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}% {data[3]}USDT' for index, data in enumerate(increase[:3])]))
+                if now - base_price_time > AFTER:
+                    base_price_time = now
+                    base_price = price
+                    logger.info('User now base price')
+                time.sleep(0.1)
 
         return targets
 
-    def get_target_midnight(self, target_time, base_price, batch_size=MIDNIGHT_BATCHSIZE, interval=MIDNIGHT_INTERVAL, unstop=False):
+    def get_target_midnight(self, target_time, base_price, interval=MIDNIGHT_INTERVAL, unstop=False):
         targets = []
         while True:
             try:
                 now = time.time()
 
                 increase, price = self.get_increase(base_price)
-                big_increase = [item for item in increase if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)][:batch_size]
+                big_increase = [
+                    item for item in increase
+                    if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)
+                    and item[3] > MIN_VOL
+                ][:BATCH_SIZE]
                 if big_increase:
                     for symbol, now_price, target_increase, vol in big_increase:
                         self.price_record.setdefault(symbol, base_price[symbol][0])
