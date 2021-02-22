@@ -93,9 +93,9 @@ class MarketClient(_MarketClient):
                 big_increase = [item for item in increase if item[2] > BOOT_PRECENT]
                 if big_increase:
                     for symbol, now_price, target_increase, vol in big_increase:
-                        self.price_record.setdefault(symbol, base_price[symbol])
+                        self.price_record.setdefault(symbol, base_price[symbol][0])
                         targets.append(self.symbols_info[symbol])
-                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
+                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
                     break
                 elif now > target_time + MAX_AFTER:
                     logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
@@ -121,10 +121,10 @@ class MarketClient(_MarketClient):
                 increase, price = self.get_increase(base_price)
                 big_increase = [item for item in increase if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)][:batch_size]
                 if big_increase:
-                    for symbol, now_price, target_increase in big_increase:
-                        self.price_record.setdefault(symbol, base_price[symbol])
+                    for symbol, now_price, target_increase, vol in big_increase:
+                        self.price_record.setdefault(symbol, base_price[symbol][0])
                         targets.append(self.symbols_info[symbol])
-                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
+                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
                     break
                 elif not unstop and now > target_time + interval:
                     logger.warning(f'Fail to find target in {interval}s')
