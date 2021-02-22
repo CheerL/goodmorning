@@ -47,7 +47,7 @@ class MarketClient(_MarketClient):
     def get_price(self):
         market_data = self.get_market_tickers()
         price = {
-            pair.symbol: pair.close
+            pair.symbol: (pair.close, pair.amount)
             for pair in market_data
             if pair.symbol in self.symbols_info
         }
@@ -73,8 +73,12 @@ class MarketClient(_MarketClient):
     def get_increase(self, initial_price):
         price = self.get_price()
         increase = [
-            (symbol, close, (close - initial_price[symbol]) / initial_price[symbol])
-            for symbol, close in price.items()
+            (
+                symbol, close,
+                (close - initial_price[symbol][0]) / initial_price[symbol][0],
+                (amount - initial_price[symbol][1]) * initial_price[symbol][0]
+            )
+            for symbol, (close, amount) in price.items()
             if symbol in initial_price and symbol.endswith('usdt')
         ]
         increase = sorted(increase, key=lambda pair: pair[2], reverse=True)
@@ -88,16 +92,16 @@ class MarketClient(_MarketClient):
                 increase, price = self.get_increase(base_price)
                 big_increase = [item for item in increase if item[2] > BOOT_PRECENT]
                 if big_increase:
-                    for symbol, now_price, target_increase in big_increase:
+                    for symbol, now_price, target_increase, vol in big_increase:
                         self.price_record.setdefault(symbol, base_price[symbol])
                         targets.append(self.symbols_info[symbol])
-                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%')
+                        logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {vol} USDT')
                     break
                 elif now > target_time + MAX_AFTER:
                     logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
                     break
                 else:
-                    logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}%' for index, data in enumerate(increase[:3])]))
+                    logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}% {data[3]}USDT' for index, data in enumerate(increase[:3])]))
                     if now - base_price_time > AFTER:
                         base_price_time = now
                         base_price = price
