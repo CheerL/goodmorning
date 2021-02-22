@@ -4,7 +4,6 @@ import os
 import time
 
 from logger import create_logger
-from collections import namedtuple
 
 import pytz
 from huobi.client.account import AccountClient
@@ -48,11 +47,15 @@ class MarketClient(_MarketClient):
     def get_price(self):
         market_data = self.get_market_tickers()
         price = {
-            pair.symbol: (pair.close, pair.amount)
+            pair.symbol: (pair.close, pair.vol)
             for pair in market_data
             if pair.symbol in self.symbols_info
         }
         return price
+
+    def get_vol(self, symbol):
+        [kline] = self.get_candlestick(symbol, CandlestickInterval.MIN1, 1)
+        return kline.vol
 
     def get_base_price(self, target_time):
         while True:
@@ -76,36 +79,58 @@ class MarketClient(_MarketClient):
         increase = [
             (
                 symbol, close,
-                (close - initial_price[symbol][0]) / initial_price[symbol][0],
-                (amount - initial_price[symbol][1]) * initial_price[symbol][0]
+                round((close - initial_price[symbol][0]) / initial_price[symbol][0] * 100, 4),
+                round(vol - initial_price[symbol][1], 4)
             )
-            for symbol, (close, amount) in price.items()
-            if symbol in initial_price and symbol.endswith('usdt')
+            for symbol, (close, vol) in price.items()
         ]
         increase = sorted(increase, key=lambda pair: pair[2], reverse=True)
         return increase, price
 
-    def get_target(self, target_time, base_price, base_price_time):
+    def get_big_increase(self, increase):
+        big_increase = [
+            item for item in increase
+            if item[2] > BOOT_PRECENT
+        ][:BATCH_SIZE]
+
+        if big_increase:
+            big_increase_vol = [self.get_vol(item[0]) for item in big_increase]
+            big_increase = [
+                (symbol, close, increment, vol)
+                for ((symbol, close, increment, _), vol) in zip(big_increase, big_increase_vol)
+                if vol > MIN_VOL
+            ]
+
+        return big_increase
+
+    def handle_big_increase(self, big_increase, base_price):
         targets = []
+        for symbol, now_price, target_increase, vol in big_increase:
+            init_price, _ = base_price[symbol]
+            target = self.symbols_info[symbol]
+            self.price_record.setdefault(symbol, init_price)
+            targets.append(target)
+            logger.debug(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
+        return targets
+
+    def get_target(self, target_time, base_price, base_price_time):
         while True:
             now = time.time()
             increase, price = self.get_increase(base_price)
-            big_increase = [
-                item for item in increase
-                if item[2] > BOOT_PRECENT
-                and item[3] > MIN_VOL
-            ][:BATCH_SIZE]
+            big_increase = self.get_big_increase(increase)
+
             if big_increase:
-                for symbol, now_price, target_increase, vol in big_increase:
-                    self.price_record.setdefault(symbol, base_price[symbol][0])
-                    targets.append(self.symbols_info[symbol])
-                    logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {round(vol, 4)} USDT')
+                targets = self.handle_big_increase(big_increase, base_price)
                 break
             elif now > target_time + MAX_AFTER:
                 logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
+                targets = []
                 break
             else:
-                logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}% {round(data[3], 4)} USDT' for index, data in enumerate(increase[:3])]))
+                logger.info('\t'.join([
+                    f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
+                    for index, (symbol, _, increment, vol) in enumerate(increase[:3])
+                ]))
                 if now - base_price_time > AFTER:
                     base_price_time = now
                     base_price = price
@@ -115,28 +140,23 @@ class MarketClient(_MarketClient):
         return targets
 
     def get_target_midnight(self, target_time, base_price, interval=MIDNIGHT_INTERVAL, unstop=False):
-        targets = []
         while True:
-
             now = time.time()
-
             increase, price = self.get_increase(base_price)
-            big_increase = [
-                item for item in increase
-                if item[2] > BOOT_PRECENT * self._precent_modify(now-target_time)
-                and item[3] > MIN_VOL
-            ][:BATCH_SIZE]
+            big_increase = self.get_big_increase(increase)
+
             if big_increase:
-                for symbol, now_price, target_increase, vol in big_increase:
-                    self.price_record.setdefault(symbol, base_price[symbol][0])
-                    targets.append(self.symbols_info[symbol])
-                    logger.debug(f'Find target: {symbol.upper()}, initial price {base_price[symbol][0]}, now price {now_price} , increase {round(target_increase * 100, 4)}%, vol {round(vol, 4)} USDT')
+                targets = self.handle_big_increase(big_increase, base_price)
                 break
             elif not unstop and now > target_time + interval:
                 logger.warning(f'Fail to find target in {interval}s')
+                targets = []
                 break
             else:
-                logger.info('\t'.join([f'{index+1}. {data[0].upper()} {round(data[2]*100, 4)}% {round(data[3], 4)} USDT' for index, data in enumerate(increase[:3])]))
+                logger.info('\t'.join([
+                    f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
+                    for index, (symbol, _, increment, vol) in enumerate(increase[:3])
+                ]))
                 time.sleep(0.05)
 
 

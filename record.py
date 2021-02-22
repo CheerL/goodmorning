@@ -38,12 +38,10 @@ def main():
         price_list.append(price)
         time_list.append(now)
 
-    
-    
     for now, price in zip(time_list, price_list):
         for symbol, (close, amount) in price.items():
             cursor.execute(f'INSERT into market (symbol, time, price, amount) values (\'{symbol}\', \'{now}\', \'{close}\', \'{amount}\')')
-    
+
     cursor.close()
     conn.commit()
     conn.close()
