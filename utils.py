@@ -4,7 +4,7 @@ import math
 import os
 import time
 
-from logger import create_logger
+from logger import create_logger, WxPusher
 
 import pytz
 from huobi.client.account import AccountClient
@@ -23,6 +23,7 @@ logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 
+TOKEN = config.get('setting', 'Token')
 BEFORE = config.getint('setting', 'Before')
 BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
 AFTER = config.getint('setting', 'After')
@@ -168,13 +169,14 @@ class MarketClient(_MarketClient):
         return max(min(0.5 * t, 0.9), 0.5)
 
 class User:
-    def __init__(self, access_key, secret_key, buy_amount):
+    def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         self.algo_client = AlgoClient(api_key=access_key, secret_key=secret_key)
         self.access_key = access_key
         self.sercet_key = secret_key
         self.buy_amount = buy_amount
+        self.wxuid = wxuid
 
         self.account_id = next(filter(
             lambda account: account.type=='spot' and account.state =='working',
@@ -322,26 +324,30 @@ class User:
                      + [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
         buy_info = [{
             'symbol': order.symbol,
-            'time': strftime(float(order.finished_at)),
+            'time': strftime(order.finished_at / 1000),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
             'currency': order.symbol[:-4].upper(),
             'vol': float(order.filled_cash_amount)
-        } for order in buy_order]
+        } for order in buy_order
+        if order.state == 'filled'
+        ]
         sell_info = [{
             'symbol': order.symbol,
-            'time': strftime(float(order.finished_at)),
+            'time': strftime(order.finished_at / 1000),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
             'currency': order.symbol[:-4].upper(),
             'vol': float(order.filled_cash_amount)
-        } for order in sell_order]
-        pay = sum([each['vol'] for each in buy_info])
-        income = sum([each['vol'] for each in sell_info])
+        } for order in sell_order
+        if order.state == 'filled'
+        ]
+        pay = round(sum([each['vol'] for each in buy_info]), 4)
+        income = round(sum([each['vol'] for each in sell_info]), 4)
         profit = income - pay
-        precent = round(profit / pay * 100, 3)
+        precent = round(profit / pay * 100, 4)
 
         logger.info(f'REPORT for user {self.account_id}')
         logger.info('Buy')
@@ -352,7 +358,7 @@ class User:
             amount = each['amount']
             price = each['price']
             fee = each['fee']
-            logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}')
+            logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
 
         logger.info('Sell')
         for each in sell_info:
@@ -362,17 +368,53 @@ class User:
             amount = each['amount']
             price = each['price']
             fee = each['fee']
-            logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT')
+            logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
 
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
 
+        if self.wxuid:
+            summary = f'支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
+            msg = '''
+### 买入记录
 
-def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
+| 币种 | 时间 |价格 | 成交量 | 成交额 | 手续费 |
+| ---- | ---- | ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each["currency"]} | {each["time"]} | {each["price"]} | {each["amount"]} | {each["vol"]} | {each["fee"]} |'
+    for each in buy_info
+]) + '''
+### 卖出记录
+
+| 币种 | 时间 | 价格 | 成交量 | 成交额 | 手续费 |
+| ---- | ---- | ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each["currency"]} | {each["time"]} | {each["price"]} | {each["amount"]} | {each["vol"]} | {each["fee"]} |'
+    for each in sell_info
+]) + f'''
+### 总结
+            
+- 支出: **{pay} USDT**
+
+- 收入: **{income} USDT**
+
+- 利润: **{profit} USDT**
+
+- 收益率: **{precent} %**
+'''
+            wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
+
+
+def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S.%f'):
     tz = pytz.timezone(tz_name)
     utc_time = pytz.utc.localize(
         pytz.datetime.datetime.utcfromtimestamp(timestamp)
     )
     return utc_time.astimezone(tz).strftime(fmt)
+
+def wxpush(content, uids, content_type=1, summary=None):
+    WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
 
 def get_target_time():
     TIME = config.get('setting', 'Time')
@@ -406,13 +448,15 @@ def initial():
     ACCESSKEY = config.get('setting', 'AccessKey')
     SECRETKEY = config.get('setting', 'SecretKey')
     BUY_AMOUNT = config.get('setting', 'BuyAmount')
+    WXUIDS = config.get('setting', 'WxUid')
     TEST = config.getboolean('setting', 'Test')
     market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
+    wxuids = [uid.strip() for uid in WXUIDS.split(',')]
 
-    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts)]
+    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
     if TEST:
         users = users[:1]
 
