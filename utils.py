@@ -324,7 +324,7 @@ class User:
                      + [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
         buy_info = [{
             'symbol': order.symbol,
-            'time': strftime(order.finished_at / 1000),
+            'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
@@ -335,7 +335,7 @@ class User:
         ]
         sell_info = [{
             'symbol': order.symbol,
-            'time': strftime(order.finished_at / 1000),
+            'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
@@ -346,7 +346,7 @@ class User:
         ]
         pay = round(sum([each['vol'] for each in buy_info]), 4)
         income = round(sum([each['vol'] for each in sell_info]), 4)
-        profit = income - pay
+        profit = round(income - pay, 4)
         precent = round(profit / pay * 100, 4)
 
         logger.info(f'REPORT for user {self.account_id}')
@@ -373,7 +373,7 @@ class User:
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
 
         if self.wxuid:
-            summary = f'支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
+            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
             msg = '''
 ### 买入记录
 
@@ -406,7 +406,7 @@ class User:
             wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
 
 
-def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S.%f'):
+def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
     utc_time = pytz.utc.localize(
         pytz.datetime.datetime.utcfromtimestamp(timestamp)
