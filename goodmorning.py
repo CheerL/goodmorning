@@ -79,6 +79,9 @@ def main():
     # sell_half_after(users, targets, buy_time, SELL_INTERVAL)
     # sell_half_after(users, targets, buy_time, 2*SELL_INTERVAL)
 
+    for user in users:
+        user.report()
+
     logger.debug('Exit')
 
 if __name__ == '__main__':

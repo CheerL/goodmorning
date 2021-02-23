@@ -1,4 +1,5 @@
 import configparser
+from logging import log
 import math
 import os
 import time
@@ -314,6 +315,56 @@ class User:
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {order["amount"] / target_balance}')
             else:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
+
+    def report(self):
+        buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
+        sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id] \
+                     + [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
+        buy_info = [{
+            'symbol': order.symbol,
+            'time': strftime(float(order.finished_at)),
+            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+            'amount': round(float(order.filled_amount), 6),
+            'fee': round(float(order.filled_fees), 6),
+            'currency': order.symbol[:-4].upper(),
+            'vol': float(order.filled_cash_amount)
+        } for order in buy_order]
+        sell_info = [{
+            'symbol': order.symbol,
+            'time': strftime(float(order.finished_at)),
+            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+            'amount': round(float(order.filled_amount), 6),
+            'fee': round(float(order.filled_fees), 6),
+            'currency': order.symbol[:-4].upper(),
+            'vol': float(order.filled_cash_amount)
+        } for order in sell_order]
+        pay = sum([each['vol'] for each in buy_info])
+        income = sum([each['vol'] for each in sell_info])
+        profit = income - pay
+        precent = round(profit / pay * 100, 3)
+
+        logger.info(f'REPORT for user {self.account_id}')
+        logger.info('Buy')
+        for each in buy_info:
+            currency = each['currency']
+            symbol_name = '/'.join([currency, 'USDT'])
+            vol = each['vol']
+            amount = each['amount']
+            price = each['price']
+            fee = each['fee']
+            logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}')
+
+        logger.info('Sell')
+        for each in sell_info:
+            currency = each['currency']
+            symbol_name = '/'.join([currency, 'USDT'])
+            vol = each['vol']
+            amount = each['amount']
+            price = each['price']
+            fee = each['fee']
+            logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT')
+
+        logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
 
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
