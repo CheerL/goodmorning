@@ -23,12 +23,8 @@ def sell_algo_left_market(users, targets, buy_time, market_client):
     while time.time() < buy_time + SELL_AFTER:
         pass
     else:
-        logger.info(f'Sell left after {SELL_AFTER}s')
         for user in users:
-            user.cancel_algo()
-            user.get_balance(targets)
-            sell_amounts = [user.balance[target.base_currency] for target in targets]
-            user.sell(targets, sell_amounts)
+            user.cancel_algo_and_sell()
 
 def main():
     users, market_client, target_time = initial()

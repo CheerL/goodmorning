@@ -183,6 +183,9 @@ class User:
         self.balance = {}
         self.buy_order_list = []
         self.sell_order_list = []
+        self.buy_id = []
+        self.sell_id = []
+        self.sell_algo_id = []
 
     @staticmethod
     def _check_amount(amount, symbol_info):
@@ -206,9 +209,10 @@ class User:
                 target.min_order_value
             ), target)}
             for target, amount in zip(targets, amounts)
+            if amount > 0
         ]
 
-        self.buy_order_id = self.trade_client.batch_create_order(buy_order_list)
+        self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
         logger.debug(f'User {self.account_id} buy report')
         for order in buy_order_list:
             logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
@@ -228,9 +232,10 @@ class User:
                 target.sell_market_min_order_amt
             ), target)}
             for target, amount in zip(targets, amounts)
+            if amount > 0
         ]
 
-        self.trade_client.batch_create_order(sell_order_list)
+        self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
         logger.debug(f'User {self.account_id} sell report')
         for order in sell_order_list:
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
@@ -239,6 +244,9 @@ class User:
 
     def sell_algo(self, targets, amounts, price_record, rate):
         for target, amount in zip(targets, amounts):
+            if amount <= 0:
+                continue
+
             symbol = target.symbol
             stop_price = str(self._check_price(rate * price_record[symbol], target))
             amount = str(self._check_amount(max(
@@ -258,15 +266,35 @@ class User:
                 "amount": amount,
                 "id": sell_order_id
             }
+            self.sell_algo_id.append(client_id)
             self.sell_order_list.append(order)
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
-    def cancel_algo(self):
-        try:
-            self.algo_client.cancel_orders([order['id'] for order in self.sell_order_list])
-            logger.info('Cancel all algo orders')
-        except:
-            pass
+    def cancel_algo_and_sell(self):
+        open_orders = self.algo_client.get_open_orders() or []
+        if open_orders:
+            open_ids = [order.clientOrderId for order in open_orders]
+            self.algo_client.cancel_orders(open_ids)
+            logger.info('Cancel algo orders')
+
+            sell_order_list = [{
+                "symbol": order.symbol,
+                "account_id": self.account_id,
+                "order_type": OrderType.SELL_MARKET,
+                "source": OrderSource.API,
+                "price": 1,
+                "amount": float(order.orderSize)
+                } for order in open_orders
+            ]
+
+            self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
+            logger.debug(f'User {self.account_id} sell report')
+            for order in sell_order_list:
+                logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
+
+            self.sell_order_list.extend(sell_order_list)
+            self.sell_algo_id = [list(set(self.sell_algo_id)-set(open_ids))]
+
 
     def get_balance(self, targets):
         target_currencies = [target.base_currency for target in targets]
