@@ -311,62 +311,63 @@ class User:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
 
     def report(self):
-        buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
-        sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id]
-        sell_order += [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
-        buy_info = [{
-            'symbol': order.symbol,
-            'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
-            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-            'amount': round(float(order.filled_amount), 6),
-            'fee': round(float(order.filled_fees), 6),
-            'currency': order.symbol[:-4].upper(),
-            'vol': float(order.filled_cash_amount)
-        } for order in buy_order
-        if order.state == 'filled'
-        ]
-        sell_info = [{
-            'symbol': order.symbol,
-            'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
-            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-            'amount': round(float(order.filled_amount), 6),
-            'fee': round(float(order.filled_fees), 6),
-            'currency': order.symbol[:-4].upper(),
-            'vol': float(order.filled_cash_amount)
-        } for order in sell_order
-        if order.state == 'filled'
-        ]
-        pay = round(sum([each['vol'] for each in buy_info]), 4)
-        income = round(sum([each['vol'] for each in sell_info]), 4)
-        profit = round(income - pay, 4)
-        precent = round(profit / pay * 100, 4)
+        try:
+            buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
+            sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id]
+            sell_order += [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
+            buy_info = [{
+                'symbol': order.symbol,
+                'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
+                'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+                'amount': round(float(order.filled_amount), 6),
+                'fee': round(float(order.filled_fees), 6),
+                'currency': order.symbol[:-4].upper(),
+                'vol': float(order.filled_cash_amount)
+            } for order in buy_order
+            if order.state == 'filled'
+            ]
+            sell_info = [{
+                'symbol': order.symbol,
+                'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
+                'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+                'amount': round(float(order.filled_amount), 6),
+                'fee': round(float(order.filled_fees), 6),
+                'currency': order.symbol[:-4].upper(),
+                'vol': float(order.filled_cash_amount)
+            } for order in sell_order
+            if order.state == 'filled'
+            ]
+            pay = round(sum([each['vol'] for each in buy_info]), 4)
+            income = round(sum([each['vol'] for each in sell_info]), 4)
+            profit = round(income - pay, 4)
+            precent = round(profit / pay * 100, 4)
 
-        logger.info(f'REPORT for user {self.account_id}')
-        logger.info('Buy')
-        for each in buy_info:
-            currency = each['currency']
-            symbol_name = '/'.join([currency, 'USDT'])
-            vol = each['vol']
-            amount = each['amount']
-            price = each['price']
-            fee = each['fee']
-            logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
+            logger.info(f'REPORT for user {self.account_id}')
+            logger.info('Buy')
+            for each in buy_info:
+                currency = each['currency']
+                symbol_name = '/'.join([currency, 'USDT'])
+                vol = each['vol']
+                amount = each['amount']
+                price = each['price']
+                fee = each['fee']
+                logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
 
-        logger.info('Sell')
-        for each in sell_info:
-            currency = each['currency']
-            symbol_name = '/'.join([currency, 'USDT'])
-            vol = each['vol']
-            amount = each['amount']
-            price = each['price']
-            fee = each['fee']
-            logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
+            logger.info('Sell')
+            for each in sell_info:
+                currency = each['currency']
+                symbol_name = '/'.join([currency, 'USDT'])
+                vol = each['vol']
+                amount = each['amount']
+                price = each['price']
+                fee = each['fee']
+                logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
 
-        logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
+            logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
 
-        if self.wxuid:
-            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
-            msg = '''
+            if self.wxuid:
+                summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
+                msg = '''
 ### 买入记录
 
 | 币种 | 时间 |价格 | 成交量 | 成交额 | 手续费 |
@@ -395,8 +396,10 @@ class User:
 
 - 收益率: **{precent} %**
 '''
-            wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
-
+                wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
+            
+        except Exception as e:
+            logger.error(e)
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
