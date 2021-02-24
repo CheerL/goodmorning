@@ -26,6 +26,7 @@ config.read(CONFIG_PATH)
 TOKEN = config.get('setting', 'Token')
 BEFORE = config.getint('setting', 'Before')
 BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
+END_PRECENT = config.getfloat('setting', 'EndPrecent')
 AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
@@ -45,6 +46,7 @@ class MarketClient(_MarketClient):
             for info in generic_client.get_exchange_symbols()
             if info.symbol.endswith('usdt') and info.symbol not in self.exclude_list
         }
+        self.target_symbol = []
 
     def get_price(self):
         market_data = self.get_market_tickers()
@@ -92,7 +94,8 @@ class MarketClient(_MarketClient):
     def get_big_increase(self, increase):
         big_increase = [
             item for item in increase
-            if item[2] > BOOT_PRECENT
+            if END_PRECENT > item[2] > BOOT_PRECENT
+            and item[0] not in self.target_symbol
         ][:BATCH_SIZE]
 
         if big_increase:
@@ -112,36 +115,12 @@ class MarketClient(_MarketClient):
             target = self.symbols_info[symbol]
             self.price_record.setdefault(symbol, init_price)
             targets.append(target)
+            self.target_symbol.append(symbol)
             logger.debug(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
         return targets
 
-    def get_target(self, target_time, base_price, base_price_time):
-        while True:
-            now = time.time()
-            increase, price = self.get_increase(base_price)
-            big_increase = self.get_big_increase(increase)
-
-            if big_increase:
-                targets = self.handle_big_increase(big_increase, base_price)
-                break
-            elif now > target_time + MAX_AFTER:
-                logger.warning(f'Fail to find target in {MAX_AFTER}s, exit')
-                targets = []
-                break
-            else:
-                logger.info('\t'.join([
-                    f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
-                    for index, (symbol, _, increment, vol) in enumerate(increase[:3])
-                ]))
-                if now - base_price_time > AFTER:
-                    base_price_time = now
-                    base_price = price
-                    logger.info('User now base price')
-                time.sleep(0.1)
-
-        return targets
-
-    def get_target_midnight(self, target_time, base_price, interval=MIDNIGHT_INTERVAL, unstop=False):
+    def get_target(self, target_time, base_price, base_price_time=None, change_base=True, interval=MAX_AFTER, unstop=False):
+        targets = []
         while True:
             now = time.time()
             increase, price = self.get_increase(base_price)
@@ -151,18 +130,23 @@ class MarketClient(_MarketClient):
                 targets = self.handle_big_increase(big_increase, base_price)
                 break
             elif not unstop and now > target_time + interval:
-                logger.warning(f'Fail to find target in {interval}s')
-                targets = []
+                logger.warning(f'Fail to find target in {interval}s, exit')
+                break
+            elif unstop and now > target_time + 60:
+                logger.warning(f'Fail to find target in 60s, end unstop model')
                 break
             else:
                 logger.info('\t'.join([
                     f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
                     for index, (symbol, _, increment, vol) in enumerate(increase[:3])
                 ]))
+                if change_base and now - base_price_time > AFTER:
+                    base_price_time = now
+                    base_price = price
+                    logger.info('User now base price')
                 time.sleep(0.05)
 
-
-        return targets, price
+        return targets
 
     @staticmethod
     def _precent_modify(t):
