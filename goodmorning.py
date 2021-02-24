@@ -81,8 +81,6 @@ def main():
 
         buy_time = time.time()
 
-        time.sleep(0.5)
-
         for user in users:
             sell_amounts = [user.balance[target.base_currency] for target in targets]
             user.sell_algo(targets, sell_amounts, market_client.price_record, SELL_RATE)

@@ -284,12 +284,15 @@ class User:
 
 
     def get_balance(self, targets):
-        target_currencies = [target.base_currency for target in targets]
-        self.balance = {
-            currency.currency: float(currency.balance)
-            for currency in self.account_client.get_balance(self.account_id)
-            if currency.currency in target_currencies and currency.type == 'trade'
-        }
+        while True:
+            target_currencies = [target.base_currency for target in targets]
+            self.balance = {
+                currency.currency: float(currency.balance)
+                for currency in self.account_client.get_balance(self.account_id)
+                if currency.currency in target_currencies and currency.type == 'trade'
+            }
+            if not list(set(target_currencies)-set(self.balance.keys())):
+                break
 
     def check_balance(self, targets):
         self.get_balance(targets)
