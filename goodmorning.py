@@ -6,6 +6,20 @@ SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MIDNIGHT = config.getboolean('setting', 'Midnight')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
 
+def cancel_after(users, t):
+    while time.time() < t:
+        open_orders = []
+        for user in users:
+            open_orders.extend(user.algo_client.get_open_orders())
+        
+        if open_orders:
+            time.sleep(1)
+        else:
+            break
+
+    for user in users:
+        user.cancel_algo_and_sell()
+
 def main():
     users, market_client, target_time = initial()
     base_price, base_price_time = market_client.get_base_price(target_time)
@@ -44,15 +58,12 @@ def main():
             logger.warning('No targets in 2 tries, exit')
             return
 
-        while time.time() < buy_time + SELL_AFTER:
-            pass
-        else:
-            for user in users:
-                user.cancel_algo_and_sell()
+        # cancel_after(users, buy_time + SELL_AFTER)
     else:
         logger.info('General model')
         targets = market_client.get_target(target_time, base_price, base_price_time)
         if not targets:
+            logger.debug('Exit')
             return
 
         for user in users:
@@ -67,17 +78,11 @@ def main():
             sell_amounts = [user.balance[target.base_currency] for target in targets]
             user.sell_algo(targets, sell_amounts)
 
-        while time.time() < buy_time + SELL_AFTER:
-            pass
-        else:
-            for user in users:
-                user.cancel_algo_and_sell()
-
+    cancel_after(users, buy_time + SELL_AFTER)
 
     for user in users:
         user.report()
 
-    logger.debug('Exit')
 
 if __name__ == '__main__':
     main()
