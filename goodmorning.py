@@ -34,7 +34,7 @@ def main():
     if MIDNIGHT or target_time % (24*60*60) == 16*60*60:
         logger.info('Midnight model')
         targets_1 = market_client.get_target(
-            target_time, base_price, chang_base=False, interval=MIDNIGHT_INTERVAL, unstop=True
+            target_time, base_price, change_base=False, interval=MIDNIGHT_INTERVAL, unstop=True
         )
         if targets_1:
             for user in users:
@@ -47,7 +47,7 @@ def main():
 
 
         targets_2 = market_client.get_target(
-            target_time, base_price, chang_base=False, interval=MIDNIGHT_INTERVAL
+            target_time, base_price, change_base=False, interval=MIDNIGHT_INTERVAL
         )
         if targets_2:
             for user in users:
