@@ -82,6 +82,9 @@ def main():
         buy_time = time.time()
 
         for user in users:
+            user.check_balance()
+
+        for user in users:
             sell_amounts = [user.balance[target.base_currency] for target in targets]
             user.sell_algo(targets, sell_amounts, market_client.price_record, SELL_RATE)
 
