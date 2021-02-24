@@ -32,6 +32,8 @@ BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
 MIN_VOL = config.getfloat('setting', 'MinVol')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
+SELL_RATE = config.getfloat('setting', 'SellRate')
+SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
@@ -40,7 +42,6 @@ class MarketClient(_MarketClient):
         super().__init__(**kwargs)
         generic_client = GenericClient()
 
-        self.price_record = {}
         self.symbols_info = {
             info.symbol: info
             for info in generic_client.get_exchange_symbols()
@@ -113,7 +114,8 @@ class MarketClient(_MarketClient):
         for symbol, now_price, target_increase, vol in big_increase:
             init_price, _ = base_price[symbol]
             target = self.symbols_info[symbol]
-            self.price_record.setdefault(symbol, init_price)
+            target.buy_price = now_price
+            target.init_price = init_price
             targets.append(target)
             self.target_symbol.append(symbol)
             logger.debug(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
@@ -229,13 +231,16 @@ class User:
 
         self.sell_order_list.extend(sell_order_list)
 
-    def sell_algo(self, targets, amounts, price_record, rate):
+    def sell_algo(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
         for target, amount in zip(targets, amounts):
             if amount <= 0:
                 continue
 
             symbol = target.symbol
-            stop_price = str(self._check_price(rate * price_record[symbol], target))
+            stop_price = str(self._check_price(max(
+                rate * target.init_price,
+                min_rate * target.buy_price
+            ), target))
             amount = str(self._check_amount(max(
                 amount,
                 target.min_order_amt,
@@ -280,7 +285,7 @@ class User:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
             self.sell_order_list.extend(sell_order_list)
-            self.sell_algo_id = [list(set(self.sell_algo_id)-set(open_ids))]
+            self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
 
 
     def get_balance(self, targets):
@@ -307,8 +312,8 @@ class User:
 
     def report(self):
         buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
-        sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id] \
-                     + [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
+        sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id]
+        sell_order += [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
         buy_info = [{
             'symbol': order.symbol,
             'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
