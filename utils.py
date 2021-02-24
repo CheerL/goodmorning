@@ -36,7 +36,7 @@ SELL_RATE = config.getfloat('setting', 'SellRate')
 SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class MarketClient(_MarketClient):
-    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
+    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt'] + ['maskusdt', 'topusdt']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -132,7 +132,7 @@ class MarketClient(_MarketClient):
                 targets = self.handle_big_increase(big_increase, base_price)
                 break
             elif not unstop and now > target_time + interval:
-                logger.warning(f'Fail to find target in {interval}s, exit')
+                logger.warning(f'Fail to find target in {interval}s')
                 break
             elif unstop and now > target_time + 60:
                 logger.warning(f'Fail to find target in 60s, end unstop model')
@@ -191,7 +191,7 @@ class User:
             "symbol": target.symbol,
             "account_id": self.account_id,
             "order_type": OrderType.BUY_MARKET,
-            "source": OrderSource.API,
+            "source": OrderSource.SPOT_API,
             "price": 1,
             "amount": self._check_amount(max(
                 amount,
@@ -213,7 +213,7 @@ class User:
             "symbol": target.symbol,
             "account_id": self.account_id,
             "order_type": OrderType.SELL_MARKET,
-            "source": OrderSource.API,
+            "source": OrderSource.SPOT_API,
             "price": 1,
             "amount": self._check_amount(max(
                 amount,
@@ -230,6 +230,34 @@ class User:
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
         self.sell_order_list.extend(sell_order_list)
+
+    def sell_limit(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
+        sell_order_list = [{
+            "symbol": target.symbol,
+            "account_id": self.account_id,
+            "order_type": OrderType.SELL_LIMIT,
+            "source": OrderSource.SPOT_API,
+            "price": self._check_price(max(
+                rate * target.init_price,
+                min_rate * target.buy_price
+            ), target),
+            "amount": self._check_amount(max(
+                amount,
+                target.min_order_amt,
+                target.sell_market_min_order_amt
+            ), target)}
+            for target, amount in zip(targets, amounts)
+            if amount > 0
+        ]
+
+        self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
+        self.sell_order_list.extend(sell_order_list)
+        logger.debug(f'User {self.account_id} sell report')
+        for order in sell_order_list:
+            logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
+        # for each in self.sell_id:
+        #     each.print_object()
+        # self.trade_client.get_order(self.sell_id[0].order_id).print_object()
 
     def sell_algo(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
         for target, amount in zip(targets, amounts):
@@ -261,6 +289,17 @@ class User:
             self.sell_algo_id.append(client_id)
             self.sell_order_list.append(order)
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
+
+    def cancel_and_sell(self, targets):
+        symbols = ','.join([target.symbol for target in targets])
+        self.trade_client.cancel_open_orders(self.account_id, symbols=symbols, side=OrderSide.SELL)
+        logger.info(f'User {self.account_id} cancel all orders')
+        
+        time.sleep(1)
+        self.get_balance(targets)
+        sell_amount = [self.balance[target.base_currency] for target in targets]
+        self.sell(targets, sell_amount)
+
 
     def cancel_algo_and_sell(self):
         open_orders = self.algo_client.get_open_orders() or []
@@ -313,8 +352,12 @@ class User:
     def report(self):
         try:
             buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
-            sell_order = [self.trade_client.get_order(order.order_id) for order in self.sell_id]
-            sell_order += [self.trade_client.get_order_by_client_order_id(order_id) for order_id in self.sell_algo_id]
+            sell_order = [
+                self.trade_client.get_order(order.order_id)
+                for order in self.sell_id
+                if order.order_id
+            ]
+
             buy_info = [{
                 'symbol': order.symbol,
                 'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
