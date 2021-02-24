@@ -351,7 +351,11 @@ class User:
 
     def report(self):
         try:
-            buy_order = [self.trade_client.get_order(order.order_id) for order in self.buy_id]
+            buy_order = [
+                self.trade_client.get_order(order.order_id)
+                for order in self.buy_id
+                if order.order_id
+            ]
             sell_order = [
                 self.trade_client.get_order(order.order_id)
                 for order in self.sell_id
