@@ -82,7 +82,7 @@ def main():
         buy_time = time.time()
 
         for user in users:
-            user.check_balance()
+            user.check_balance(targets)
 
         for user in users:
             sell_amounts = [user.balance[target.base_currency] for target in targets]
