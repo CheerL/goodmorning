@@ -204,7 +204,7 @@ class User:
         for target, order in zip(targets, self.buy_order_list):
             target_balance = self.balance[target.base_currency]
             if target_balance > 10 ** -target.amount_precision:
-                buy_price = order["amount"] / target_balance
+                buy_price = order["amount"] / target_balance * 0.998
                 target.buy_price = max(buy_price, target.buy_price)
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {buy_price}')
             else:
@@ -258,7 +258,8 @@ class User:
                 vol = each['vol']
                 amount = each['amount']
                 price = each['price']
-                fee = each['fee']
+                fee = round(each['fee'] * price, 6)
+                each['fee'] = fee
                 logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
 
             logger.info('Sell')
