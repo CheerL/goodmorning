@@ -1,5 +1,7 @@
 from huobi.constant.definition import *
-from utils import logger, config, initial
+from utils import logger, config, get_target_time
+from user import User
+from market import MarketClient
 import time
 import itertools
 
@@ -7,6 +9,27 @@ SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MIDNIGHT = config.getboolean('setting', 'Midnight')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
+
+
+def initial():
+    ACCESSKEY = config.get('setting', 'AccessKey')
+    SECRETKEY = config.get('setting', 'SecretKey')
+    BUY_AMOUNT = config.get('setting', 'BuyAmount')
+    WXUIDS = config.get('setting', 'WxUid')
+    TEST = config.getboolean('setting', 'Test')
+    market_client = MarketClient()
+    access_keys = [key.strip() for key in ACCESSKEY.split(',')]
+    secret_keys = [key.strip() for key in SECRETKEY.split(',')]
+    buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
+    wxuids = [uid.strip() for uid in WXUIDS.split(',')]
+
+    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
+    if TEST:
+        users = users[:1]
+
+    target_time = get_target_time()
+
+    return users, market_client, target_time
 
 def cancel_and_sell_after(users, targets, t):
     while time.time() < t:
@@ -77,7 +100,7 @@ def main():
         logger.info('General model')
         targets = market_client.get_target(target_time, base_price, base_price_time)
         if not targets:
-            logger.debug('Exit')
+            logger.info('Exit')
             return
 
         for user in users:
