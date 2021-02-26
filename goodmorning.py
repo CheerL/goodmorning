@@ -3,7 +3,6 @@ from utils import logger, config, get_target_time
 from user import User
 from market import MarketClient
 import time
-import itertools
 
 SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
@@ -33,9 +32,8 @@ def initial():
 
 def cancel_and_sell_after(users, targets, t):
     while time.time() < t:
-        for user, target in itertools.product(users, targets):
-            open_orders = user.trade_client.get_open_orders(target.symbol, user.account_id, OrderSide.SELL)
-            if open_orders:
+        for user in users:
+            if user.get_open_orders(targets):
                 time.sleep(1)
                 break
         else:

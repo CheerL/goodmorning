@@ -114,9 +114,6 @@ class User:
         logger.debug(f'User {self.account_id} sell report')
         for order in sell_order_list:
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
-        # for each in self.sell_id:
-        #     each.print_object()
-        # self.trade_client.get_order(self.sell_id[0].order_id).print_object()
 
     def sell_algo(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
         for target, amount in zip(targets, amounts):
@@ -149,40 +146,43 @@ class User:
             self.sell_order_list.append(order)
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
-    def cancel_and_sell(self, targets):
+    def get_open_orders(self, targets, side=OrderSide.SELL):
         symbols = ','.join([target.symbol for target in targets])
-        self.trade_client.cancel_open_orders(self.account_id, symbols=symbols, side=OrderSide.SELL)
-        logger.info(f'User {self.account_id} cancel all orders')
-        
-        time.sleep(1)
-        self.get_balance(targets)
-        sell_amount = [self.balance[target.base_currency] for target in targets]
-        self.sell(targets, sell_amount)
+        open_orders = self.trade_client.get_open_orders(symbols, self.account_id, side)
+        return open_orders
+
+    def cancel_and_sell(self, targets):
+        open_orders = self.get_open_orders(targets)
+        if open_orders:
+            symbols = ','.join([target.symbol for target in targets])
+            self.trade_client.cancel_orders(symbols, [order.id for order in open_orders])
+            logger.info(f'User {self.account_id} cancel all open sell orders')
+            
+            time.sleep(1)
+            sell_amount = [float(order.amount) for order in open_orders]
+            target_dict = {
+                target.symbol:target
+                for target in targets
+            }
+            sell_targets = [target_dict[order.symbol] for order in open_orders]
+            self.sell(sell_targets, sell_amount)
 
 
-    def cancel_algo_and_sell(self):
+    def cancel_algo_and_sell(self, targets):
         open_orders = self.algo_client.get_open_orders() or []
         if open_orders:
             open_ids = [order.clientOrderId for order in open_orders]
             self.algo_client.cancel_orders(open_ids)
-            logger.info('Cancel algo orders')
+            logger.info(f'User {self.account_id} cancel all open algo orders')
 
-            sell_order_list = [{
-                "symbol": order.symbol,
-                "account_id": self.account_id,
-                "order_type": OrderType.SELL_MARKET,
-                "source": OrderSource.API,
-                "price": 1,
-                "amount": float(order.orderSize)
-                } for order in open_orders
-            ]
-
-            self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
-            logger.debug(f'User {self.account_id} sell report')
-            for order in sell_order_list:
-                logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
-
-            self.sell_order_list.extend(sell_order_list)
+            time.sleep(1)
+            sell_amount = [float(order.amount) for order in open_orders]
+            target_dict = {
+                target.symbol:target
+                for target in targets
+            }
+            sell_targets = [target_dict[order.symbol] for order in open_orders]
+            self.sell(sell_targets, sell_amount)
             self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
 
 
@@ -211,72 +211,59 @@ class User:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
 
     def report(self):
-        try:
-            buy_order = [
-                self.trade_client.get_order(order.order_id)
-                for order in self.buy_id
-                if order.order_id
-            ]
-            sell_order = [
-                self.trade_client.get_order(order.order_id)
-                for order in self.sell_id
-                if order.order_id
-            ]
+        orders = [
+            self.trade_client.get_order(order.order_id)
+            for order in self.buy_id + self.sell_id
+            if order.order_id
+        ]
 
-            buy_info = [{
-                'symbol': order.symbol,
-                'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
-                'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-                'amount': round(float(order.filled_amount), 6),
-                'fee': round(float(order.filled_fees), 6),
-                'currency': order.symbol[:-4].upper(),
-                'vol': float(order.filled_cash_amount)
-            } for order in buy_order
+        order_info = [{
+            'symbol': order.symbol,
+            'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
+            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+            'amount': round(float(order.filled_amount), 6),
+            'fee': round(float(order.filled_fees), 6),
+            'currency': order.symbol[:-4].upper(),
+            'vol': float(order.filled_cash_amount),
+            'direct': order.type.split('-')[0]}
+            for order in orders
             if order.state == 'filled'
-            ]
-            sell_info = [{
-                'symbol': order.symbol,
-                'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
-                'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-                'amount': round(float(order.filled_amount), 6),
-                'fee': round(float(order.filled_fees), 6),
-                'currency': order.symbol[:-4].upper(),
-                'vol': float(order.filled_cash_amount)
-            } for order in sell_order
-            if order.state == 'filled'
-            ]
-            pay = round(sum([each['vol'] for each in buy_info]), 4)
-            income = round(sum([each['vol'] for each in sell_info]), 4)
-            profit = round(income - pay, 4)
-            precent = round(profit / pay * 100, 4)
+        ]
+        buy_info = list(filter(lambda x: x['direct']=='buy', order_info))
+        sell_info = list(filter(lambda x: x['direct']=='sell', order_info))
 
-            logger.info(f'REPORT for user {self.account_id}')
-            logger.info('Buy')
-            for each in buy_info:
-                currency = each['currency']
-                symbol_name = '/'.join([currency, 'USDT'])
-                vol = each['vol']
-                amount = each['amount']
-                price = each['price']
-                fee = round(each['fee'] * price, 6)
-                each['fee'] = fee
-                logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
+        pay = round(sum([each['vol'] for each in buy_info]), 4)
+        income = round(sum([each['vol'] for each in sell_info]), 4)
+        profit = round(income - pay, 4)
+        precent = round(profit / pay * 100, 4)
 
-            logger.info('Sell')
-            for each in sell_info:
-                currency = each['currency']
-                symbol_name = '/'.join([currency, 'USDT'])
-                vol = each['vol']
-                amount = each['amount']
-                price = each['price']
-                fee = each['fee']
-                logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
+        logger.info(f'REPORT for user {self.account_id}')
+        logger.info('Buy')
+        for each in buy_info:
+            currency = each['currency']
+            symbol_name = '/'.join([currency, 'USDT'])
+            vol = each['vol']
+            amount = each['amount']
+            price = each['price']
+            fee = round(each['fee'] * price, 6)
+            each['fee'] = fee
+            logger.info(f'{symbol_name}: use {vol} USDT, get {amount} {currency}, price {price}, fee {fee} {currency}, at {each["time"]}')
 
-            logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
+        logger.info('Sell')
+        for each in sell_info:
+            currency = each['currency']
+            symbol_name = '/'.join([currency, 'USDT'])
+            vol = each['vol']
+            amount = each['amount']
+            price = each['price']
+            fee = each['fee']
+            logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
 
-            if self.wxuid:
-                summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
-                msg = '''
+        logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
+
+        if self.wxuid:
+            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
+            msg = '''
 ### 买入记录
 
 | 币种 | 时间 |价格 | 成交量 | 成交额 | 手续费 |
@@ -305,7 +292,4 @@ class User:
 
 - 收益率: **{precent} %**
 '''
-                wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
-            
-        except Exception as e:
-            logger.error(e)
+            wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
