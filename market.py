@@ -14,12 +14,14 @@ AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
 MIN_VOL = config.getfloat('setting', 'MinVol')
+MIDNIGHT_MIN_VOL = config.getfloat('setting', 'MidnightMinVol')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.midnight = False
         generic_client = GenericClient()
 
         self.symbols_info = {
@@ -84,7 +86,7 @@ class MarketClient(_MarketClient):
             big_increase = [
                 (symbol, close, increment, vol)
                 for ((symbol, close, increment, _), vol) in zip(big_increase, big_increase_vol)
-                if vol > MIN_VOL
+                if vol > (MIDNIGHT_MIN_VOL if self.midnight else MIN_VOL)
             ]
 
         return big_increase
