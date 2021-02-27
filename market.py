@@ -5,7 +5,7 @@ from huobi.client.market import MarketClient as _MarketClient
 from huobi.constant import *
 from huobi.utils import *
 
-from utils import config, logger
+from utils import config, logger, timeout_handle
 
 BEFORE = config.getint('setting', 'Before')
 BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
@@ -31,6 +31,7 @@ class MarketClient(_MarketClient):
         }
         self.target_symbol = []
 
+    @timeout_handle({})
     def get_price(self):
         market_data = self.get_market_tickers()
         price = {
@@ -40,6 +41,7 @@ class MarketClient(_MarketClient):
         }
         return price
 
+    @timeout_handle(0)
     def get_vol(self, symbol):
         [kline] = self.get_candlestick(symbol, CandlestickInterval.MIN1, 1)
         return kline.vol

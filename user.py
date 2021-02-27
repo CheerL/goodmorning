@@ -1,14 +1,13 @@
 import math
 import time
 
-import pytz
 from huobi.client.account import AccountClient
 from huobi.client.algo import AlgoClient
 from huobi.client.trade import TradeClient
 from huobi.constant import *
 from huobi.utils import *
 
-from utils import config, logger, wxpush, strftime
+from utils import config, logger, wxpush, strftime, timeout_handle
 
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
@@ -146,6 +145,7 @@ class User:
             self.sell_order_list.append(order)
             logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
+    @timeout_handle([])
     def get_open_orders(self, targets, side=OrderSide.SELL):
         symbols = ','.join([target.symbol for target in targets])
         open_orders = self.trade_client.get_open_orders(symbols, self.account_id, side)
@@ -167,7 +167,6 @@ class User:
             sell_targets = [target_dict[order.symbol] for order in open_orders]
             self.sell(sell_targets, sell_amount)
 
-
     def cancel_algo_and_sell(self, targets):
         open_orders = self.algo_client.get_open_orders() or []
         if open_orders:
@@ -184,7 +183,6 @@ class User:
             sell_targets = [target_dict[order.symbol] for order in open_orders]
             self.sell(sell_targets, sell_amount)
             self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
-
 
     def get_balance(self, targets):
         while True:

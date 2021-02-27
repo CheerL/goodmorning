@@ -1,8 +1,10 @@
 import configparser
+import functools
 import os
 import time
 
 import pytz
+import requests
 
 from logger import WxPusher, create_logger
 
@@ -53,3 +55,14 @@ def get_target_time():
 
     logger.info(f'Target time is {strftime(target_time)}')
     return target_time
+
+def timeout_handle(value):
+    def wrapper(func):
+        @functools.wraps(func)
+        def sub_wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except requests.exceptions.Timeout:
+                return value
+        return sub_wrapper
+    return wrapper
