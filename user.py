@@ -59,12 +59,12 @@ class User:
             for target, amount in zip(targets, amounts)
             if amount > 0
         ]
-
-        self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
-        self.buy_order_list.extend(buy_order_list)
-        logger.debug(f'User {self.account_id} buy report')
-        for order in buy_order_list:
-            logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
+        if buy_order_list:
+            self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
+            self.buy_order_list.extend(buy_order_list)
+            logger.debug(f'User {self.account_id} buy report')
+            for order in buy_order_list:
+                logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
 
         
 
@@ -82,12 +82,13 @@ class User:
             order for order, target in zip(sell_order_list, targets)
             if order['amount'] >= target.sell_market_min_order_amt
         ]
-
-        self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
-        self.sell_order_list.extend(sell_order_list)
-        logger.debug(f'User {self.account_id} sell report')
-        for order in sell_order_list:
-            logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
+        
+        if sell_order_list:
+            self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
+            self.sell_order_list.extend(sell_order_list)
+            logger.debug(f'User {self.account_id} sell report')
+            for order in sell_order_list:
+                logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
 
     def sell_limit(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):

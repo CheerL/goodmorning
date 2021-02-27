@@ -1,4 +1,5 @@
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
@@ -9,7 +10,7 @@ def create_logger(name, log_file=None):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s-%(levelname)s: %(message)s")
-    consoleHandler = logging.StreamHandler()
+    consoleHandler = logging.StreamHandler(sys.stdout)
     consoleHandler.setFormatter(formatter)
     logger.addHandler(consoleHandler)
 
