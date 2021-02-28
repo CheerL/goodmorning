@@ -17,7 +17,7 @@ MIN_VOL = config.getfloat('setting', 'MinVol')
 MIDNIGHT_MIN_VOL = config.getfloat('setting', 'MidnightMinVol')
 
 class MarketClient(_MarketClient):
-    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt']
+    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
