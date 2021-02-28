@@ -1,10 +1,14 @@
 import configparser
+import ctypes
 import functools
 import os
+import threading
 import time
 
 import pytz
 import requests
+from huobi.connection.impl.websocket_manage import websocket_connection_handler
+from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 
 from logger import WxPusher, create_logger
 
@@ -15,6 +19,7 @@ LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
+
 
 TOKEN = config.get('setting', 'Token')
 
@@ -66,3 +71,20 @@ def timeout_handle(value):
                 return value
         return sub_wrapper
     return wrapper
+
+
+def kill_thread(thread):
+    thread._reset_internal_locks(False)
+    thread_id = ctypes.c_long(thread._ident)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(SystemExit)) 
+    if res > 1: 
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
+        print('Exception raise failure') 
+
+def kill_all_threads():
+    for manage in websocket_connection_handler.values():
+        kill_thread(manage._WebsocketManage__thread)
+
+    for thread in threading.enumerate():
+        if isinstance(thread, WebSocketWatchDog):
+            kill_thread(thread)

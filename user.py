@@ -109,11 +109,12 @@ class User:
             if order['amount'] >= target.limit_order_min_order_amt
         ]
 
-        self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
-        self.sell_order_list.extend(sell_order_list)
-        logger.debug(f'User {self.account_id} sell report')
-        for order in sell_order_list:
-            logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
+        if sell_order_list:
+            self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
+            self.sell_order_list.extend(sell_order_list)
+            logger.debug(f'User {self.account_id} sell report')
+            for order in sell_order_list:
+                logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
 
     def sell_algo(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
         for target, amount in zip(targets, amounts):
