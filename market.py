@@ -31,6 +31,13 @@ class MarketClient(_MarketClient):
         }
         self.target_symbol = []
 
+    def exclude_expensive(self, base_price):
+        self.symbols_info = {
+            symbol: info
+            for symbol, info in self.symbols_info.items()
+            if base_price[symbol] < 10
+        }
+
     @timeout_handle({})
     def get_price(self):
         market_data = self.get_market_tickers()
@@ -43,6 +50,7 @@ class MarketClient(_MarketClient):
 
     @timeout_handle(0)
     def get_vol(self, symbol):
+        
         [kline] = self.get_candlestick(symbol, CandlestickInterval.MIN1, 1)
         return kline.vol
 

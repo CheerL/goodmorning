@@ -63,6 +63,7 @@ def main():
         market_client.midnight = True
 
     base_price, base_price_time = market_client.get_base_price(target_time)
+    market_client.exclude_expensive(base_price)
 
     for _ in range(5):
         market_client.get_target(time.time(), base_price, base_price_time, change_base=False, interval=10, unstop=False)

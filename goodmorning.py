@@ -50,6 +50,7 @@ def cancel_and_sell_after(users, targets, t):
 def main():
     users, market_client, target_time = initial()
     base_price, base_price_time = market_client.get_base_price(target_time)
+    market_client.exclude_expensive(base_price)
 
     if market_client.midnight:
         logger.info('Midnight model')
