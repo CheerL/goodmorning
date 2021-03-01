@@ -35,7 +35,7 @@ class MarketClient(_MarketClient):
         self.symbols_info = {
             symbol: info
             for symbol, info in self.symbols_info.items()
-            if base_price[symbol] < 10
+            if base_price[symbol][0] < 10
         }
 
     @timeout_handle({})
