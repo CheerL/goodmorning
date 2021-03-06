@@ -8,6 +8,7 @@ SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MIDNIGHT = config.getboolean('setting', 'Midnight')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
+MIDNIGHT_SELL_AFTER = config.getfloat('setting', 'MidnightSellAfter')
 
 
 def initial():
@@ -95,7 +96,7 @@ def main():
         if not targets:
             logger.warning('No targets in 3 tries, exit')
             return
-
+        cancel_and_sell_after(users, targets, target_time + MIDNIGHT_SELL_AFTER)
         # cancel_after(users, buy_time + SELL_AFTER)
     else:
         logger.info('General model')
@@ -107,7 +108,7 @@ def main():
         for user in users:
             user.buy(targets, [user.buy_amount for _ in targets])
 
-        # buy_time = time.time()
+        buy_time = time.time()
 
         for user in users:
             user.check_balance(targets)
@@ -116,7 +117,7 @@ def main():
             sell_amounts = [user.balance[target.base_currency] for target in targets]
             user.sell_limit(targets, sell_amounts)
 
-    cancel_and_sell_after(users, targets, target_time + SELL_AFTER)
+        cancel_and_sell_after(users, targets, buy_time + SELL_AFTER)
 
     for user in users:
         user.report()
