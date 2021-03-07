@@ -20,7 +20,7 @@ def initial():
     market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
-    buy_amounts = [float(amount.strip()) for amount in BUY_AMOUNT.split(',')]
+    buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]
     wxuids = [uid.strip() for uid in WXUIDS.split(',')]
 
     users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]

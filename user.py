@@ -15,18 +15,22 @@ SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
+        self.access_key = access_key
+        self.sercet_key = secret_key
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         self.algo_client = AlgoClient(api_key=access_key, secret_key=secret_key)
-        self.access_key = access_key
-        self.sercet_key = secret_key
-        self.buy_amount = buy_amount
-        self.wxuid = wxuid
-
         self.account_id = next(filter(
             lambda account: account.type=='spot' and account.state =='working',
             self.account_client.get_accounts()
         )).id
+        
+        if buy_amount.startswith('/'):
+            usdt_balance = self.get_currency_balance(['usdt'])['usdt']
+            self.buy_amount =  max(math.floor(usdt_balance / float(buy_amount[1:])), 5)
+        else:
+            self.buy_amount = float(buy_amount)
+        self.wxuid = wxuid
 
         self.balance = {}
         self.buy_order_list = []
@@ -186,14 +190,17 @@ class User:
             self.sell(sell_targets, sell_amount)
             self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
 
+    def get_currency_balance(self, currencies):
+        return {
+            currency.currency: float(currency.balance)
+            for currency in self.account_client.get_balance(self.account_id)
+            if currency.currency in currencies and currency.type == 'trade'
+        }
+
     def get_balance(self, targets):
         while True:
             target_currencies = [target.base_currency for target in targets]
-            self.balance = {
-                currency.currency: float(currency.balance)
-                for currency in self.account_client.get_balance(self.account_id)
-                if currency.currency in target_currencies and currency.type == 'trade'
-            }
+            self.balance = self.get_currency_balance(target_currencies)
             if not list(set(target_currencies)-set(self.balance.keys())):
                 break
 
