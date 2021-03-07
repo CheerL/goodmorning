@@ -60,15 +60,16 @@ def kline_callback_csv(symbol, target_time):
         increase = close / open_ - 1
         back = 1 - high / close
         
-        with open(csv_path, 'w') as fcsv:
+        with open(csv_path, 'a+') as fcsv:
             csv.writer(fcsv).writerow([now, close, vol, increase, high, back])
 
 
     target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
     csv_path = os.path.join(ROOT, 'test', 'db', f'{symbol}_{target_time_str}.csv')
     if not os.path.exists(csv_path):
-            with open(csv_path, 'w') as fcsv:
-                csv.writer(fcsv).writerow(['时间', '价格', '成交额', '涨幅', '高', '回撤'])
+        with open(csv_path, 'a+') as fcsv:
+            csv.writer(fcsv).writerow(['时间', '价格', '成交额', '涨幅', '高', '回撤'])
+
     return wrapper
 
 
