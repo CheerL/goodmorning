@@ -103,7 +103,6 @@ def main():
                 for user in users
             ], is_lock=False)
 
-        # buy_time = time.time()
         targets = list(set(targets_1+targets_2+targets_3))
         if not targets:
             logger.warning('No targets in 3 tries, exit')
@@ -127,8 +126,7 @@ def main():
         buy_time = time.time()
         cancel_and_sell_after(users, targets, buy_time + SELL_AFTER)
 
-    for user in users:
-        user.report()
+    run_thread([(lambda user: user.report(), (user, )) for user in users])
 
 
 if __name__ == '__main__':

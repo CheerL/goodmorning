@@ -10,7 +10,6 @@ SQL_PATH = os.path.join(ROOT, 'market.db')
 target_time = get_target_time()
 
 class SQLMarketClient(MarketClient):
-
     def handle_big_increase(self, big_increase, base_price):
         targets = []
         for symbol, now_price, target_increase, _ in big_increase:
