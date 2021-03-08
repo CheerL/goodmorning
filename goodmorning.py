@@ -84,14 +84,6 @@ def main():
                 (buy_and_sell, (user, targets_1, ))
                 for user in users
             ], is_lock=False)
-            # for user in users:
-            #     user.buy(targets_1, [user.buy_amount for _ in targets_1])
-            # for user in users:
-            #     user.check_balance(targets_1)
-            # for user in users:
-            #     sell_amounts = [user.balance[target.base_currency]
-            #                     for target in targets_1]
-            #     user.sell_limit(targets_1, sell_amounts)
 
         targets_2 = market_client.get_target(
             time.time(), base_price, change_base=False, interval=MIDNIGHT_INTERVAL
@@ -101,14 +93,6 @@ def main():
                 (buy_and_sell, (user, targets_2, ))
                 for user in users
             ], is_lock=False)
-            # for user in users:
-            #     user.buy(targets_2, [user.buy_amount for _ in targets_2])
-            # for user in users:
-            #     user.check_balance(targets_2)
-            # for user in users:
-            #     sell_amounts = [user.balance[target.base_currency]
-            #                     for target in targets_2]
-            #     user.sell_limit(targets_2, sell_amounts)
 
         targets_3 = market_client.get_target(
             time.time(), base_price, change_base=False, interval=MIDNIGHT_INTERVAL
@@ -118,43 +102,29 @@ def main():
                 (buy_and_sell, (user, targets_3, ))
                 for user in users
             ], is_lock=False)
-            # for user in users:
-            #     user.buy(targets_3, [user.buy_amount for _ in targets_3])
-            # for user in users:
-            #     user.check_balance(targets_3)
-            # for user in users:
-            #     sell_amounts = [user.balance[target.base_currency]
-            #                     for target in targets_3]
-            #     user.sell_limit(targets_3, sell_amounts)
 
         # buy_time = time.time()
         targets = list(set(targets_1+targets_2+targets_3))
         if not targets:
             logger.warning('No targets in 3 tries, exit')
             return
+
         cancel_and_sell_after(users, targets, target_time + MIDNIGHT_SELL_AFTER)
-        # cancel_after(users, buy_time + SELL_AFTER)
     else:
         logger.info('General model')
         targets = market_client.get_target(
             target_time, base_price, base_price_time)
+
         if not targets:
             logger.info('Exit')
             return
 
-        for user in users:
-            user.buy(targets, [user.buy_amount for _ in targets])
+        run_thread([
+            (buy_and_sell, (user, targets, ))
+            for user in users
+        ], is_lock=False)
 
         buy_time = time.time()
-
-        for user in users:
-            user.check_balance(targets)
-
-        for user in users:
-            sell_amounts = [user.balance[target.base_currency]
-                            for target in targets]
-            user.sell_limit(targets, sell_amounts)
-
         cancel_and_sell_after(users, targets, buy_time + SELL_AFTER)
 
     for user in users:
