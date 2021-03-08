@@ -238,6 +238,10 @@ class User:
         sell_info = list(filter(lambda x: x['direct']=='sell', order_info))
 
         pay = round(sum([each['vol'] for each in buy_info]), 4)
+        if pay <= 0:
+            logger.warning(f'NO REPORT for User {self.account_id}')
+            return
+
         income = round(sum([each['vol'] for each in sell_info]), 4)
         profit = round(income - pay, 4)
         precent = round(profit / pay * 100, 4)
