@@ -10,6 +10,7 @@ SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MIDNIGHT = config.getboolean('setting', 'Midnight')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
 MIDNIGHT_SELL_AFTER = config.getfloat('setting', 'MidnightSellAfter')
+MIDNIGHT_MAX_WAIT = config.getfloat('setting', 'MidnightMaxWait')
 
 
 def initial():
@@ -95,7 +96,7 @@ def main():
             ], is_lock=False)
 
         targets_3 = market_client.get_target(
-            time.time(), base_price, change_base=False, interval=MIDNIGHT_INTERVAL
+            time.time(), base_price, change_base=False, interval=min(MIDNIGHT_INTERVAL, MIDNIGHT_MAX_WAIT+target_time-time.time())
         )
         if targets_3:
             run_thread([
