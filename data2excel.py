@@ -9,7 +9,7 @@ def find_csv_path(target_time_str, db_path):
     return [each for each in os.listdir(db_path) if target_time_str in each]
 
 def add_sheet(wb, db_path, csv_path):
-    symbol = csv_path.split('_')[0]
+    symbol = csv_path.split('_')[1]
     sheetname = symbol[:-4]
     wb.create_sheet(sheetname)
     ws = wb[sheetname]
