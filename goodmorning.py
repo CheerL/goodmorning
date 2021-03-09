@@ -38,20 +38,15 @@ def initial():
 
 def cancel_and_sell_after(users, targets, t):
     while time.time() < t:
+        time.sleep(1)
         open_orders = []
-
         run_thread([(
             lambda user, targets: open_orders.extend(user.get_open_orders(targets)),
             (user, targets)
             ) for user in users
         ])
-        if open_orders:
-            time.sleep(1)
-        # for user in users:
-        #     if user.get_open_orders(targets):
-        #         time.sleep(1)
-        #         break
-        else:
+
+        if not open_orders:
             logger.info('No open orders')
             break
     else:
