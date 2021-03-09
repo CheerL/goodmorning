@@ -1,13 +1,18 @@
+import csv
 import os
 import sqlite3
 import time
-import csv
 
+from data2excel import create_excel
 from market import MarketClient
 from utils import ROOT, get_target_time, kill_all_threads, logger
 
-SQL_PATH = os.path.join(ROOT, 'market.db')
 target_time = get_target_time()
+target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
+DB_PATH = os.path.join(ROOT, 'test', 'db', 'csv')
+
+def get_csv_path(symbol):
+    return os.path.join(DB_PATH, f'{target_time_str}_{symbol}.csv')
 
 class SQLMarketClient(MarketClient):
     def handle_big_increase(self, big_increase, base_price):
@@ -62,9 +67,7 @@ def kline_callback_csv(symbol, target_time):
         with open(csv_path, 'a+') as fcsv:
             csv.writer(fcsv).writerow([now, close, vol, increase, high, back])
 
-
-    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
-    csv_path = os.path.join(ROOT, 'test', 'db', f'{symbol}_{target_time_str}.csv')
+    csv_path = get_csv_path(symbol)
     if not os.path.exists(csv_path):
         with open(csv_path, 'a+') as fcsv:
             csv.writer(fcsv).writerow(['时间', '价格', '成交额', '涨幅', '高', '回撤'])
@@ -104,6 +107,7 @@ def main():
         pass
 
     kill_all_threads()
+    create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':
     main()

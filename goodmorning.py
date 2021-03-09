@@ -1,9 +1,11 @@
+import time
+
 from huobi.constant.definition import *
-from utils import logger, config, get_target_time
-from user import User
+
 from market import MarketClient
 from parallel import run_thread
-import time
+from user import User
+from utils import config, get_target_time, logger
 
 SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
