@@ -13,7 +13,7 @@ def add_sheet(wb, db_path, csv_path):
     sheetname = symbol[:-4]
     wb.create_sheet(sheetname)
     ws = wb[sheetname]
-    with open(os.join(db_path, csv_path), 'r') as csv_file:
+    with open(os.path.join(db_path, csv_path), 'r') as csv_file:
         reader = csv.reader(csv_file)
         for index, row in enumerate(reader):
             if index > 0:
