@@ -41,7 +41,7 @@ def initial():
         market_client.min_vol = MIDNIGHT_MIN_VOL
         market_client.boot_percent = MIDNIGHT_BOOT_PERCENT
     else:
-        users = [user for index, user in users if not MIDNIGHT_ONLY[index]]
+        users = [user for user, only in zip(users, MIDNIGHT_ONLY) if not only]
 
     return users, market_client, target_time
 
