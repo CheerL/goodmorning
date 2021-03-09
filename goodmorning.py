@@ -13,6 +13,9 @@ MIDNIGHT = config.getboolean('setting', 'Midnight')
 MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
 MIDNIGHT_SELL_AFTER = config.getfloat('setting', 'MidnightSellAfter')
 MIDNIGHT_MAX_WAIT = config.getfloat('setting', 'MidnightMaxWait')
+MIDNIGHT_MIN_VOL = config.getfloat('setting', 'MidnightMinVol')
+MIDNIGHT_BOOT_PERCENT = config.getfloat('setting', 'MidnightBootPercent')
+MIDNIGHT_ONLY = [each == 'true' for each in config.get('setting', 'MidnightOnly').split(',')]
 
 
 def initial():
@@ -35,6 +38,10 @@ def initial():
     target_time = get_target_time()
     if MIDNIGHT or target_time % (24*60*60) == 16*60*60:
         market_client.midnight = True
+        market_client.min_vol = MIDNIGHT_MIN_VOL
+        market_client.boot_percent = MIDNIGHT_BOOT_PERCENT
+    else:
+        users = [user for index, user in users if not MIDNIGHT_ONLY[index]]
 
     return users, market_client, target_time
 
@@ -58,8 +65,6 @@ def cancel_and_sell_after(users, targets, t):
         lambda user, targets: user.cancel_and_sell(targets),
         (user, targets, )
     ) for user in users], is_lock=True)
-    # for user in users:
-    #     user.cancel_and_sell(targets)
 
 def buy_and_sell(user, targets):
     user.buy(targets, [user.buy_amount for _ in targets])

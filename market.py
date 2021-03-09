@@ -8,13 +8,12 @@ from huobi.utils import *
 from utils import config, logger, timeout_handle
 
 BEFORE = config.getint('setting', 'Before')
-BOOT_PRECENT = config.getfloat('setting', 'BootPrecent')
-END_PRECENT = config.getfloat('setting', 'EndPrecent')
+BOOT_PERCENT = config.getfloat('setting', 'BootPercent')
+END_PERCENT = config.getfloat('setting', 'EndPercent')
 AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
 MIN_VOL = config.getfloat('setting', 'MinVol')
-MIDNIGHT_MIN_VOL = config.getfloat('setting', 'MidnightMinVol')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
@@ -22,6 +21,9 @@ class MarketClient(_MarketClient):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.midnight = False
+        self.boot_percent = BOOT_PERCENT
+        self.end_percent = END_PERCENT
+        self.min_vol = MIN_VOL
         generic_client = GenericClient()
 
         self.symbols_info = {
@@ -87,7 +89,7 @@ class MarketClient(_MarketClient):
     def get_big_increase(self, increase):
         big_increase = [
             item for item in increase
-            if END_PRECENT > item[2] > BOOT_PRECENT
+            if self.end_percent > item[2] > self.boot_percent
             and item[0] not in self.target_symbol
         ][:BATCH_SIZE]
 
@@ -96,7 +98,7 @@ class MarketClient(_MarketClient):
             big_increase = [
                 (symbol, close, increment, vol)
                 for ((symbol, close, increment, _), vol) in zip(big_increase, big_increase_vol)
-                if vol > (MIDNIGHT_MIN_VOL if self.midnight else MIN_VOL)
+                if vol > self.min_vol
             ]
 
         return big_increase
@@ -117,6 +119,9 @@ class MarketClient(_MarketClient):
         targets = []
         while True:
             now = time.time()
+            if now <= target_time:
+                continue
+
             increase, price = self.get_increase(base_price)
             big_increase = self.get_big_increase(increase)
 
@@ -138,10 +143,10 @@ class MarketClient(_MarketClient):
                     base_price_time = now
                     base_price = price
                     logger.info('User now base price')
-                time.sleep(0.05)
+                time.sleep(0.03)
 
         return targets
 
     @staticmethod
-    def _precent_modify(t):
+    def _PERCent_modify(t):
         return max(min(0.5 * t, 0.9), 0.5)

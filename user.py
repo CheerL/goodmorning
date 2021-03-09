@@ -244,7 +244,7 @@ class User:
 
         income = round(sum([each['vol'] for each in sell_info]), 4)
         profit = round(income - pay, 4)
-        precent = round(profit / pay * 100, 4)
+        percent = round(profit / pay * 100, 4)
 
         logger.info(f'REPORT for user {self.account_id}')
         logger.info('Buy')
@@ -268,10 +268,10 @@ class User:
             fee = each['fee']
             logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
 
-        logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {precent}%')
+        logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {percent}%')
 
         if self.wxuid:
-            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {precent}%'
+            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
             msg = '''
 ### 买入记录
 
@@ -299,6 +299,6 @@ class User:
 
 - 利润: **{profit} USDT**
 
-- 收益率: **{precent} %**
+- 收益率: **{percent} %**
 '''
             wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
