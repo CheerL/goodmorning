@@ -119,7 +119,7 @@ class MarketClient(_MarketClient):
         targets = []
         while True:
             now = time.time()
-            if now <= target_time:
+            if now <= target_time+0.5:
                 continue
 
             increase, price = self.get_increase(base_price)
