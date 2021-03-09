@@ -8,12 +8,12 @@ from openpyxl.chart import LineChart, Reference
 def find_csv_path(target_time_str, db_path):
     return [each for each in os.listdir(db_path) if target_time_str in each]
 
-def add_sheet(wb, csv_path):
-    symbol = os.path.basename(csv_path).split('_')[0]
+def add_sheet(wb, db_path, csv_path):
+    symbol = csv_path.split('_')[0]
     sheetname = symbol[:-4]
     wb.create_sheet(sheetname)
     ws = wb[sheetname]
-    with open(csv_path, 'r') as csv_file:
+    with open(os.join(db_path, csv_path), 'r') as csv_file:
         reader = csv.reader(csv_file)
         for index, row in enumerate(reader):
             if index > 0:
@@ -42,7 +42,7 @@ def create_excel(target_time_str, db_path):
     wb = Workbook()
     wb.remove(wb['Sheet'])
     for csv_path in find_csv_path(target_time_str, db_path):
-        add_sheet(wb, csv_path)
+        add_sheet(wb, db_path, csv_path)
     wb.save(os.path.join(db_path, '..', f'{target_time_str}.xlsx'))
 
 
