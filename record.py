@@ -107,6 +107,7 @@ def main():
         pass
 
     kill_all_threads()
+    time.sleep(10)
     create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':
