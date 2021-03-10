@@ -79,36 +79,20 @@ def main():
 
     if market_client.midnight:
         logger.info('Midnight model')
-        targets_1 = market_client.get_target(
-            target_time, base_price, change_base=False, interval=MIDNIGHT_INTERVAL, unstop=True
-        )
-        if targets_1:
-            run_thread([
-                (buy_and_sell, (user, targets_1, ))
-                for user in users
-            ], is_lock=False)
+        targets = []
+        while True:
+            tmp_targets = market_client.get_target(target_time, base_price, change_base=False, unstop=True)
+            if tmp_targets:
+                run_thread([
+                    (buy_and_sell, (user, tmp_targets, ))
+                    for user in users
+                ], is_lock=False)
+                targets.extend(tmp_targets)
+            else:
+                break
 
-        targets_2 = market_client.get_target(
-            time.time(), base_price, change_base=False, interval=MIDNIGHT_INTERVAL
-        )
-        if targets_2:
-            run_thread([
-                (buy_and_sell, (user, targets_2, ))
-                for user in users
-            ], is_lock=False)
-
-        targets_3 = market_client.get_target(
-            time.time(), base_price, change_base=False, interval=min(MIDNIGHT_INTERVAL, MIDNIGHT_MAX_WAIT+target_time-time.time())
-        )
-        if targets_3:
-            run_thread([
-                (buy_and_sell, (user, targets_3, ))
-                for user in users
-            ], is_lock=False)
-
-        targets = list(set(targets_1+targets_2+targets_3))
         if not targets:
-            logger.warning('No targets in 3 tries, exit')
+            logger.warning('No targets, exit')
             return
 
         cancel_and_sell_after(users, targets, target_time + MIDNIGHT_SELL_AFTER)

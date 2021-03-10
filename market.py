@@ -14,6 +14,7 @@ AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
 MAX_AFTER = config.getint('setting', 'MaxAfter')
 MIN_VOL = config.getfloat('setting', 'MinVol')
+UNSTOP_MAX_WAIT = config.getfloat('setting', 'UnstopMaxWait')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
@@ -131,8 +132,8 @@ class MarketClient(_MarketClient):
             elif not unstop and now > target_time + interval:
                 logger.warning(f'Fail to find target in {interval}s')
                 break
-            elif unstop and now > target_time + 60:
-                logger.warning(f'Fail to find target in 60s, end unstop model')
+            elif unstop and now > target_time + UNSTOP_MAX_WAIT:
+                logger.warning(f'Fail to find target in {UNSTOP_MAX_WAIT}s, end unstop model')
                 break
             else:
                 logger.info('\t'.join([
@@ -148,5 +149,5 @@ class MarketClient(_MarketClient):
         return targets
 
     @staticmethod
-    def _PERCent_modify(t):
+    def _percent_modify(t):
         return max(min(0.5 * t, 0.9), 0.5)
