@@ -163,7 +163,7 @@ class User:
             symbols = ','.join([target.symbol for target in targets])
             self.trade_client.cancel_orders(symbols, [order.id for order in open_orders])
             logger.info(f'User {self.account_id} cancel all open sell orders')
-            # sleep(0.1)
+            time.sleep(0.2)
             sell_amount = [float(order.amount) for order in open_orders]
             target_dict = {
                 target.symbol:target
