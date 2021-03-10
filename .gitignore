@@ -1,6 +1,7 @@
 __pycache__
 .vscode
-config.ini
+*.ini
+!config.example.ini
 log
 *.db
 test
