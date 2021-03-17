@@ -39,10 +39,14 @@ def add_sheet(wb, db_path, csv_path):
     ws.add_chart(lc, 'I3')
 
 def create_excel(target_time_str, db_path):
+    csv_pathes = find_csv_path(target_time_str, db_path)
+    if not csv_pathes:
+        return
+
     wb = Workbook()
     wb.remove(wb['Sheet'])
-    for csv_path in find_csv_path(target_time_str, db_path):
-        add_sheet(wb, db_path, csv_path)
+    for csv_file in csv_pathes:
+        add_sheet(wb, db_path, csv_file)
     wb.save(os.path.join(db_path, '..', f'{target_time_str}.xlsx'))
 
 
