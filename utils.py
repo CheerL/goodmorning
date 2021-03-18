@@ -10,7 +10,7 @@ import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-
+from huobi.constant.system import WebSocketDefine, RestApiDefine
 from logger import WxPusher, create_logger
 
 
@@ -25,7 +25,9 @@ logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 session._request = session.request
-session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
+session.request = lambda *args, **kwargs: session._request(timeout=5, *args, **kwargs)
+WebSocketDefine.Uri = WS_URL
+RestApiDefine.Url = URL
 
 TOKEN = config.get('setting', 'Token')
 
