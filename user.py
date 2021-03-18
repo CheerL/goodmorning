@@ -7,7 +7,7 @@ from huobi.client.trade import TradeClient
 from huobi.constant import *
 from huobi.utils import *
 
-from utils import config, logger, wxpush, strftime, timeout_handle, URL
+from utils import config, logger, wxpush, strftime, timeout_handle
 
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
@@ -17,9 +17,8 @@ class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
         self.sercet_key = secret_key
-        self.account_client = AccountClient(api_key=access_key, secret_key=secret_key, url=URL)
-        self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key, url=URL)
-        # self.algo_client = AlgoClient(api_key=access_key, secret_key=secret_key, url=URL)
+        self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
+        self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         self.account_id = next(filter(
             lambda account: account.type=='spot' and account.state =='working',
             self.account_client.get_accounts()

@@ -10,7 +10,7 @@ import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-
+from huobi.constant.system import WebSocketDefine, RestApiDefine
 from logger import WxPusher, create_logger
 
 
@@ -26,6 +26,8 @@ config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
+WebSocketDefine.Uri = WS_URL
+RestApiDefine.Url = URL
 
 TOKEN = config.get('setting', 'Token')
 
@@ -78,14 +80,14 @@ def timeout_handle(value):
         return sub_wrapper
     return wrapper
 
-def ws_url(func):
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        self.__kwargs['url'] = WS_URL
-        result = func(self, *args, **kwargs)
-        self.__kwargs['url'] = URL
-        return result
-    return wrapper
+# def ws_url(func):
+#     @functools.wraps(func)
+#     def wrapper(self, *args, **kwargs):
+#         self.__kwargs['url'] = WS_URL
+#         result = func(self, *args, **kwargs)
+#         self.__kwargs['url'] = URL
+#         return result
+#     return wrapper
 
 def kill_thread(thread):
     thread._reset_internal_locks(False)
