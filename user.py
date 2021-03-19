@@ -168,7 +168,7 @@ class User:
             sell_targets = [target_dict[order.symbol] for order in open_orders]
             self.sell(sell_targets, sell_amount)
 
-            target_currencies = [target.base_currency for target in sell_targets]
+            target_currencies = [target.base_currency for target in targets]
             while True:
                 frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
                 if not any(frozen_balance.values()):
