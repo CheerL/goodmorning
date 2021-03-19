@@ -162,14 +162,24 @@ class User:
             symbols = ','.join([target.symbol for target in targets])
             self.trade_client.cancel_orders(symbols, [order.id for order in open_orders])
             logger.info(f'User {self.account_id} cancel all open sell orders')
-            time.sleep(1)
+            time.sleep(0.5)
             sell_amount = [float(order.amount) for order in open_orders]
-            target_dict = {
-                target.symbol:target
-                for target in targets
-            }
+            target_dict = {target.symbol: target for target in targets}
             sell_targets = [target_dict[order.symbol] for order in open_orders]
             self.sell(sell_targets, sell_amount)
+
+            target_currencies = [target.base_currency for target in sell_targets]
+            while True:
+                frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
+                if not any(frozen_balance.values):
+                    break
+                else:
+                    time.sleep(0.5)
+            
+            self.get_balance(targets)
+            amounts = [self.balance[target.base_currency] for target in targets]
+            self.sell(targets, amounts)
+
 
     # def cancel_algo_and_sell(self, targets):
     #     open_orders = self.algo_client.get_open_orders() or []
@@ -187,11 +197,11 @@ class User:
     #         self.sell(sell_targets, sell_amount)
     #         self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
 
-    def get_currency_balance(self, currencies):
+    def get_currency_balance(self, currencies, balance_type='trade'):
         return {
             currency.currency: float(currency.balance)
             for currency in self.account_client.get_balance(self.account_id)
-            if currency.currency in currencies and currency.type == 'trade'
+            if currency.currency in currencies and currency.type == balance_type
         }
 
     def get_balance(self, targets):
