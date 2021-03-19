@@ -11,7 +11,6 @@ from utils import config, logger, wxpush, strftime, timeout_handle, URL
 
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
-SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):

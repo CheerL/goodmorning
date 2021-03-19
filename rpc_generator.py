@@ -14,6 +14,6 @@ def get_watcher_client():
     client = make_client(thrift.Watcher, WATCHER_HOST, WATCHER_PORT)
     return client
 
-def get_watcher_server():
-    server = make_server(thrift.Watcher, '0.0.0.0', WATCHER_PORT)
+def get_watcher_server(handler):
+    server = make_server(thrift.Watcher, handler, '0.0.0.0', WATCHER_PORT)
     return server
