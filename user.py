@@ -171,7 +171,7 @@ class User:
             target_currencies = [target.base_currency for target in sell_targets]
             while True:
                 frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
-                if not any(frozen_balance.values):
+                if not any(frozen_balance.values()):
                     break
                 else:
                     time.sleep(0.5)
