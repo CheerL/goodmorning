@@ -7,16 +7,8 @@ from parallel import run_thread
 from user import User
 from utils import config, get_target_time, logger
 
-SELL_INTERVAL = config.getfloat('setting', 'SellInterval')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
-MIDNIGHT = config.getboolean('setting', 'Midnight')
-MIDNIGHT_INTERVAL = config.getfloat('setting', 'MidnightInterval')
-MIDNIGHT_SELL_AFTER = config.getfloat('setting', 'MidnightSellAfter')
-MIDNIGHT_MAX_WAIT = config.getfloat('setting', 'MidnightMaxWait')
-MIDNIGHT_MIN_VOL = config.getfloat('setting', 'MidnightMinVol')
-MIDNIGHT_BOOT_PERCENT = config.getfloat('setting', 'MidnightBootPercent')
-MIDNIGHT_ONLY = [each == 'true' for each in config.get('setting', 'MidnightOnly').split(',')]
-
+TOKEN = config.get('setting', 'Token')
 
 def initial():
     ACCESSKEY = config.get('setting', 'AccessKey')
@@ -36,31 +28,13 @@ def initial():
         users = users[:1]
 
     target_time = get_target_time()
-    if MIDNIGHT or target_time % (24*60*60) == 16*60*60:
-        market_client.midnight = True
-        market_client.min_vol = MIDNIGHT_MIN_VOL
-        market_client.boot_percent = MIDNIGHT_BOOT_PERCENT
-    else:
-        users = [user for user, only in zip(users, MIDNIGHT_ONLY) if not only]
-
     return users, market_client, target_time
 
 def cancel_and_sell_after(users, targets, t):
     while time.time() < t:
         time.sleep(1)
-        open_orders = []
-        run_thread([(
-            lambda user, targets: open_orders.extend(user.get_open_orders(targets)),
-            (user, targets)
-            ) for user in users
-        ])
 
-        if not open_orders:
-            logger.info('No open orders')
-            break
-    else:
-        logger.info('Time to cancel')
-
+    logger.info('Time to cancel')
     run_thread([(
         lambda user, targets: user.cancel_and_sell(targets),
         (user, targets, )
@@ -77,42 +51,23 @@ def main():
     base_price, base_price_time = market_client.get_base_price(target_time)
     market_client.exclude_expensive(base_price)
 
-    if market_client.midnight:
-        logger.info('Midnight model')
-        targets = []
-        while True:
-            tmp_targets = market_client.get_target(target_time, base_price, change_base=False, unstop=True)
-            if tmp_targets:
-                run_thread([
-                    (buy_and_sell, (user, tmp_targets, ))
-                    for user in users
-                ], is_lock=False)
-                targets.extend(tmp_targets)
-            else:
-                break
+    targets = []
+    while True:
+        tmp_targets = market_client.get_target(target_time, base_price, change_base=False, unstop=True)
+        if tmp_targets:
+            run_thread([
+                (buy_and_sell, (user, tmp_targets, ))
+                for user in users
+            ], is_lock=False)
+            targets.extend(tmp_targets)
+        else:
+            break
 
-        if not targets:
-            logger.warning('No targets, exit')
-            return
+    if not targets:
+        logger.warning('No targets, exit')
+        return
 
-        cancel_and_sell_after(users, targets, target_time + MIDNIGHT_SELL_AFTER)
-    else:
-        logger.info('General model')
-        targets = market_client.get_target(
-            target_time, base_price, base_price_time)
-
-        if not targets:
-            logger.info('Exit')
-            return
-
-        run_thread([
-            (buy_and_sell, (user, targets, ))
-            for user in users
-        ], is_lock=False)
-
-        buy_time = time.time()
-        cancel_and_sell_after(users, targets, buy_time + SELL_AFTER)
-
+    cancel_and_sell_after(users, targets, target_time + SELL_AFTER)
     run_thread([(lambda user: user.report(), (user, )) for user in users])
 
 

@@ -33,55 +33,6 @@ class MarketClient(_MarketClient):
             if info.symbol.endswith('usdt') and info.symbol not in self.exclude_list
         }
         self.target_symbol = []
-        
-
-    # @ws_url
-    # def sub_candlestick(self, symbols: 'str', interval: 'CandlestickInterval', callback, error_handler):
-    #     return super().sub_candlestick(symbols, interval, callback, error_handler)
-
-    # @ws_url
-    # def sub_market_detail(self, symbols: 'str', callback, error_handler):
-    #     return super().sub_market_detail(symbols, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def sub_mbp_full(self, symbols: 'str', levels: 'int', callback, error_handler):
-    #     return super().sub_mbp_full(symbols, levels, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def sub_mbp_increase(self, symbols: 'str', levels: 'int', callback, error_handler):
-    #     return super().sub_mbp_increase(symbols, levels, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def sub_pricedepth(self, symbols: 'str', depth_step: 'str', callback, error_handler):
-    #     return super().sub_pricedepth(symbols, depth_step, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def sub_pricedepth_bbo(self, symbols: 'str', callback, error_handler):
-    #     return super().sub_pricedepth_bbo(symbols, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def sub_trade_detail(self, symbols: 'str', callback, error_handler):
-    #     return super().sub_trade_detail(symbols, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def req_candlestick(self, symbols: 'str', interval: 'CandlestickInterval', callback, from_ts_second, end_ts_second, error_handler):
-    #     return super().req_candlestick(symbols, interval, callback, from_ts_second=from_ts_second, end_ts_second=end_ts_second, error_handler=error_handler)
-
-    # @ws_url
-    # def req_market_detail(self, symbols: 'str', callback, error_handler):
-    #     return super().req_market_detail(symbols, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def req_mbp(self, symbols: 'str', levels: 'int', callback, auto_close, error_handler):
-    #     return super().req_mbp(symbols, levels, callback, auto_close=auto_close, error_handler=error_handler)
-
-    # @ws_url
-    # def req_pricedepth(self, symbols: 'str', depth_step: 'str', callback, error_handler):
-    #     return super().req_pricedepth(symbols, depth_step, callback, error_handler=error_handler)
-
-    # @ws_url
-    # def req_trade_detail(self, symbols: 'str', callback, error_handler):
-    #     return super().req_trade_detail(symbols, callback, error_handler=error_handler)
 
     def exclude_expensive(self, base_price):
         self.symbols_info = {

@@ -11,7 +11,8 @@ from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.constant.system import WebSocketDefine, RestApiDefine
-from logger import WxPusher, create_logger
+from huobi.utils import PrintBasic
+from logger import create_logger
 
 
 
@@ -28,8 +29,8 @@ session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
+PrintBasic.print_basic = lambda data, name=None: None
 
-TOKEN = config.get('setting', 'Token')
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
@@ -38,12 +39,9 @@ def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     )
     return utc_time.astimezone(tz).strftime(fmt)
 
-def wxpush(content, uids, content_type=1, summary=None):
-    WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
 
 def get_target_time():
     TIME = config.get('setting', 'Time')
-    
     now = time.time()
 
     if TIME.startswith('*/'):
@@ -79,15 +77,6 @@ def timeout_handle(value):
                 return value
         return sub_wrapper
     return wrapper
-
-# def ws_url(func):
-#     @functools.wraps(func)
-#     def wrapper(self, *args, **kwargs):
-#         self.__kwargs['url'] = WS_URL
-#         result = func(self, *args, **kwargs)
-#         self.__kwargs['url'] = URL
-#         return result
-#     return wrapper
 
 def kill_thread(thread):
     thread._reset_internal_locks(False)
