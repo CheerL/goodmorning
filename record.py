@@ -6,6 +6,7 @@ import time
 from data2excel import create_excel
 from market import MarketClient
 from utils import ROOT, get_target_time, kill_all_threads, logger
+from target import Target
 
 target_time = get_target_time()
 target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
@@ -18,7 +19,7 @@ class SQLMarketClient(MarketClient):
     def handle_big_increase(self, big_increase, base_price):
         targets = []
         for symbol, now_price, target_increase, _ in big_increase:
-            self.target_symbol.append(symbol)
+            self.targets[symbol] = Target(symbol, now_price)
             self.sub_candlestick(symbol, '5min', kline_callback(symbol, target_time), lambda e: logger.error(e))
             init_price, _ = base_price[symbol]
             logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%')
@@ -29,7 +30,7 @@ class CSVMarketClient(MarketClient):
     def handle_big_increase(self, big_increase, base_price):
         targets = []
         for symbol, now_price, target_increase, _ in big_increase:
-            self.target_symbol.append(symbol)
+            self.targets[symbol] = Target(symbol, now_price)
             self.sub_candlestick(symbol, '5min', kline_callback_csv(symbol, target_time), lambda e: logger.error(e))
             init_price, _ = base_price[symbol]
             logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%')

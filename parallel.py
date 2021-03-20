@@ -1,5 +1,6 @@
 '多线程 与 多进程'
 import sys
+import ctypes
 import time
 from collections import deque
 import threading
@@ -56,13 +57,15 @@ def run_thread(req_list, name=None, is_lock=True, limit_num=8):
         limit_num   最大线程数, int, 默认为8
         '''
     queue = deque(req_list)
+    threads = []
     while len(queue):
         if threading.active_count() <= limit_num:
             para = queue.popleft()
             now_thread = threading.Thread(target=para[0], args=para[1], name=name, daemon=True)
             now_thread.start()
+            threads.append(now_thread)
     if is_lock:
-        for now_thread in threading.enumerate():
+        for now_thread in threads:
             if now_thread is not threading.currentThread():
                 now_thread.join()
 
@@ -146,6 +149,17 @@ def pause(_time=10):
     '暂停一段时间, 防止程序运行过快出错'
     print('wait %d sec' % (int(_time)))
     time.sleep(int(_time))
+
+def kill_thread(thread):
+    thread._reset_internal_locks(False)
+    thread_id = ctypes.c_long(thread._ident)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(SystemExit)) 
+    if res > 1: 
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
+        print('Exception raise failure') 
+
+def kill_this_thread():
+    kill_thread(threading.current_thread())
 
 if __name__ == '__main__':
     time_it(1)

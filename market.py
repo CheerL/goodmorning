@@ -5,7 +5,8 @@ from huobi.client.market import MarketClient as _MarketClient
 from huobi.constant import *
 from huobi.utils import *
 
-from utils import config, logger, timeout_handle, ws_url
+from utils import config, logger, timeout_handle
+from target import Target
 
 BEFORE = config.getint('setting', 'Before')
 BOOT_PERCENT = config.getfloat('setting', 'BootPercent')
@@ -32,7 +33,7 @@ class MarketClient(_MarketClient):
             for info in generic_client.get_exchange_symbols()
             if info.symbol.endswith('usdt') and info.symbol not in self.exclude_list
         }
-        self.target_symbol = []
+        self.targets = {}
         
 
     def exclude_expensive(self, base_price):
@@ -92,7 +93,7 @@ class MarketClient(_MarketClient):
         big_increase = [
             item for item in increase
             if self.end_percent > item[2] > self.boot_percent
-            and item[0] not in self.target_symbol
+            and item[0] not in self.targets.keys()
         ][:BATCH_SIZE]
 
         if big_increase:
@@ -113,7 +114,7 @@ class MarketClient(_MarketClient):
             target.buy_price = now_price
             target.init_price = init_price
             targets.append(target)
-            self.target_symbol.append(symbol)
+            self.targets[symbol] = Target(symbol, now_price)
             logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
         return targets
 

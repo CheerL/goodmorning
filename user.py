@@ -11,6 +11,7 @@ from utils import config, logger, wxpush, strftime, timeout_handle, URL
 
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
+SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
@@ -68,8 +69,6 @@ class User:
             logger.debug(f'User {self.account_id} buy report')
             for order in buy_order_list:
                 logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
-
-        
 
     def sell(self, targets, amounts):
         sell_order_list = [{
@@ -209,7 +208,7 @@ class User:
             target_balance = self.balance[target.base_currency]
             if target_balance > 10 ** -target.amount_precision:
                 buy_price = order["amount"] / target_balance * 0.998
-                target.buy_price = max(buy_price, target.buy_price)
+                target.buy_price = buy_price
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {buy_price}')
             else:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')

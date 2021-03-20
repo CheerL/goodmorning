@@ -1,9 +1,9 @@
 import configparser
-import ctypes
 import functools
 import os
 import threading
 import time
+from parallel import kill_thread
 
 import pytz
 import requests
@@ -12,6 +12,7 @@ from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.constant.system import WebSocketDefine, RestApiDefine
 from logger import WxPusher, create_logger
+from huobi.utils import PrintBasic
 
 
 
@@ -28,6 +29,7 @@ session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=5, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
+PrintBasic.print_basic = lambda data, name=None: None
 
 TOKEN = config.get('setting', 'Token')
 
@@ -79,23 +81,6 @@ def timeout_handle(value):
                 return value
         return sub_wrapper
     return wrapper
-
-def ws_url(func):
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        self.__kwargs['url'] = WS_URL
-        result = func(self, *args, **kwargs)
-        self.__kwargs['url'] = URL
-        return result
-    return wrapper
-
-def kill_thread(thread):
-    thread._reset_internal_locks(False)
-    thread_id = ctypes.c_long(thread._ident)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(SystemExit)) 
-    if res > 1: 
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
-        print('Exception raise failure') 
 
 def kill_all_threads():
     for manage in websocket_connection_handler.values():
