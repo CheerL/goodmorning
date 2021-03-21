@@ -45,7 +45,7 @@ class MarketClient(_MarketClient):
         }
 
     @timeout_handle({})
-    def get_price(self):
+    def get_price(self) -> 'dict[str, tuple[float, float]]':
         market_data = self.get_market_tickers()
         price = {
             pair.symbol: (pair.close, pair.vol)

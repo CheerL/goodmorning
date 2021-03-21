@@ -3,18 +3,17 @@ import functools
 import os
 import threading
 import time
-from parallel import kill_thread
 
 import pytz
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-from huobi.constant.system import WebSocketDefine, RestApiDefine
-from logger import WxPusher, create_logger
+from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic
 
-
+from logger import WxPusher, create_logger
+from parallel import kill_thread
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(ROOT, 'config.ini')
