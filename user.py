@@ -36,7 +36,6 @@ class User:
         self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
-        # self.sell_algo_id = []
 
     @staticmethod
     def _check_amount(amount, symbol_info):
