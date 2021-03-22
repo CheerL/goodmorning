@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
 
-FMT = "%(asctime)s [%(pathname)s]:%(lineno)s %(name)-%(levelname)s: %(message)s"
+FMT = "%(asctime)s [%(pathname)s]:%(lineno)d %(name)s-%(levelname)s: %(message)s"
 
 def quite_logger(name=None, all_logger=False):
     if all_logger:
