@@ -88,5 +88,5 @@ def kill_all_threads():
         kill_thread(manage._WebsocketManage__thread)
 
     for thread in threading.enumerate():
-        if isinstance(thread, WebSocketWatchDog):
-            kill_thread(thread)
+        # if isinstance(thread, WebSocketWatchDog):
+        kill_thread(thread)
