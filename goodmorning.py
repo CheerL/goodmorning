@@ -5,15 +5,15 @@ from huobi.constant.definition import *
 from market import MarketClient
 from parallel import run_thread
 from user import User
-from utils import config, get_target_time, logger
+from utils import config, get_target_time, logger, user_config
 
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 
 def init_users():
-    ACCESSKEY = config.get('setting', 'AccessKey')
-    SECRETKEY = config.get('setting', 'SecretKey')
-    BUY_AMOUNT = config.get('setting', 'BuyAmount')
-    WXUIDS = config.get('setting', 'WxUid')
+    ACCESSKEY = user_config.get('setting', 'AccessKey')
+    SECRETKEY = user_config.get('setting', 'SecretKey')
+    BUY_AMOUNT = user_config.get('setting', 'BuyAmount')
+    WXUIDS = user_config.get('setting', 'WxUid')
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]

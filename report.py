@@ -7,10 +7,10 @@ import requests
 from wxpusher.wxpusher import BASEURL
 from wxpusher.wxpusher import WxPusher as _WxPusher
 
-from utils import ROOT, config, strftime, logger
+from utils import ROOT, config, user_config, strftime, logger
 from retry import retry
 
-TOKEN = config.get('setting', 'Token')
+TOKEN = user_config.get('setting', 'Token')
 
 class WxPusher(_WxPusher):
     @classmethod

@@ -1,8 +1,10 @@
 __pycache__
 .vscode
+log/*
 *.ini
-!config.example.ini
-log
 *.db
 test
-.crossbar
+node/.crossbar/*
+!node/.crossbar/config.json
+!.gitkeep
+!config.ini

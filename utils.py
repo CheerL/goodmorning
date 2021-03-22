@@ -17,20 +17,23 @@ from parallel import kill_thread
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(ROOT, 'config.ini')
+USER_CONFIG_PATH = os.path.join(ROOT, 'user.ini')
 LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
+
 URL = 'https://api-aws.huobi.pro'
 WS_URL = 'wss://api-aws.huobi.pro'
 
 logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
+user_config = configparser.ConfigParser()
+user_config.read(USER_CONFIG_PATH)
+
 session._request = session.request
-session.request = lambda *args, **kwargs: session._request(timeout=5, *args, **kwargs)
+session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
 PrintBasic.print_basic = lambda data, name=None: None
-
-TOKEN = config.get('setting', 'Token')
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
