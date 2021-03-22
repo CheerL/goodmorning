@@ -78,10 +78,7 @@ def init_watcher(Client):
     return client
 
 def main():
-    if len(sys.argv) > 1:
-        WATCHER_MODE = sys.argv[1]
-
-    if WATCHER_MODE == 'master':
+    if len(sys.argv) > 1 and sys.argv[1] == 'master':
         logger.info('Master watcher')
         Client = WatcherMasterClient
 
