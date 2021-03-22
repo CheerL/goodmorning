@@ -16,8 +16,8 @@ from logger import create_logger
 from parallel import kill_thread
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(ROOT, 'config.ini')
-USER_CONFIG_PATH = os.path.join(ROOT, 'user.ini')
+CONFIG_PATH = os.path.join(ROOT, 'config', 'config.ini')
+USER_CONFIG_PATH = os.path.join(ROOT, 'config', 'user.ini')
 LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 
 URL = 'https://api-aws.huobi.pro'
@@ -27,7 +27,9 @@ logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 user_config = configparser.ConfigParser()
-user_config.read(USER_CONFIG_PATH)
+
+if os.path.exists(USER_CONFIG_PATH):
+    user_config.read(USER_CONFIG_PATH)
 
 session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
