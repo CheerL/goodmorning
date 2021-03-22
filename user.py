@@ -98,8 +98,8 @@ class User:
             "order_type": OrderType.SELL_LIMIT,
             "source": OrderSource.SPOT_API,
             "price": self._check_price(max(
-                rate * target.init_price,
-                min_rate * target.buy_price
+                (1 + rate / 100) * target.init_price,
+                (1 + min_rate / 100) * target.buy_price
             ), target),
             "amount": self._check_amount(amount, target)}
             for target, amount in zip(targets, amounts)

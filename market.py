@@ -9,11 +9,11 @@ from utils import config, logger, timeout_handle
 from target import Target
 
 BEFORE = config.getint('setting', 'Before')
-BOOT_PERCENT = config.getfloat('setting', 'BootPercent')
-END_PERCENT = config.getfloat('setting', 'EndPercent')
+BOOT_RATE = config.getfloat('setting', 'BootRate')
+END_RATE = config.getfloat('setting', 'EndRate')
 AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
-MAX_AFTER = config.getint('setting', 'MaxAfter')
+MAX_WAIT = config.getint('setting', 'MaxWait')
 MIN_VOL = config.getfloat('setting', 'MinVol')
 UNSTOP_MAX_WAIT = config.getfloat('setting', 'UnstopMaxWait')
 
@@ -23,8 +23,8 @@ class MarketClient(_MarketClient):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.midnight = False
-        self.boot_percent = BOOT_PERCENT
-        self.end_percent = END_PERCENT
+        self.boot_rate = BOOT_RATE
+        self.end_rate = END_RATE
         self.min_vol = MIN_VOL
         generic_client = GenericClient()
 
@@ -92,7 +92,7 @@ class MarketClient(_MarketClient):
     def get_big_increase(self, increase):
         big_increase = [
             item for item in increase
-            if self.end_percent > item[2] > self.boot_percent
+            if self.end_rate > item[2] > self.boot_rate
             and item[0] not in self.targets.keys()
         ][:BATCH_SIZE]
 
@@ -118,7 +118,7 @@ class MarketClient(_MarketClient):
             logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
         return targets
 
-    def get_target(self, target_time, base_price, base_price_time=None, change_base=True, interval=MAX_AFTER, unstop=False):
+    def get_target(self, target_time, base_price, base_price_time=None, change_base=True, max_wait=MAX_WAIT, unstop=False):
         targets = []
         while True:
             now = time.time()
@@ -131,8 +131,8 @@ class MarketClient(_MarketClient):
             if big_increase:
                 targets = self.handle_big_increase(big_increase, base_price)
                 break
-            elif not unstop and now > target_time + interval:
-                logger.warning(f'Fail to find target in {interval}s')
+            elif not unstop and now > target_time + max_wait:
+                logger.warning(f'Fail to find target in {max_wait}s')
                 break
             elif unstop and now > target_time + UNSTOP_MAX_WAIT:
                 logger.warning(f'Fail to find target in {UNSTOP_MAX_WAIT}s, end unstop model')

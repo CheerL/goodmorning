@@ -18,13 +18,15 @@ DEALER_NUM = config.getint('setting', 'DealerNum')
 WATCHER_NUM = config.getint('setting', 'WatcherNum')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MAX_BUY = config.getint('setting', 'MaxBuy')
-RUN_TOPIC = 'run'
-CLIENT_INFO_TOPIC = 'info'
-BUY_SIGNAL_TOPIC = config.get('setting', 'BuySignalTopic')
-SELL_SIGNAL_TOPIC = config.get('setting', 'SellSignalTopic')
+
 WS_HOST = config.get('setting', 'WsHost')
 WS_PORT = config.getint('setting', 'WsPort')
 WS_URL = f'ws://{WS_HOST}:{WS_PORT}'
+
+RUN_TOPIC = 'run'
+CLIENT_INFO_TOPIC = 'info'
+BUY_SIGNAL_TOPIC = 'buy'
+SELL_SIGNAL_TOPIC = 'sell'
 
 quite_logger(all_logger=True)
 

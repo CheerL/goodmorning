@@ -9,8 +9,8 @@ from utils import config, kill_all_threads, logger
 
 from retry import retry
 
-BOOT_PERCENT = config.getfloat('setting', 'BootPercent')
-END_PERCENT = config.getfloat('setting', 'EndPercent')
+BOOT_RATE = config.getfloat('setting', 'BootRate')
+END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
 UNSTOP_MAX_WAIT = config.getfloat('setting', 'UnstopMaxWait')
 
@@ -29,7 +29,7 @@ def check_buy_signal(client, symbol, kline):
     close = kline.tick.close
     open_ = kline.tick.open
     increase = round((close - open_) / open_ * 100, 4)
-    if increase < BOOT_PERCENT or increase > END_PERCENT:
+    if increase < BOOT_RATE or increase > END_RATE:
         return
 
     try:
@@ -78,12 +78,14 @@ def init_watcher(Client):
     return client
 
 def main():
-    WATCHER_MODE = sys.argv[1]
+    if len(sys.argv) > 1:
+        WATCHER_MODE = sys.argv[1]
+
     if WATCHER_MODE == 'master':
         logger.info('Master watcher')
         Client = WatcherMasterClient
 
-    elif WATCHER_MODE == 'sub':
+    else:
         logger.info('Sub watcher')
         Client = WatcherClient
 

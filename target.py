@@ -1,7 +1,7 @@
 from utils import config
 
 SELL_LEAST_AFTER = config.getfloat('setting', 'SellLeastAfter')
-SELL_AT_BACK = config.getfloat('setting', 'SellAtBack')
+SELL_BACK_RATE = config.getfloat('setting', 'SellBackRate')
 
 class Target:
     def __init__(self, symbol, price, init_price=None, time=None):
@@ -11,5 +11,5 @@ class Target:
         self.time = time
 
         self.sell_least_time = time + SELL_LEAST_AFTER
-        self.sell_least_price = price * (100 - SELL_AT_BACK) / 100
+        self.sell_least_price = price * (100 - SELL_BACK_RATE) / 100
         self.own = True
