@@ -1,12 +1,12 @@
 import sys
 import time
 
+from wampyapp import WatcherClient, WatcherMasterClient
 from huobi.constant.definition import CandlestickInterval
 
 from market import MarketClient
-from utils import config, get_target_time, kill_all_threads, logger
+from utils import config, kill_all_threads, logger
 
-from wampyapp import WatcherClient, WatcherMasterClient
 from retry import retry
 
 BOOT_PERCENT = config.getfloat('setting', 'BootPercent')

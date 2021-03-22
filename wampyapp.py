@@ -177,7 +177,8 @@ class DealerClient(ControlledClient):
         #     for user in self.users
         # ], is_lock=False)
         self.targets.append(target)
-        print(symbol, price, 'buy')
+        increase = round((price - init_price) / init_price * 100, 4)
+        logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
 
     @subscribe(topic=SELL_SIGNAL_TOPIC)
     def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):
@@ -186,4 +187,5 @@ class DealerClient(ControlledClient):
 
         target = self.market_client.symbols_info[symbol]
         # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
-        print(symbol, price, 'sell')
+        increase = round((price - init_price) / init_price * 100, 4)
+        logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
