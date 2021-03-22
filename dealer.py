@@ -3,8 +3,9 @@ import time
 from parallel import run_thread
 from wampyapp import DealerClient as Client
 from utils import config, kill_all_threads, logger
-
-from goodmorning import initial
+from market import MarketClient
+from goodmorning import init_users
+from retry import retry
 
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 
@@ -15,12 +16,19 @@ def buy_and_sell(user, targets):
     user.sell_limit(targets, sell_amounts)
 
 
-def main():
-    users, market_client, target_time = initial()
+@retry(tries=5, delay=1, logger=logger)
+def init_dealer():
+    users = init_users()
+    market_client = MarketClient()
     client = Client(market_client, users)
     client.start()
+    return client
 
-    sell_time = target_time + SELL_AFTER
+def main():
+    client = init_dealer()
+    client.wait_to_run()
+
+    sell_time = client.target_time + SELL_AFTER
     time.sleep(max(sell_time - time.time() - 5, 1))
 
     while time.time() < sell_time:
@@ -29,8 +37,8 @@ def main():
     client.stop()
     logger.info('Time to cancel')
     run_thread([(user.cancel_and_sell, (client.targets, ))
-                for user in users], is_lock=True)
-    run_thread([(user.report, ()) for user in users], is_lock=True)
+                for user in client.users], is_lock=True)
+    run_thread([(user.report, ()) for user in client.users], is_lock=True)
     kill_all_threads()
 
 

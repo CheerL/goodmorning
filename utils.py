@@ -12,7 +12,7 @@ from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic
 
-from logger import WxPusher, create_logger
+from logger import create_logger
 from parallel import kill_thread
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -38,9 +38,6 @@ def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
         pytz.datetime.datetime.utcfromtimestamp(timestamp)
     )
     return utc_time.astimezone(tz).strftime(fmt)
-
-def wxpush(content, uids, content_type=1, summary=None):
-    WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
 
 def get_target_time():
     TIME = config.get('setting', 'Time')

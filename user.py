@@ -1,14 +1,14 @@
 import math
 import time
 
+import huobi
 from huobi.client.account import AccountClient
-# from huobi.client.algo import AlgoClient
 from huobi.client.trade import TradeClient
 from huobi.constant import *
 from huobi.utils import *
 
-from utils import config, logger, wxpush, strftime, timeout_handle, URL
-
+from utils import config, logger, strftime, timeout_handle
+from report import wx_report, add_profit, get_profit
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
 SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
@@ -19,7 +19,6 @@ class User:
         self.sercet_key = secret_key
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
-        # self.algo_client = AlgoClient(api_key=access_key, secret_key=secret_key, url=URL)
         self.account_id = next(filter(
             lambda account: account.type=='spot' and account.state =='working',
             self.account_client.get_accounts()
@@ -118,48 +117,22 @@ class User:
             for order in sell_order_list:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
 
-    # def sell_algo(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
-    #     for target, amount in zip(targets, amounts):
-    #         if amount <= 0:
-    #             continue
-
-    #         symbol = target.symbol
-    #         stop_price = str(self._check_price(max(
-    #             rate * target.init_price,
-    #             min_rate * target.buy_price
-    #         ), target))
-    #         amount = str(self._check_amount(max(
-    #             amount,
-    #             target.min_order_amt,
-    #             target.sell_market_min_order_amt
-    #         ), target))
-    #         client_id = (symbol + stop_price + str(time.time())).replace('.', '_')
-    #         sell_order_id = self.algo_client.create_order(
-    #             account_id=self.account_id, symbol=symbol, order_side=OrderSide.SELL,
-    #             order_type='market', stop_price=stop_price, order_size=amount,
-    #             client_order_id=client_id
-    #         )
-    #         order = {
-    #             "symbol": symbol,
-    #             "price": stop_price,
-    #             "amount": amount,
-    #             "id": sell_order_id
-    #         }
-    #         self.sell_algo_id.append(client_id)
-    #         self.sell_order_list.append(order)
-    #         logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
     @timeout_handle([])
-    def get_open_orders(self, targets, side=OrderSide.SELL):
-        symbols = ','.join([target.symbol for target in targets])
-        open_orders = self.trade_client.get_open_orders(symbols, self.account_id, side)
+    def get_open_orders(self, targets, side=OrderSide.SELL) -> 'list[huobi.model.trade.order.Order]':
+        open_orders = []
+        all_symbols = [target.symbol for target in targets]
+        for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
+            open_orders.extend(self.trade_client.get_open_orders(','.join(symbols), self.account_id, side))
         return open_orders
 
     def cancel_and_sell(self, targets):
         open_orders = self.get_open_orders(targets)
         if open_orders:
-            symbols = ','.join([target.symbol for target in targets])
-            self.trade_client.cancel_orders(symbols, [order.id for order in open_orders])
+            all_symbols = [target.symbol for target in targets]
+            for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
+                self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
+
             logger.info(f'User {self.account_id} cancel all open sell orders')
             time.sleep(1)
             sell_amount = [float(order.amount) for order in open_orders]
@@ -169,22 +142,6 @@ class User:
             }
             sell_targets = [target_dict[order.symbol] for order in open_orders]
             self.sell(sell_targets, sell_amount)
-
-    # def cancel_algo_and_sell(self, targets):
-    #     open_orders = self.algo_client.get_open_orders() or []
-    #     if open_orders:
-    #         open_ids = [order.clientOrderId for order in open_orders]
-    #         self.algo_client.cancel_orders(open_ids)
-    #         logger.info(f'User {self.account_id} cancel all open algo orders')
-
-    #         sell_amount = [float(order.amount) for order in open_orders]
-    #         target_dict = {
-    #             target.symbol:target
-    #             for target in targets
-    #         }
-    #         sell_targets = [target_dict[order.symbol] for order in open_orders]
-    #         self.sell(sell_targets, sell_amount)
-    #         self.sell_algo_id = list(set(self.sell_algo_id)-set(open_ids))
 
     def get_currency_balance(self, currencies):
         return {
@@ -267,36 +224,6 @@ class User:
             logger.info(f'{symbol_name}: use {amount} {currency}, get {vol} USDT, price {price}, fee {fee} USDT, at {each["time"]}')
 
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {percent}%')
-
-        if self.wxuid:
-            summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
-            msg = '''
-### 买入记录
-
-| 币种 | 时间 |价格 | 成交量 | 成交额 | 手续费 |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
-    f'| {each["currency"]} | {each["time"]} | {each["price"]} | {each["amount"]} | {each["vol"]} | {each["fee"]} |'
-    for each in buy_info
-]) + '''
-### 卖出记录
-
-| 币种 | 时间 | 价格 | 成交量 | 成交额 | 手续费 |
-| ---- | ---- | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
-    f'| {each["currency"]} | {each["time"]} | {each["price"]} | {each["amount"]} | {each["vol"]} | {each["fee"]} |'
-    for each in sell_info
-]) + f'''
-### 总结
-            
-- 支出: **{pay} USDT**
-
-- 收入: **{income} USDT**
-
-- 利润: **{profit} USDT**
-
-- 收益率: **{percent} %**
-'''
-            wxpush(content=msg, uids=[self.wxuid], content_type=3, summary=summary)
+        add_profit(self.account_id, pay, income, profit, percent)
+        total_profit, month_profit = get_profit(self.account_id)
+        wx_report(self.wxuid, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)

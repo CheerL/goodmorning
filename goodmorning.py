@@ -9,13 +9,11 @@ from utils import config, get_target_time, logger
 
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 
-def initial():
+def init_users():
     ACCESSKEY = config.get('setting', 'AccessKey')
     SECRETKEY = config.get('setting', 'SecretKey')
     BUY_AMOUNT = config.get('setting', 'BuyAmount')
     WXUIDS = config.get('setting', 'WxUid')
-    TEST = config.getboolean('setting', 'Test')
-    market_client = MarketClient()
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]
@@ -23,6 +21,12 @@ def initial():
 
     users = [User(*user_data) for user_data in zip(access_keys,
                                                    secret_keys, buy_amounts, wxuids)]
+    return users
+def initial():
+    users = init_users()
+    TEST = config.getboolean('setting', 'Test')
+    market_client = MarketClient()
+    
     if TEST:
         users = users[:1]
 
