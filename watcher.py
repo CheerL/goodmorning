@@ -103,7 +103,8 @@ def main():
             time.sleep(0.5)
 
 
-    logger.info(f"Watcher stop after {WATCHER_SLEEP}s")
+    time.sleep(client.target_time - time.time())
+    logger.info(f"Watcher stop in {WATCHER_SLEEP}s")
     time.sleep(WATCHER_SLEEP)
 
     client.stop()
