@@ -197,7 +197,7 @@ class User:
             logger.warning(f'NO REPORT for User {self.account_id}')
             return
 
-        income = round(sum([each['vol'] for each in sell_info]), 4)
+        income = round(sum([each['vol'] - each['fee'] for each in sell_info]), 4)
         profit = round(income - pay, 4)
         percent = round(profit / pay * 100, 4)
 

@@ -7,7 +7,8 @@ import requests
 from wxpusher.wxpusher import BASEURL
 from wxpusher.wxpusher import WxPusher as _WxPusher
 
-from utils import ROOT, config, strftime
+from utils import ROOT, config, strftime, logger
+from retry import retry
 
 TOKEN = config.get('setting', 'Token')
 
@@ -27,7 +28,7 @@ class WxPusher(_WxPusher):
         url = f'{BASEURL}/send/message'
         return requests.post(url, json=payload).json()
 
-
+@retry(tries=5, delay=1, logger=logger)
 def wxpush(content, uids, content_type=1, summary=None):
     WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
 
