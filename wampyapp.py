@@ -63,8 +63,8 @@ class ControlledClient(Client):
         self.before_stop()
         try:
             super().stop()
-        except:
-            pass
+        except Exception as e:
+            logger.error(e)
         
 
     def before_stop(self):
@@ -95,8 +95,7 @@ class WatcherClient(ControlledClient):
         self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
         self.market_client.targets[symbol].own = False
         increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {now}')
-        
+        logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {now}')
 
 class WatcherMasterClient(WatcherClient):
     def __init__(

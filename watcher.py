@@ -68,7 +68,6 @@ def kline_callback(symbol, client):
     return warpper
 
 def error_callback(error):
-    print('?')
     logger.error(error)
 
 @retry(tries=5, delay=1, logger=logger)
@@ -95,12 +94,15 @@ def main():
     if not task:
         return
 
-    logger.info(f'Watcher task is:\n{", ".join(task)}')
-    for symbol in task:
+    logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
+    for i, symbol in enumerate(task):
         client.market_client.sub_candlestick(
             symbol, CandlestickInterval.DAY1,
             kline_callback(symbol, client), error_callback
         )
+        if not i % 10:
+            time.sleep(0.5)
+
 
     logger.info(f"Watcher stop after {WATCHER_SLEEP}s")
     time.sleep(WATCHER_SLEEP)
