@@ -1,5 +1,3 @@
-from os import P_NOWAITO
-from socket import TCP_NOTSENT_LOWAT
 import sys
 import time
 
