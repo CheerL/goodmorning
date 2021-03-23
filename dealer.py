@@ -9,13 +9,6 @@ from retry import retry
 
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 
-def buy_and_sell(user, targets):
-    user.buy(targets, [user.buy_amount for _ in targets])
-    user.check_balance(targets)
-    sell_amounts = [user.balance[target.base_currency] for target in targets]
-    user.sell_limit(targets, sell_amounts)
-
-
 @retry(tries=5, delay=1, logger=logger)
 def init_dealer():
     users = init_users()

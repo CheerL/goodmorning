@@ -8,6 +8,7 @@ import time
 from logger import quite_logger
 from utils import config, logger, get_target_time
 from target import Target
+from parallel import run_thread
 
 
 from wampy.constants import (
@@ -29,6 +30,12 @@ BUY_SIGNAL_TOPIC = 'buy'
 SELL_SIGNAL_TOPIC = 'sell'
 
 quite_logger(all_logger=True)
+
+def buy_and_sell(user: 'user.User', targets):
+    user.buy(targets, [user.buy_amount for _ in targets])
+    user.check_balance(targets)
+    sell_amounts = [user.balance[target.base_currency] for target in targets]
+    user.sell_limit(targets, sell_amounts)
 
 class ControlledClient(Client):
     def __init__(
@@ -144,7 +151,6 @@ class WatcherMasterClient(WatcherClient):
             else:
                 logger.info('Run new')
             self.publish(topic=RUN_TOPIC, target_time=self.target_time)
-            
 
 class DealerClient(ControlledClient):
     def __init__(
@@ -173,10 +179,10 @@ class DealerClient(ControlledClient):
         target = self.market_client.symbols_info[symbol]
         target.init_price = init_price
         target.buy_price = price
-        # run_thread([
-        #     (buy_and_sell, (user, [target], ))
-        #     for user in self.users
-        # ], is_lock=False)
+        run_thread([
+            (buy_and_sell, (user, [target], ))
+            for user in self.users
+        ], is_lock=False)
         self.targets.append(target)
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
@@ -187,6 +193,6 @@ class DealerClient(ControlledClient):
             return
 
         target = self.market_client.symbols_info[symbol]
-        # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
+        run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
