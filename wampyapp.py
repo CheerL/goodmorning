@@ -120,10 +120,10 @@ class WatcherMasterClient(WatcherClient):
         }
 
     def after_start(self):
-        self.client_info['watcher'] += 1
+        self.info_handler(self.client_type)
 
     def before_stop(self):
-        self.client_info['watcher'] -= 1
+        self.info_handler(self.client_type, True)
 
     @callee
     def get_task(self, num) -> 'list[str]':
