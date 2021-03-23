@@ -164,7 +164,6 @@ class DealerClient(ControlledClient):
             url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
         )
         self.market_client = market_client
-        self.targets = []
         self.users = users
         self.client_type = 'dealer'
 
@@ -173,7 +172,7 @@ class DealerClient(ControlledClient):
         if not self.run:
             return
 
-        if len(self.targets) >= MAX_BUY:
+        if len(self.market_client.targets) >= MAX_BUY:
             return
 
         target = self.market_client.symbols_info[symbol]
@@ -183,13 +182,16 @@ class DealerClient(ControlledClient):
             (buy_and_sell, (user, [target], ))
             for user in self.users
         ], is_lock=False)
-        self.targets.append(target)
+        self.market_client.targets[symbol] = target
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
 
     @subscribe(topic=SELL_SIGNAL_TOPIC)
     def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):
         if not self.run:
+            return
+
+        if symbol not in self.market_client.targets:
             return
 
         target = self.market_client.symbols_info[symbol]
