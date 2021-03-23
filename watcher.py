@@ -19,7 +19,7 @@ WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
 def check_buy_signal(client, symbol, kline):
     now = kline.ts / 1000
-    if now < client.target_time or now > client.target_time + UNSTOP_MAX_WAIT:
+    if now < client.target_time + 1 or now > client.target_time + UNSTOP_MAX_WAIT:
         return
 
     vol = kline.tick.vol
@@ -96,7 +96,7 @@ def main():
     logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
     for i, symbol in enumerate(task):
         client.market_client.sub_candlestick(
-            symbol, CandlestickInterval.DAY1,
+            symbol, CandlestickInterval.MIN5,
             kline_callback(symbol, client), error_callback
         )
         if not i % 10:
