@@ -80,16 +80,15 @@ def init_watcher(Client):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == 'master':
         logger.info('Master watcher')
-        Client = WatcherMasterClient
-
+        client = init_watcher(WatcherMasterClient)
+        task = client.get_task(WATCHER_TASK_NUM)
+        client.wait_to_run()
     else:
         logger.info('Sub watcher')
-        Client = WatcherClient
+        client = init_watcher(WatcherClient)
+        client.wait_to_run()
+        task = client.get_task(WATCHER_TASK_NUM)
 
-    client = init_watcher(Client)
-    client.wait_to_run()
-
-    task = client.get_task(WATCHER_TASK_NUM)
     if not task:
         return
 
