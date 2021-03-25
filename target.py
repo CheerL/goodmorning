@@ -11,5 +11,5 @@ class Target:
         self.time = time
 
         self.sell_least_time = time + SELL_LEAST_AFTER
-        self.sell_least_price = price * (100 - SELL_BACK_RATE) / 100
+        self.sell_least_price = 0.5 * price + 0.5 * init_price 
         self.own = True
