@@ -150,17 +150,5 @@ def pause(_time=10):
     print('wait %d sec' % (int(_time)))
     time.sleep(int(_time))
 
-threads = []
-    while len(queue):
-        if threading.active_count() <= limit_num:
-            para = queue.popleft()
-            now_thread = threading.Thread(target=para[0], args=para[1], name=name, daemon=True)
-            now_thread.start()
-            threads.append(now_thread)
-    if is_lock:
-        for now_thread in threads:
-            if now_thread is not threading.currentThread():
-                now_thread.join()
-
 if __name__ == '__main__':
     time_it(1)
