@@ -131,28 +131,23 @@ class User:
             all_symbols = [target.symbol for target in targets]
             for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
                 self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
-
             logger.info(f'User {self.account_id} cancel all open sell orders')
-            time.sleep(1)
-            sell_amount = [float(order.amount) for order in open_orders]
-            target_dict = {
-                target.symbol:target
-                for target in targets
-            }
-            sell_targets = [target_dict[order.symbol] for order in open_orders]
-            self.sell(sell_targets, sell_amount)
 
-            target_currencies = [target.base_currency for target in targets]
-            while True:
-                frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
-                if not any(frozen_balance.values()):
-                    break
-                else:
-                    time.sleep(0.5)
-            
-            self.get_balance(targets)
-            amounts = [self.balance[target.base_currency] for target in targets]
-            self.sell(targets, amounts)
+        self.get_balance(targets)
+        amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell(targets, amounts)
+
+        target_currencies = [target.base_currency for target in targets]
+        while True:
+            frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
+            if not any(frozen_balance.values()):
+                break
+            else:
+                time.sleep(0.1)
+        
+        self.get_balance(targets)
+        amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell(targets, amounts)
 
     def get_currency_balance(self, currencies):
         return {
@@ -162,11 +157,11 @@ class User:
         }
 
     def get_balance(self, targets):
-        while True:
-            target_currencies = [target.base_currency for target in targets]
-            self.balance = self.get_currency_balance(target_currencies)
-            if not list(set(target_currencies)-set(self.balance.keys())):
-                break
+        while self.get_open_orders(targets, side=None):
+            pass
+
+        target_currencies = [target.base_currency for target in targets]
+        self.balance = self.get_currency_balance(target_currencies)
 
     def check_balance(self, targets):
         self.get_balance(targets)
