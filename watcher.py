@@ -19,7 +19,7 @@ WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
 def check_buy_signal(client, symbol, kline):
     now = kline.ts / 1000
-    if now < client.target_time + 1 or now > client.target_time + UNSTOP_MAX_WAIT:
+    if now < client.target_time + 0.5 or now > client.target_time + UNSTOP_MAX_WAIT:
         return
 
     vol = kline.tick.vol
