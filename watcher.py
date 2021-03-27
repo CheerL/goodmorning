@@ -37,24 +37,24 @@ def check_buy_signal(client, symbol, kline):
     except Exception as e:
         logger.error(e)
 
-def check_sell_signal(client, symbol, kline):
-    target = client.market_client.targets[symbol]
-    if not target.own:
-        return
+# def check_sell_signal(client, symbol, kline):
+#     target = client.market_client.targets[symbol]
+#     if not target.own:
+#         return
 
-    now = kline.ts / 1000
-    if now < target.sell_least_time:
-        return
+#     now = kline.ts / 1000
+#     if now < target.sell_least_time:
+#         return
     
-    close = kline.tick.close
-    open_ = kline.tick.open
-    if close > target.sell_least_price:
-        return
+#     close = kline.tick.close
+#     open_ = kline.tick.open
+#     if close > target.sell_least_price:
+#         return
 
-    try:
-        client.send_sell_signal(symbol, close, open_, now)
-    except Exception as e:
-        logger.error(e)
+#     try:
+#         client.send_sell_signal(symbol, close, open_, now)
+#     except Exception as e:
+#         logger.error(e)
 
 def kline_callback(symbol, client):
     def warpper(kline):
@@ -62,7 +62,8 @@ def kline_callback(symbol, client):
             return
 
         if symbol in client.market_client.targets.keys():
-            check_sell_signal(client, symbol, kline)
+            # check_sell_signal(client, symbol, kline)
+            pass
         else:
             check_buy_signal(client, symbol, kline)
     return warpper

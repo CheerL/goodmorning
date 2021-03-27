@@ -1,6 +1,6 @@
 import time
 
-from parallel import run_process_pool, run_process
+from parallel import run_process
 from wampyapp import DealerClient as Client
 from utils import config, kill_all_threads, logger
 from market import MarketClient
@@ -32,9 +32,6 @@ def main(user: User):
     logger.info('Time to cancel')
     user.cancel_and_sell(client.targets)
     user.report()
-    # run_thread([(user.cancel_and_sell, (client.targets, ))
-    #             for user in client.users], is_lock=True)
-    # run_thread([(user.report, ()) for user in client.users], is_lock=True)
     kill_all_threads()
 
 

@@ -8,8 +8,6 @@ import time
 from logger import quite_logger
 from utils import config, logger, get_target_time
 from target import Target
-# from parallel import run_thread
-
 
 from wampy.constants import (
     DEFAULT_TIMEOUT, DEFAULT_ROLES, DEFAULT_REALM,
@@ -94,11 +92,11 @@ class WatcherClient(ControlledClient):
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {now}')
         
-    def send_sell_signal(self, symbol, price, init_price, now):
-        self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
-        self.market_client.targets[symbol].own = False
-        increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {now}')
+    # def send_sell_signal(self, symbol, price, init_price, now):
+    #     self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
+    #     self.market_client.targets[symbol].own = False
+    #     increase = round((price - init_price) / init_price * 100, 4)
+    #     logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {now}')
 
 class WatcherMasterClient(WatcherClient):
     def __init__(
@@ -175,27 +173,18 @@ class DealerClient(ControlledClient):
         target.buy_price = price
 
         self.user.buy_and_sell([target])
-
-        # run_thread([
-        #     (buy_and_sell, (user, [target], ))
-        #     for user in self.users
-        # ], is_lock=False)
         self.targets.append(target)
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
 
-    @subscribe(topic=SELL_SIGNAL_TOPIC)
-    def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):
-        if not self.run:
-            return
-
-        if symbol not in [target.symbol for target in self.targets]:
-            return
-
-        target = self.market_client.symbols_info[symbol]
-
-        self.user.cancel_and_sell([target])
-
-        # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
-        increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
+    # @subscribe(topic=SELL_SIGNAL_TOPIC)
+    # def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):
+    #     if not self.run:
+    #         return
+    #     if symbol not in [target.symbol for target in self.targets]:
+    #         return
+    #     target = self.market_client.symbols_info[symbol]
+    #     self.user.cancel_and_sell([target])
+    #     # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
+    #     increase = round((price - init_price) / init_price * 100, 4)
+    #     logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
