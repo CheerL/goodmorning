@@ -28,6 +28,25 @@ class WxPusher(_WxPusher):
         url = f'{BASEURL}/send/message'
         return requests.post(url, json=payload).json()
 
+    @classmethod
+    def query_user(cls, token, page=1, page_size=20, uid=None):
+        """Query users."""
+        payload = {
+            'appToken': token,
+            'page': page,
+            'pageSize': page_size,
+            'uid': uid if uid else ''
+        }
+        url = f'{BASEURL}/fun/wxuser/v2'
+        return requests.get(url, params=payload).json()
+
+    @classmethod
+    def get_user_name(cls, token, uid):
+        result = cls.query_user(token, uid=uid)
+        name  = result['data']['records'][0]['nickName']
+        return name
+
+
 @retry(tries=5, delay=1, logger=logger)
 def wxpush(content, uids, content_type=1, summary=None):
     WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
@@ -93,9 +112,17 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
 def wx_report(wxuid, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:
         return
+
+    username = WxPusher.get_user_name(token=TOKEN, uid=wxuid)
     summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
-    msg = '''
+    msg = f'''
+### 用户
+ 
+{username}
+
+
 ### 买入记录
+
 | 币种 | 时间 |价格 | 成交量 | 成交额 | 手续费 |
 | ---- | ---- | ---- | ---- | ---- | ---- |
 ''' + \
@@ -114,10 +141,15 @@ def wx_report(wxuid, pay, income, profit, percent, buy_info, sell_info, total_pr
 ### 总结
             
 - 支出: **{pay} USDT**
+
 - 收入: **{income} USDT**
+
 - 利润: **{profit} USDT**
+
 - 收益率: **{percent} %**
+
 - 月累计收益: **{month_profit} USDT**
+
 - 总累计收益: **{total_profit} USDT**
 '''
     wxpush(content=msg, uids=[wxuid], content_type=3, summary=summary)
