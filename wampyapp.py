@@ -174,7 +174,7 @@ class DealerClient(ControlledClient):
         target.init_price = init_price
         target.buy_price = price
 
-        self.buy_and_sell([target])
+        self.user.buy_and_sell([target])
 
         # run_thread([
         #     (buy_and_sell, (user, [target], ))
