@@ -149,11 +149,11 @@ class User:
         amounts = [self.balance[target.base_currency] for target in targets]
         self.sell(targets, amounts)
 
-    def get_currency_balance(self, currencies):
+    def get_currency_balance(self, currencies, balance_type='trade'):
         return {
             currency.currency: float(currency.balance)
             for currency in self.account_client.get_balance(self.account_id)
-            if currency.currency in currencies and currency.type == 'trade'
+            if currency.currency in currencies and currency.type == balance_type
         }
 
     def get_balance(self, targets):
