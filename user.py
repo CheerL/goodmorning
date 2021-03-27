@@ -5,11 +5,9 @@ import huobi
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderSide, OrderType
-# from huobi.constant import *
-# from huobi.utils import *
 
 from utils import config, logger, strftime, timeout_handle
-from report import wx_report, add_profit, get_profit
+from report import wx_report, add_profit, get_profit, wx_name
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
 SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
@@ -37,6 +35,7 @@ class User:
         self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
+        self.username = wx_name(wxuid)
 
     @staticmethod
     def _check_amount(amount, symbol_info):
@@ -239,4 +238,4 @@ class User:
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {percent}%')
         add_profit(self.account_id, pay, income, profit, percent)
         total_profit, month_profit = get_profit(self.account_id)
-        wx_report(self.wxuid, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)
+        wx_report(self.wxuid, self.username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)

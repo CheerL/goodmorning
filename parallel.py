@@ -44,16 +44,14 @@ def func_cpu(para, model=0, some=0):
     my_print('%s, 运行结束, 结果为%d' % (para, num), file_name, model)
     return num
 
-def run_thread(req_list, name=None, is_lock=True, limit_num=32):
+def run_thread(req_list, is_lock=True, limit_num=32):
     ''' 多线程函数
         req_list    任务列表, list, 每个元素为一个任务, 形式为
                     [
-                        (func_0, (para_0_1, para_0_2, *,)),
-                        (func_1, (para_1_1, para_1_2, *,)),
+                        (func_0, (para_0_1, para_0_2, *,), [name_0]),
+                        (func_1, (para_1_1, para_1_2, *,), [name_1]),
                         *
-                        ]
-        name        线程名, str, 默认为None
-        if_debug    debug模式开关, bool, 默认为False, 为True时会显示运行时间
+                    ]
         limit_num   最大线程数, int, 默认为8
         '''
     queue = deque(req_list)
@@ -61,13 +59,37 @@ def run_thread(req_list, name=None, is_lock=True, limit_num=32):
     while len(queue):
         if threading.active_count() <= limit_num:
             para = queue.popleft()
-            now_thread = threading.Thread(target=para[0], args=para[1], name=name, daemon=True)
+            thread_name = para[2] if len(para) > 2 else None
+            now_thread = threading.Thread(target=para[0], args=para[1], name=thread_name, daemon=True)
             now_thread.start()
             threads.append(now_thread)
     if is_lock:
         for now_thread in threads:
-            if now_thread is not threading.currentThread():
-                now_thread.join()
+            # if now_thread is not threading.currentThread():
+            now_thread.join()
+
+def run_process(req_list, is_lock=True, limit_num=8):
+    ''' 多进程函数
+        req_list    任务列表, list, 每个元素为一个任务, 形式为
+                    [
+                        (func_0, (para_0_1, para_0_2, *,), [name_0]),
+                        (func_1, (para_1_1, para_1_2, *,), [name_1]),
+                        *
+                    ]
+        limit_num   最大线程数, int, 默认为8
+        '''
+    queue = deque(req_list)
+    processes = []
+    while len(queue):
+        if threading.active_count() <= limit_num:
+            para = queue.popleft()
+            process_name = para[2] if len(para) > 2 else None
+            now_process = multiprocessing.Process(target=para[0], args=para[1], name=process_name)
+            now_process.start()
+            processes.append(now_process)
+    if is_lock:
+        for now_process in processes:
+            now_process.join()
 
 def run_process_pool(req_list, is_lock=True, limit_num=8):
     ''' 多进程程函数, 使用进程池
@@ -123,7 +145,7 @@ def search_thread(name, part=False):
 def main():
     '主函数'
     req_list = [(func_cpu, (num, 1, 0, )) for num in range(100)]
-    print(run_thread(req_list))
+    # print(run_thread(req_list))
     # reply = {
     #     0:run_thread(req_list),
     #     1:run_process_pool(req_list),
@@ -134,6 +156,7 @@ def main():
     #     if argv1 in reply.keys():
     #         reply[argv1]
     #pause(10)
+    run_process_pool(req_list, True)
 
 def profile():
     '性能分析'

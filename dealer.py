@@ -1,6 +1,6 @@
 import time
 
-from parallel import run_process_pool
+from parallel import run_process_pool, run_process
 from wampyapp import DealerClient as Client
 from utils import config, kill_all_threads, logger
 from market import MarketClient
@@ -18,6 +18,7 @@ def init_dealer(user):
     return client
 
 def main(user: User):
+    logger.info('Start run sub process')
     client = init_dealer(user)
     client.wait_to_run()
 
@@ -39,4 +40,4 @@ def main(user: User):
 
 if __name__ == '__main__':
     users = init_users()
-    run_process_pool([(main, (user,)) for user in users], is_lock=True, limit_num=len(users)+2)
+    run_process([(main, (user,), user.username) for user in users], is_lock=True, limit_num=len(users)+2)
