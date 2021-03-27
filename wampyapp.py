@@ -1,14 +1,14 @@
 from wampy.peers.clients import Client
 from wampy.roles.subscriber import subscribe
 from wampy.roles.callee import callee
-import market
-import user
+from market import MarketClient
+from user import User
 import time
 
 from logger import quite_logger
 from utils import config, logger, get_target_time
 from target import Target
-from parallel import run_thread
+# from parallel import run_thread
 
 
 from wampy.constants import (
@@ -30,12 +30,6 @@ BUY_SIGNAL_TOPIC = 'buy'
 SELL_SIGNAL_TOPIC = 'sell'
 
 quite_logger(all_logger=True)
-
-def buy_and_sell(user: 'user.User', targets):
-    user.buy(targets, [user.buy_amount for _ in targets])
-    user.check_balance(targets)
-    sell_amounts = [user.balance[target.base_currency] for target in targets]
-    user.sell_limit(targets, sell_amounts)
 
 class ControlledClient(Client):
     def __init__(
@@ -81,7 +75,7 @@ class ControlledClient(Client):
 
 class WatcherClient(ControlledClient):
     def __init__(
-        self, market_client: 'market.MarketClient', url=WS_URL, cert_path=None, ipv=4, name=None,
+        self, market_client: MarketClient, url=WS_URL, cert_path=None, ipv=4, name=None,
         realm=DEFAULT_REALM, roles=DEFAULT_ROLES, call_timeout=DEFAULT_TIMEOUT,
         message_handler_cls=None
     ):
@@ -108,7 +102,7 @@ class WatcherClient(ControlledClient):
 
 class WatcherMasterClient(WatcherClient):
     def __init__(
-        self, market_client: 'market.MarketClient', url=WS_URL, cert_path=None, ipv=4, name=None,
+        self, market_client: MarketClient, url=WS_URL, cert_path=None, ipv=4, name=None,
         realm=DEFAULT_REALM, roles=DEFAULT_ROLES, call_timeout=DEFAULT_TIMEOUT,
         message_handler_cls=None
     ):
@@ -154,8 +148,8 @@ class WatcherMasterClient(WatcherClient):
 
 class DealerClient(ControlledClient):
     def __init__(
-        self, market_client: 'market.MarketClient',
-        users: 'list[user.User]',
+        self, market_client: MarketClient,
+        user: User,
         url=WS_URL, cert_path=None, ipv=4, name=None,
         realm=DEFAULT_REALM, roles=DEFAULT_ROLES, call_timeout=DEFAULT_TIMEOUT,
         message_handler_cls=None
@@ -165,7 +159,7 @@ class DealerClient(ControlledClient):
         )
         self.market_client = market_client
         self.targets = []
-        self.users = users
+        self.user = user
         self.client_type = 'dealer'
 
     @subscribe(topic=BUY_SIGNAL_TOPIC)
@@ -179,10 +173,13 @@ class DealerClient(ControlledClient):
         target = self.market_client.symbols_info[symbol]
         target.init_price = init_price
         target.buy_price = price
-        run_thread([
-            (buy_and_sell, (user, [target], ))
-            for user in self.users
-        ], is_lock=False)
+
+        self.buy_and_sell([target])
+
+        # run_thread([
+        #     (buy_and_sell, (user, [target], ))
+        #     for user in self.users
+        # ], is_lock=False)
         self.targets.append(target)
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
@@ -196,6 +193,9 @@ class DealerClient(ControlledClient):
             return
 
         target = self.market_client.symbols_info[symbol]
-        run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
+
+        self.user.cancel_and_sell([target])
+
+        # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')

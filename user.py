@@ -4,8 +4,9 @@ import time
 import huobi
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
-from huobi.constant import *
-from huobi.utils import *
+from huobi.constant import OrderSource, OrderSide, OrderType
+# from huobi.constant import *
+# from huobi.utils import *
 
 from utils import config, logger, strftime, timeout_handle
 from report import wx_report, add_profit, get_profit
@@ -148,6 +149,12 @@ class User:
         self.get_balance(targets)
         amounts = [self.balance[target.base_currency] for target in targets]
         self.sell(targets, amounts)
+
+    def buy_and_sell(self, targets):
+        self.buy(targets, [self.buy_amount for _ in targets])
+        self.check_balance(targets)
+        sell_amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell_limit(targets, sell_amounts)
 
     def get_currency_balance(self, currencies):
         return {

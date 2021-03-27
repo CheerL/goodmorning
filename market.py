@@ -2,8 +2,9 @@ import time
 
 from huobi.client.generic import GenericClient
 from huobi.client.market import MarketClient as _MarketClient
-from huobi.constant import *
-from huobi.utils import *
+from huobi.constant import CandlestickInterval
+# from huobi.constant import *
+# from huobi.utils import *
 
 from utils import config, logger, timeout_handle
 from target import Target

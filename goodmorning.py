@@ -1,6 +1,6 @@
 import time
 
-from huobi.constant.definition import *
+# from huobi.constant.definition import *
 
 from market import MarketClient
 from parallel import run_thread
