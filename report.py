@@ -50,7 +50,7 @@ class WxPusher(_WxPusher):
 
 @retry(tries=5, delay=1, logger=logger)
 def wx_push(content, uids, content_type=1, summary=None):
-    WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
+    WxPusher.send_message(content, uids=uids, content_type=content_type, summary=summary or content[:20])
 
 @retry(tries=5, delay=1, logger=logger)
 def wx_name(uid):
@@ -123,6 +123,7 @@ def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info
 ### 用户
  
 {username}
+
 
 ### 买入记录
 

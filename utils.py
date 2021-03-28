@@ -9,7 +9,7 @@ import pytz
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
-from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
+# from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.constant.system import WebSocketDefine, RestApiDefine
 from huobi.utils import PrintBasic
 from logger import create_logger
@@ -91,5 +91,5 @@ def kill_all_threads():
         kill_thread(manage._WebsocketManage__thread)
 
     for thread in threading.enumerate():
-        if isinstance(thread, WebSocketWatchDog):
-            kill_thread(thread)
+        # if isinstance(thread, WebSocketWatchDog):
+        kill_thread(thread)
