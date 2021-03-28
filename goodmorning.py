@@ -30,22 +30,6 @@ def initial():
     target_time = get_target_time()
     return users, market_client, target_time
 
-def cancel_and_sell_after(users, targets, t):
-    while time.time() < t:
-        time.sleep(1)
-
-    logger.info('Time to cancel')
-    run_thread([(
-        lambda user, targets: user.cancel_and_sell(targets),
-        (user, targets, )
-    ) for user in users], is_lock=True)
-
-def buy_and_sell(user, targets):
-    user.buy(targets, [user.buy_amount for _ in targets])
-    user.check_balance(targets)
-    sell_amounts = [user.balance[target.base_currency] for target in targets]
-    user.sell_limit(targets, sell_amounts)
-
 def main():
     users, market_client, target_time = initial()
     base_price, base_price_time = market_client.get_base_price(target_time)
@@ -55,10 +39,7 @@ def main():
     while True:
         tmp_targets = market_client.get_target(target_time, base_price, change_base=False, unstop=True)
         if tmp_targets:
-            run_thread([
-                (buy_and_sell, (user, tmp_targets, ))
-                for user in users
-            ], is_lock=False)
+            run_thread([(user.buy_and_sell, (tmp_targets, )) for user in users], is_lock=False)
             targets.extend(tmp_targets)
         else:
             break
@@ -67,8 +48,12 @@ def main():
         logger.warning('No targets, exit')
         return
 
-    cancel_and_sell_after(users, targets, target_time + SELL_AFTER)
-    run_thread([(lambda user: user.report(), (user, )) for user in users])
+    while time.time() < target_time + SELL_AFTER:
+        time.sleep(1)
+
+    logger.info('Time to cancel')
+    run_thread([(user.cancel_and_sell, (targets, )) for user in users], is_lock=True)
+    run_thread([(user.report, ()) for user in users], is_lock=True)
 
 
 if __name__ == '__main__':
