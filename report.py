@@ -4,8 +4,7 @@ import sqlite3
 import time
 
 import requests
-from wxpusher.wxpusher import BASEURL
-from wxpusher.wxpusher import WxPusher as _WxPusher
+from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
 
 from utils import ROOT, config, strftime, logger
 from retry import retry
@@ -13,11 +12,13 @@ from retry import retry
 TOKEN = config.get('setting', 'Token')
 
 class WxPusher(_WxPusher):
+    token = TOKEN
+
     @classmethod
     def send_message(cls, content, **kwargs):
         """Send Message."""
         payload = {
-            'appToken': cls._get_token(kwargs.get('token')),
+            'appToken': cls.token,
             'content': content,
             'summary': kwargs.get('summary', content[:19]),
             'contentType': kwargs.get('content_type', 0),
@@ -29,10 +30,10 @@ class WxPusher(_WxPusher):
         return requests.post(url, json=payload).json()
     
     @classmethod
-    def query_user(cls, token, page=1, page_size=20, uid=None):
+    def query_user(cls, page=1, page_size=20, uid=None):
         """Query users."""
         payload = {
-            'appToken': token,
+            'appToken': cls.token,
             'page': page,
             'pageSize': page_size,
             'uid': uid if uid else ''
@@ -41,15 +42,19 @@ class WxPusher(_WxPusher):
         return requests.get(url, params=payload).json()
 
     @classmethod
-    def get_user_name(cls, token, uid):
-        result = cls.query_user(token, uid=uid)
+    def get_user_name(cls, uid):
+        result = cls.query_user(uid=uid)
         name  = result['data']['records'][0]['nickName']
         return name
 
 
 @retry(tries=5, delay=1, logger=logger)
-def wxpush(content, uids, content_type=1, summary=None):
+def wx_push(content, uids, content_type=1, summary=None):
     WxPusher.send_message(content, uids=uids, token=TOKEN, content_type=content_type, summary=summary or content[:20])
+
+@retry(tries=5, delay=1, logger=logger)
+def wx_name(uid):
+    return WxPusher.get_user_name(uid=uid)
 
 def get_profit(account_id):
     path = os.path.join(ROOT, 'log', 'profit.sqlite')
@@ -109,10 +114,10 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
     conn.commit()
     conn.close()
 
-def wx_report(wxuid, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
+def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:
         return
-    username = WxPusher.get_user_name(token=TOKEN, uid=wxuid)
+
     summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
     msg = f'''
 ### 用户
@@ -151,4 +156,4 @@ def wx_report(wxuid, pay, income, profit, percent, buy_info, sell_info, total_pr
 
 - 总累计收益: **{total_profit} USDT**
 '''
-    wxpush(content=msg, uids=[wxuid], content_type=3, summary=summary)
+    wx_push(content=msg, uids=[wxuid], content_type=3, summary=summary)

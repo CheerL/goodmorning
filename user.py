@@ -1,13 +1,13 @@
 import math
 import time
 
+import huobi
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
-from huobi.constant import *
-from huobi.utils import *
+from huobi.constant import OrderSource, OrderSide, OrderType
 
 from utils import config, logger, strftime, timeout_handle
-from report import wx_report, add_profit, get_profit
+from report import wx_report, add_profit, get_profit, wx_name
 
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
@@ -36,6 +36,7 @@ class User:
         self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
+        self.username = wx_name(wxuid)
 
     @staticmethod
     def _check_amount(amount, symbol_info):
@@ -67,8 +68,6 @@ class User:
             logger.debug(f'User {self.account_id} buy report')
             for order in buy_order_list:
                 logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
-
-        
 
     def sell(self, targets, amounts):
         sell_order_list = [{
@@ -119,34 +118,42 @@ class User:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
 
     @timeout_handle([])
-    def get_open_orders(self, targets, side=OrderSide.SELL):
-        symbols = ','.join([target.symbol for target in targets])
-        open_orders = self.trade_client.get_open_orders(symbols, self.account_id, side)
+    def get_open_orders(self, targets, side=OrderSide.SELL) -> 'list[huobi.model.trade.order.Order]':
+        open_orders = []
+        all_symbols = [target.symbol for target in targets]
+        for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
+            open_orders.extend(self.trade_client.get_open_orders(','.join(symbols), self.account_id, side))
         return open_orders
 
     def cancel_and_sell(self, targets):
         open_orders = self.get_open_orders(targets)
         if open_orders:
-            symbols = ','.join([target.symbol for target in targets])
-            self.trade_client.cancel_orders(symbols, [order.id for order in open_orders])
+            all_symbols = [target.symbol for target in targets]
+            for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
+                self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
             logger.info(f'User {self.account_id} cancel all open sell orders')
-            time.sleep(0.5)
-            sell_amount = [float(order.amount) for order in open_orders]
-            target_dict = {target.symbol: target for target in targets}
-            sell_targets = [target_dict[order.symbol] for order in open_orders]
-            self.sell(sell_targets, sell_amount)
 
-            target_currencies = [target.base_currency for target in targets]
-            while True:
-                frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
-                if not any(frozen_balance.values()):
-                    break
-                else:
-                    time.sleep(0.5)
-            
-            self.get_balance(targets)
-            amounts = [self.balance[target.base_currency] for target in targets]
-            self.sell(targets, amounts)
+        self.get_balance(targets)
+        amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell(targets, amounts)
+
+        target_currencies = [target.base_currency for target in targets]
+        while True:
+            frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
+            if not any(frozen_balance.values()):
+                break
+            else:
+                time.sleep(0.1)
+        
+        self.get_balance(targets)
+        amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell(targets, amounts)
+
+    def buy_and_sell(self, targets):
+        self.buy(targets, [self.buy_amount for _ in targets])
+        self.check_balance(targets)
+        sell_amounts = [self.balance[target.base_currency] for target in targets]
+        self.sell_limit(targets, sell_amounts)
 
     def get_currency_balance(self, currencies, balance_type='trade'):
         return {
@@ -156,11 +163,12 @@ class User:
         }
 
     def get_balance(self, targets):
-        while True:
-            target_currencies = [target.base_currency for target in targets]
-            self.balance = self.get_currency_balance(target_currencies)
-            if not list(set(target_currencies)-set(self.balance.keys())):
-                break
+        while self.get_open_orders(targets, side=None):
+            pass
+
+        target_currencies = [target.base_currency for target in targets]
+        self.balance = self.get_currency_balance(target_currencies)
+
 
     def check_balance(self, targets):
         self.get_balance(targets)
@@ -170,7 +178,7 @@ class User:
             target_balance = self.balance[target.base_currency]
             if target_balance > 10 ** -target.amount_precision:
                 buy_price = order["amount"] / target_balance * 0.998
-                target.buy_price = max(buy_price, target.buy_price)
+                target.buy_price = buy_price
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {buy_price}')
             else:
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
@@ -231,4 +239,4 @@ class User:
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {percent}%')
         add_profit(self.account_id, pay, income, profit, percent)
         total_profit, month_profit = get_profit(self.account_id)
-        wx_report(self.wxuid, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)
+        wx_report(self.wxuid, self.username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)
