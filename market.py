@@ -3,8 +3,7 @@ import time
 from huobi.client.generic import GenericClient
 from huobi.client.market import MarketClient as _MarketClient
 from huobi.constant import CandlestickInterval
-# from huobi.constant import *
-# from huobi.utils import *
+from retry import retry
 
 from utils import config, logger, timeout_handle
 
@@ -53,7 +52,7 @@ class MarketClient(_MarketClient):
         }
         return price
 
-    @timeout_handle(0)
+    @retry(tries=5, delay=0, logger=logger)
     def get_vol(self, symbol):
         [kline] = self.get_candlestick(symbol, CandlestickInterval.MIN1, 1)
         return kline.vol
