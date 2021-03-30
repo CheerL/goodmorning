@@ -26,6 +26,7 @@ class User:
         if buy_amount.startswith('/'):
             usdt_balance = self.get_currency_balance(['usdt'])['usdt']
             self.buy_amount =  max(math.floor(usdt_balance / float(buy_amount[1:])), 5)
+            self.usdt_balance = usdt_balance
         else:
             self.buy_amount = float(buy_amount)
         self.wxuid = wxuid
@@ -211,7 +212,7 @@ class User:
 
         income = round(sum([each['vol'] - each['fee'] for each in sell_info]), 4)
         profit = round(income - pay, 4)
-        percent = round(profit / pay * 100, 4)
+        percent = round(profit / self.usdt_balance * 100, 4)
 
         logger.info(f'REPORT for user {self.account_id}')
         logger.info('Buy')
