@@ -118,7 +118,7 @@ def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info
     if not wxuid:
         return
 
-    summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
+    summary = f'{strftime(time.time())} {username} 今日支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
     msg = f'''
 ### 用户
  
