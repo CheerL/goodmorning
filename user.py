@@ -36,7 +36,7 @@ class User:
         self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
-        self.username = wx_name(wxuid[0])
+        self.username = wx_name(self.wxuid[0])
 
     @staticmethod
     def _check_amount(amount, symbol_info):
