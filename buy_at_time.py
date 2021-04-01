@@ -1,7 +1,8 @@
+from math import log
 import sys
 import time
 
-from huobi.constant import OrderSide, OrderSource, OrderType
+from huobi.constant import OrderSide, OrderSource, OrderType, OrderState
 from retry import retry
 
 from goodmorning import init_users
@@ -10,21 +11,39 @@ from report import wx_push
 from user import User
 from utils import logger, user_config
 
+MAX_ORDER_RETRY = 5
+
+class FailBuyException(Exception):
+    pass
 
 @retry(tries=-1, delay=0.05, logger=logger)
 def buy_at(user: 'User', symbol: str, amount: float):
-    user.trade_client.create_order(
+    order_id = user.trade_client.create_order(
         symbol, user.account_id, OrderType.BUY_MARKET,
         amount, 0, OrderSource.API
     )
+    user.buy_id.append(order_id)
 
 def buy_task(user: User, symbol: str):
+    @retry(FailBuyException, tries=MAX_ORDER_RETRY, delay=0.5, logger=logger)
+    def _buy():
+        buy_at(user, symbol, user.buy_amount)
+
+        while user.trade_client.get_open_orders(symbol, user.account_id, OrderSide.BUY):
+            pass
+
+        order = user.trade_client.get_order(user.buy_id[0])
+        if order.state in [OrderState.CANCELED, OrderState.CANCELLING, OrderState.FAILED]:
+            user.buy_id.clear()
+            raise FailBuyException(f'order failed: {order.state}')
+
     logger.info(f'User {user.username} start to run, use {user.buy_amount} USDT')
-    buy_at(user, symbol, user.buy_amount)
-
-    while user.trade_client.get_open_orders(symbol, user.account_id, OrderSide.BUY):
-        pass
-
+    try:
+        _buy()
+    except:
+        logger.error(f'Fail to buy after {MAX_ORDER_RETRY} tries')
+        wx_push(f'尝试购买{symbol.upper()}失败累计{MAX_ORDER_RETRY}次, 放弃此次购买', [user.wxuid])
+    
     currency = symbol[:-4]
     user.balance = user.get_currency_balance([currency])
     num = user.balance[currency]
