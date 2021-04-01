@@ -22,13 +22,14 @@ class User:
             lambda account: account.type=='spot' and account.state =='working',
             self.account_client.get_accounts()
         )).id
-        
+
+        self.usdt_balance = self.get_currency_balance(['usdt'])['usdt']
+
         if buy_amount.startswith('/'):
-            usdt_balance = self.get_currency_balance(['usdt'])['usdt']
-            self.buy_amount =  max(math.floor(usdt_balance / float(buy_amount[1:])), 5)
-            self.usdt_balance = usdt_balance
+            self.buy_amount =  max(math.floor(self.usdt_balance / float(buy_amount[1:])), 5)
         else:
             self.buy_amount = float(buy_amount)
+
         self.wxuid = wxuid.split(';')
 
         self.balance = {}
