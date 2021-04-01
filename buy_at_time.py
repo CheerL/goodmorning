@@ -52,7 +52,7 @@ def buy_task(user: User, symbol: str):
 
     logger.info(f'User {user.username} speed {user.buy_amount} USDT get {num} {currency.upper()} with price {price}')
     msg = f'用户{user.username}花费{user.buy_amount} USDT购入{num} {currency.upper()}, 单价{price}, 请注意自行卖出'
-    wx_push(msg, [user.wxuid])
+    wx_push(msg, user.wxuid)
 
 def main():
     FMT  = '%Y-%m-%d %H:%M:%S'

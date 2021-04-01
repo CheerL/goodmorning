@@ -29,14 +29,14 @@ class User:
             self.usdt_balance = usdt_balance
         else:
             self.buy_amount = float(buy_amount)
-        self.wxuid = wxuid
+        self.wxuid = wxuid.split(';')
 
         self.balance = {}
         self.buy_order_list = []
         self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
-        self.username = wx_name(wxuid)
+        self.username = wx_name(wxuid[0])
 
     @staticmethod
     def _check_amount(amount, symbol_info):

@@ -156,4 +156,4 @@ def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info
 
 - 总累计收益: **{total_profit} USDT**
 '''
-    wx_push(content=msg, uids=[wxuid], content_type=3, summary=summary)
+    wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
