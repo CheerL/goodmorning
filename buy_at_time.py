@@ -43,6 +43,7 @@ def buy_task(user: User, symbol: str):
     except:
         logger.error(f'Fail to buy after {MAX_ORDER_RETRY} tries')
         wx_push(f'尝试购买{symbol.upper()}失败累计{MAX_ORDER_RETRY}次, 放弃此次购买', [user.wxuid])
+        return
     
     currency = symbol[:-4]
     user.balance = user.get_currency_balance([currency])
