@@ -96,7 +96,7 @@ def main():
     logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
     for i, symbol in enumerate(task):
         client.market_client.sub_candlestick(
-            symbol, CandlestickInterval.MIN5,
+            symbol, CandlestickInterval.MIN1,
             kline_callback(symbol, client), error_callback
         )
         if not i % 10:
