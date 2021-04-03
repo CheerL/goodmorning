@@ -85,8 +85,8 @@ def main():
         task = client.get_task(WATCHER_TASK_NUM)
         client.wait_to_run()
     else:
-        time.sleep(25)
         logger.info('Sub watcher')
+        time.sleep(25)
         client = init_watcher(WatcherClient)
         client.wait_to_run()
         task = client.get_task(WATCHER_TASK_NUM)
