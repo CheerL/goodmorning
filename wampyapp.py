@@ -86,11 +86,11 @@ class WatcherClient(ControlledClient):
     def get_task(self, num) -> 'list[str]':
         return self.rpc.get_task(num)
 
-    def send_buy_signal(self, symbol, price, init_price, now):
-        self.publish(topic=BUY_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
+    def send_buy_signal(self, symbol, price, init_price, now, vol):
+        self.publish(topic=BUY_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol)
         self.market_client.targets[symbol] = Target(symbol, price, init_price, now)
         increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {now}')
+        logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {now}')
         
     # def send_sell_signal(self, symbol, price, init_price, now):
     #     self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
@@ -161,7 +161,7 @@ class DealerClient(ControlledClient):
         self.client_type = 'dealer'
 
     @subscribe(topic=BUY_SIGNAL_TOPIC)
-    def buy_signal_handler(self, symbol, price, init_price, *args, **kwargs):
+    def buy_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
         if not self.run:
             return
 
@@ -175,7 +175,7 @@ class DealerClient(ControlledClient):
         self.user.buy_and_sell([target])
         self.targets.append(target)
         increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Buy {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
+        logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
 
     # @subscribe(topic=SELL_SIGNAL_TOPIC)
     # def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):

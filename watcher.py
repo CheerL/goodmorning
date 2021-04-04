@@ -33,7 +33,7 @@ def check_buy_signal(client, symbol, kline):
         return
 
     try:
-        client.send_buy_signal(symbol, close, open_, now)
+        client.send_buy_signal(symbol, close, open_, now, vol)
     except Exception as e:
         logger.error(e)
 
