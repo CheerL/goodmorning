@@ -31,6 +31,7 @@ def main(user: User):
     client.stop()
     logger.info('Time to cancel')
     user.cancel_and_sell(client.targets)
+    time.sleep(2)
     user.report()
     kill_all_threads()
 
