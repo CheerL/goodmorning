@@ -1,115 +1,100 @@
 import csv
 import os
-import sqlite3
 import time
 
 from data2excel import create_excel
 from market import MarketClient
 from utils import ROOT, get_target_time, kill_all_threads, logger
 from target import Target
+from huobi.model.market.candlestick_event import CandlestickEvent
+from huobi.model.market.trade_detail_event import TradeDetailEvent
 
-target_time = get_target_time()
-target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
 DB_PATH = os.path.join(ROOT, 'test', 'db', 'csv')
 
-def get_csv_path(symbol):
+def writerow(csv_path, row):
+    with open(csv_path, 'a+') as fcsv:
+        csv.writer(fcsv).writerow(row)
+
+def writerows(csv_path, rows):
+    with open(csv_path, 'a+') as fcsv:
+        csv.writer(fcsv).writerows(rows)
+
+def get_csv_path(symbol, target_time_str):
     return os.path.join(DB_PATH, f'{target_time_str}_{symbol}.csv')
 
-class SQLMarketClient(MarketClient):
-    def handle_big_increase(self, big_increase, base_price):
-        targets = []
-        for symbol, now_price, target_increase, _ in big_increase:
-            self.targets[symbol] = Target(symbol, now_price)
-            self.sub_candlestick(symbol, '5min', kline_callback(symbol, target_time), lambda e: logger.error(e))
-            init_price, _ = base_price[symbol]
-            logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%')
+def get_csv_handler(symbol, target_time):
+    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
+    csv_path = get_csv_path(symbol, target_time_str)
+    if not os.path.exists(csv_path):
+        writerow(csv_path, ['时间', '价格', '成交额', '开盘价', '高'])
 
-        return targets
+    return csv_path
 
-class CSVMarketClient(MarketClient):
-    def handle_big_increase(self, big_increase, base_price):
-        targets = []
-        for symbol, now_price, target_increase, _ in big_increase:
-            self.targets[symbol] = Target(symbol, now_price)
-            self.sub_candlestick(symbol, '5min', kline_callback_csv(symbol, target_time), lambda e: logger.error(e))
-            init_price, _ = base_price[symbol]
-            logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%')
+def write_kline_csv(csv_path, target_time: float, kline: CandlestickEvent):
+    now = kline.ts / 1000 - target_time
+    close = kline.tick.close
+    high = kline.tick.high
+    open_ = kline.tick.open
+    vol = kline.tick.vol
+    # fcsv_writer.writerow([now, close, vol, open_, high])
+    writerow(csv_path, [now, close, vol, open_, high])
+    print(time.time() - kline.ts / 1000)
 
-        return targets
+def write_detail_csv(csv_path, target_time: float, detail: TradeDetailEvent):
+    writerows(csv_path, [[detail_item.ts/1000 - target_time, detail_item.price, detail_item.amount, 0, 0] for detail_item in detail.data])
+    print(time.time() - detail.ts / 1000)
 
-def create_conn(path):
-    if not os.path.exists(path):
-        conn = sqlite3.connect(path)
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE market (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol varchar(20),
-            time varchar(30),
-            price varchar(30),
-            vol varchar(30)
-        )
-        ''')
-    else:
-        conn = sqlite3.connect(path)
-        cursor = conn.cursor()
-    return conn, cursor
-
-def kline_callback_csv(symbol, target_time):
+def kline_callback(csv_path, target_time):
     def wrapper(kline):
-        now = time.time() - target_time
+        now = kline.ts / 1000 - target_time
         close = kline.tick.close
         high = kline.tick.high
         open_ = kline.tick.open
         vol = kline.tick.vol
-        increase = close / open_ - 1
-        back = 1 - high / close
-        
-        with open(csv_path, 'a+') as fcsv:
-            csv.writer(fcsv).writerow([now, close, vol, increase, high, back])
-
-    csv_path = get_csv_path(symbol)
-    if not os.path.exists(csv_path):
-        with open(csv_path, 'a+') as fcsv:
-            csv.writer(fcsv).writerow(['时间', '价格', '成交额', '涨幅', '高', '回撤'])
-
+        # fcsv_writer.writerow([now, close, vol, open_, high])
+        writerow(csv_path, [now, close, vol, open_, high])
+        print(time.time() - kline.ts / 1000)
+    
     return wrapper
 
+def detail_callback(csv_path, target_time, interval=60):
+    def wrapper(detail):
+        with open(csv_path, 'a+') as fcsv:
+            for detail_item in detail.data:
+                now = detail_item.ts // interval
+                if now > info['last']:
+                    info['last'] = now
+                    info['open_'] = detail_item.price
+                    info['vol'] = 0
+                    info['high'] = info['open_']
+                
+                info['vol'] += detail_item.price * detail_item.amount
+                info['high'] = max(info['high'], detail_item.price)
 
-def kline_callback(symbol, target_time):
-    def wrapper(kline):
-        conn, cursor = create_conn(sql_path)
-        now = time.time()
-        close = kline.tick.close
-        vol = kline.tick.vol
-        cursor.execute(f'INSERT into market (symbol, time, price, vol) values (\'{symbol}\', \'{now}\', \'{close}\', \'{vol}\')')
-        cursor.close()
-        conn.commit()
-        conn.close()
-
-
-    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
-    sql_path = os.path.join(ROOT, 'test', 'db', f'{symbol}_{target_time_str}.db')
-
+                csv.writer(fcsv).writerow([detail_item.ts/1000 - target_time, detail_item.price, info['vol'], info['open_'], info['high']])
+        print(time.time() - detail.ts / 1000)
+    
+    info = {
+        'last': 0,
+        'vol': 0,
+        'open_': 0,
+        'high': 0
+    }
+    interval *= 1000
     return wrapper
 
 def main():
-    market_client = CSVMarketClient()
-    if target_time % (24*60*60) == 16*60*60:
-        market_client.midnight = True
+    m = MarketClient()
+    target_time = time.time()
+    symbol = 'btcusdt'
 
-    base_price, base_price_time = market_client.get_base_price(target_time)
-    market_client.exclude_expensive(base_price)
-
-    for _ in range(5):
-        market_client.get_target(time.time(), base_price, base_price_time, change_base=False, interval=10, unstop=False)
-
-    while time.time() < target_time + 300:
-        pass
-
+    kline_path = get_csv_handler('kline', target_time)
+    detail_path = get_csv_handler('detail', target_time)
+    m.sub_candlestick(symbol, '1min', kline_callback(kline_path, target_time), None)
+    m.sub_trade_detail(symbol, detail_callback(detail_path, target_time), None)
+    time.sleep(30)
+    # close_csv_handler()
     kill_all_threads()
-    time.sleep(10)
-    create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':
     main()

@@ -3,10 +3,11 @@ import time
 
 from wampyapp import WatcherClient, WatcherMasterClient
 from huobi.constant.definition import CandlestickInterval
+from huobi.model.market.candlestick_event import CandlestickEvent
 
 from market import MarketClient
 from utils import config, kill_all_threads, logger
-
+from record import write_kline_csv, get_csv_handler
 from retry import retry
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
@@ -56,9 +57,9 @@ def check_buy_signal(client, symbol, kline):
 #     except Exception as e:
 #         logger.error(e)
 
-def kline_callback(symbol, client):
-    def warpper(kline):
-        if not client.run:
+def kline_callback(symbol: str, client: WatcherClient):
+    def warpper(kline: CandlestickEvent):
+        if not client.run or kline.ts / 1000 < client.target_time:
             return
 
         if symbol in client.market_client.targets.keys():
@@ -66,13 +67,17 @@ def kline_callback(symbol, client):
             pass
         else:
             check_buy_signal(client, symbol, kline)
+
+        write_kline_csv(csv_path, client.target_time, kline)
+
+    csv_path = get_csv_handler(symbol, client.target_time)
     return warpper
 
 def error_callback(error):
     logger.error(error)
 
 @retry(tries=5, delay=1, logger=logger)
-def init_watcher(Client):
+def init_watcher(Client) -> WatcherClient:
     market_client = MarketClient()
     client = Client(market_client)
     client.start()
