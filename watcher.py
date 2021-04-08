@@ -81,7 +81,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
                     info['vol'] = 0
 
                 info['vol'] += price * detail.amount
-                info['high'] = max(info['info'], price)
+                info['high'] = max(info['high'], price)
 
                 if symbol in client.market_client.targets.keys():
                     check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
@@ -140,7 +140,7 @@ def main():
         #     kline_callback(symbol, client), error_callback
         # )
         client.market_client.sub_trade_detail(
-            symbol, trade_detail_callback(symbol, client)
+            symbol, trade_detail_callback(symbol, client), error_callback
         )
         if not i % 10:
             time.sleep(0.5)
