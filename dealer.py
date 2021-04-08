@@ -23,7 +23,7 @@ def main(user: User):
     client.wait_to_run()
 
     sell_time = client.target_time + SELL_AFTER
-    time.sleep(max(sell_time - time.time() - 5, 1))
+    time.sleep(max(sell_time - time.time() - 5, 0.5))
 
     while time.time() < sell_time:
         pass

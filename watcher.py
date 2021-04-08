@@ -1,7 +1,7 @@
 import sys
 import time
 
-from wampyapp import WatcherClient, WatcherMasterClient
+from wampyapp import SELL_AFTER, WatcherClient, WatcherMasterClient
 from huobi.constant.definition import CandlestickInterval
 from huobi.model.market.candlestick_event import CandlestickEvent
 
@@ -13,16 +13,12 @@ from retry import retry
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
-UNSTOP_MAX_WAIT = config.getfloat('setting', 'UnstopMaxWait')
+SELL_AFTER = config.getfloat('setting', 'SellAfter')
 
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client, symbol, kline):
-    now = kline.ts / 1000
-    if now < client.target_time + 0.1 or now > client.target_time + UNSTOP_MAX_WAIT:
-        return
-
+def check_buy_signal(client, symbol, kline, now):
     vol = kline.tick.vol
     if vol < MIN_VOL:
         return
@@ -30,45 +26,41 @@ def check_buy_signal(client, symbol, kline):
     close = kline.tick.close
     open_ = kline.tick.open
     increase = round((close - open_) / open_ * 100, 4)
-    if increase < BOOT_RATE or increase > END_RATE:
+
+    if BOOT_RATE < increase < END_RATE:
+        try:
+            client.send_buy_signal(symbol, close, open_, now, vol)
+        except Exception as e:
+            logger.error(e)
+
+def check_sell_signal(client, symbol, kline, now):
+    target = client.market_client.targets[symbol]
+    if not target.own or now < target.sell_least_time:
         return
-
-    try:
-        client.send_buy_signal(symbol, close, open_, now, vol)
-    except Exception as e:
-        logger.error(e)
-
-# def check_sell_signal(client, symbol, kline):
-#     target = client.market_client.targets[symbol]
-#     if not target.own:
-#         return
-
-#     now = kline.ts / 1000
-#     if now < target.sell_least_time:
-#         return
     
-#     close = kline.tick.close
-#     open_ = kline.tick.open
-#     if close > target.sell_least_price:
-#         return
+    close = kline.tick.close
+    open_ = kline.tick.open
+    vol = kline.tick.vol
 
-#     try:
-#         client.send_sell_signal(symbol, close, open_, now)
-#     except Exception as e:
-#         logger.error(e)
+    if close < target.sell_least_price:
+        try:
+            client.send_sell_signal(symbol, close, open_, now, vol)
+        except Exception as e:
+            logger.error(e)
 
 def kline_callback(symbol: str, client: WatcherClient):
     def warpper(kline: CandlestickEvent):
-        if not client.run or kline.ts / 1000 < client.target_time:
+        now = kline.ts / 1000
+        if not client.run or now < client.target_time:
             return
 
         if symbol in client.market_client.targets.keys():
-            # check_sell_signal(client, symbol, kline)
-            pass
-        else:
-            check_buy_signal(client, symbol, kline)
+            check_sell_signal(client, symbol, kline, now)
+            write_kline_csv(csv_path, client.target_time, kline)
 
-        write_kline_csv(csv_path, client.target_time, kline)
+        elif now < client.target_time + SELL_AFTER:
+            check_buy_signal(client, symbol, kline, now)
+            write_kline_csv(csv_path, client.target_time, kline)
 
     csv_path = get_csv_handler(symbol, client.target_time)
     return warpper

@@ -4,8 +4,8 @@ import time
 
 from data2excel import create_excel
 from market import MarketClient
-from utils import ROOT, get_target_time, kill_all_threads, logger
-from target import Target
+from utils import ROOT, kill_all_threads
+# from target import Target
 from huobi.model.market.candlestick_event import CandlestickEvent
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 

@@ -9,7 +9,6 @@ from huobi.constant import OrderSource, OrderSide, OrderType
 from utils import config, logger, strftime, timeout_handle
 from report import wx_report, add_profit, get_profit, wx_name
 
-SELL_RATE = config.getfloat('setting', 'SellRate')
 SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
 
 class User:
@@ -93,16 +92,13 @@ class User:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
 
-    def sell_limit(self, targets, amounts, rate=SELL_RATE, min_rate=SELL_MIN_RATE):
+    def sell_limit(self, targets, amounts, min_rate=SELL_MIN_RATE):
         sell_order_list = [{
             "symbol": target.symbol,
             "account_id": self.account_id,
             "order_type": OrderType.SELL_LIMIT,
             "source": OrderSource.SPOT_API,
-            "price": self._check_price(max(
-                (1 + rate / 100) * target.init_price,
-                (1 + min_rate / 100) * target.buy_price
-            ), target),
+            "price": self._check_price((1 + min_rate / 100) * target.buy_price, target),
             "amount": self._check_amount(amount, target)}
             for target, amount in zip(targets, amounts)
         ]

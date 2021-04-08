@@ -92,11 +92,11 @@ class WatcherClient(ControlledClient):
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {now}')
         
-    # def send_sell_signal(self, symbol, price, init_price, now):
-    #     self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price)
-    #     self.market_client.targets[symbol].own = False
-    #     increase = round((price - init_price) / init_price * 100, 4)
-    #     logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {now}')
+    def send_sell_signal(self, symbol, price, init_price, now, vol):
+        self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol)
+        self.market_client.targets[symbol].own = False
+        increase = round((price - init_price) / init_price * 100, 4)
+        logger.info(f'Sell {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}')
 
 class WatcherMasterClient(WatcherClient):
     def __init__(
@@ -162,10 +162,7 @@ class DealerClient(ControlledClient):
 
     @subscribe(topic=BUY_SIGNAL_TOPIC)
     def buy_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
-        if not self.run:
-            return
-
-        if len(self.targets) >= MAX_BUY:
+        if not self.run or len(self.targets) >= MAX_BUY:
             return
 
         target = self.market_client.symbols_info[symbol]
@@ -177,14 +174,12 @@ class DealerClient(ControlledClient):
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
 
-    # @subscribe(topic=SELL_SIGNAL_TOPIC)
-    # def sell_signal_handler(self, symbol, price, init_price, *args, **kwargs):
-    #     if not self.run:
-    #         return
-    #     if symbol not in [target.symbol for target in self.targets]:
-    #         return
-    #     target = self.market_client.symbols_info[symbol]
-    #     self.user.cancel_and_sell([target])
-    #     # run_thread([(user.cancel_and_sell, ([target], )) for user in self.users], is_lock=False)
-    #     increase = round((price - init_price) / init_price * 100, 4)
-    #     logger.info(f'Sell {symbol} with price {price}USDT, increament {increase}% at {time.time()}')
+    @subscribe(topic=SELL_SIGNAL_TOPIC)
+    def sell_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
+        if not self.run or symbol not in [target.symbol for target in self.targets]:
+            return
+
+        target = self.market_client.symbols_info[symbol]
+        self.user.cancel_and_sell([target])
+        increase = round((price - init_price) / init_price * 100, 4)
+        logger.info(f'Sell {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')

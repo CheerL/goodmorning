@@ -14,9 +14,7 @@ BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
 AFTER = config.getint('setting', 'After')
 BATCH_SIZE = config.getint('setting', 'Batchsize')
-MAX_WAIT = config.getint('setting', 'MaxWait')
 MIN_VOL = config.getfloat('setting', 'MinVol')
-UNSTOP_MAX_WAIT = config.getfloat('setting', 'UnstopMaxWait')
 
 class MarketClient(_MarketClient):
     exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
@@ -119,37 +117,37 @@ class MarketClient(_MarketClient):
             logger.info(f'Find target: {symbol.upper()}, initial price {init_price}, now price {now_price} , increase {target_increase}%, vol {vol} USDT')
         return targets
 
-    def get_target(self, target_time, base_price, base_price_time=None, change_base=True, max_wait=MAX_WAIT, unstop=False):
-        targets = []
-        while True:
-            now = time.time()
-            if now <= target_time+0.5:
-                continue
+    # def get_target(self, target_time, base_price, base_price_time=None, change_base=True, max_wait=MAX_WAIT, unstop=False):
+    #     targets = []
+    #     while True:
+    #         now = time.time()
+    #         if now <= target_time+0.5:
+    #             continue
 
-            increase, price = self.get_increase(base_price)
-            big_increase = self.get_big_increase(increase)
+    #         increase, price = self.get_increase(base_price)
+    #         big_increase = self.get_big_increase(increase)
 
-            if big_increase:
-                targets = self.handle_big_increase(big_increase, base_price)
-                break
-            elif not unstop and now > target_time + max_wait:
-                logger.warning(f'Fail to find target in {max_wait}s')
-                break
-            elif unstop and now > target_time + UNSTOP_MAX_WAIT:
-                logger.warning(f'Fail to find target in {UNSTOP_MAX_WAIT}s, end unstop model')
-                break
-            else:
-                logger.info('\t'.join([
-                    f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
-                    for index, (symbol, _, increment, vol) in enumerate(increase[:3])
-                ]))
-                if change_base and now - base_price_time > AFTER:
-                    base_price_time = now
-                    base_price = price
-                    logger.info('User now base price')
-                time.sleep(0.03)
+    #         if big_increase:
+    #             targets = self.handle_big_increase(big_increase, base_price)
+    #             break
+    #         elif not unstop and now > target_time + max_wait:
+    #             logger.warning(f'Fail to find target in {max_wait}s')
+    #             break
+    #         elif unstop and now > target_time + UNSTOP_MAX_WAIT:
+    #             logger.warning(f'Fail to find target in {UNSTOP_MAX_WAIT}s, end unstop model')
+    #             break
+    #         else:
+    #             logger.info('\t'.join([
+    #                 f'{index+1}. {symbol.upper()} {increment}% {vol} USDT'
+    #                 for index, (symbol, _, increment, vol) in enumerate(increase[:3])
+    #             ]))
+    #             if change_base and now - base_price_time > AFTER:
+    #                 base_price_time = now
+    #                 base_price = price
+    #                 logger.info('User now base price')
+    #             time.sleep(0.03)
 
-        return targets
+    #     return targets
 
     @staticmethod
     def _percent_modify(t):
