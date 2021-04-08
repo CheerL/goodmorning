@@ -87,8 +87,8 @@ def scp(file_path):
     os.system(f'scp {file_path} aws:{file_path}')
 
 def scp_targets(targets, target_time):
-    for target in targets:
-        file_path = get_csv_path(target.symbol, target_time)
+    for symbol in targets:
+        file_path = get_csv_path(symbol, target_time)
         scp(file_path)
 
 def main():
