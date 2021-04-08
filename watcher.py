@@ -7,7 +7,7 @@ from huobi.model.market.candlestick_event import CandlestickEvent
 
 from market import MarketClient
 from utils import config, kill_all_threads, logger
-from record import write_kline_csv, get_csv_handler
+from record import write_kline_csv, get_csv_handler, scp_targets
 from retry import retry
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
@@ -94,7 +94,7 @@ def main():
     logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
     for i, symbol in enumerate(task):
         client.market_client.sub_candlestick(
-            symbol, CandlestickInterval.MIN1,
+            symbol, CandlestickInterval.MIN5,
             kline_callback(symbol, client), error_callback
         )
         if not i % 10:
@@ -108,6 +108,7 @@ def main():
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')
+    scp_targets(client.market_client.targets.keys(), client.target_time)
 
 if __name__ == '__main__':
     main()

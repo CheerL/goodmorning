@@ -19,12 +19,12 @@ def writerows(csv_path, rows):
     with open(csv_path, 'a+') as fcsv:
         csv.writer(fcsv).writerows(rows)
 
-def get_csv_path(symbol, target_time_str):
+def get_csv_path(symbol, target_time):
+    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
     return os.path.join(DB_PATH, f'{target_time_str}_{symbol}.csv')
 
 def get_csv_handler(symbol, target_time):
-    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
-    csv_path = get_csv_path(symbol, target_time_str)
+    csv_path = get_csv_path(symbol, target_time)
     if not os.path.exists(csv_path):
         writerow(csv_path, ['时间', '价格', '成交额', '开盘价', '高'])
 
@@ -82,6 +82,14 @@ def detail_callback(csv_path, target_time, interval=60):
     }
     interval *= 1000
     return wrapper
+
+def scp(file_path):
+    os.system(f'scp {file_path} aws:{file_path}')
+
+def scp_targets(targets, target_time):
+    for target in targets:
+        file_path = get_csv_path(target.symbol, target_time)
+        scp(file_path)
 
 def main():
     m = MarketClient()
