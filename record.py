@@ -4,7 +4,7 @@ import time
 
 from data2excel import create_excel
 from market import MarketClient
-from utils import ROOT, kill_all_threads
+from utils import ROOT, get_target_time, kill_all_threads
 # from target import Target
 from huobi.model.market.candlestick_event import CandlestickEvent
 from huobi.model.market.trade_detail_event import TradeDetailEvent
@@ -92,17 +92,20 @@ def scp_targets(targets, target_time):
         scp(file_path)
 
 def main():
-    m = MarketClient()
-    target_time = time.time()
-    symbol = 'btcusdt'
+    # m = MarketClient()
+    # target_time = time.time()
+    # symbol = 'btcusdt'
 
-    kline_path = get_csv_handler('kline', target_time)
-    detail_path = get_csv_handler('detail', target_time)
-    m.sub_candlestick(symbol, '1min', kline_callback(kline_path, target_time), None)
-    m.sub_trade_detail(symbol, detail_callback(detail_path, target_time), None)
-    time.sleep(30)
-    # close_csv_handler()
-    kill_all_threads()
+    # kline_path = get_csv_handler('kline', target_time)
+    # detail_path = get_csv_handler('detail', target_time)
+    # m.sub_candlestick(symbol, '1min', kline_callback(kline_path, target_time), None)
+    # m.sub_trade_detail(symbol, detail_callback(detail_path, target_time), None)
+    # time.sleep(30)
+    # # close_csv_handler()
+    # kill_all_threads()
+    target_time = get_target_time()
+    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
+    create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':
     main()
