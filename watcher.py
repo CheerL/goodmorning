@@ -71,7 +71,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
         with open(csv_path, 'a+') as fcsv:
             writer = csv.writer(fcsv)
 
-            for detail in event.data:
+            for detail in reversed(event.data):
                 now = detail.ts / 1000
                 last = now // interval
                 price = detail.price
