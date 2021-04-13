@@ -9,7 +9,8 @@ from huobi.constant import OrderSource, OrderSide, OrderType
 from utils import config, logger, strftime, timeout_handle
 from report import wx_report, add_profit, get_profit, wx_name
 
-SELL_MIN_RATE = config.getfloat('setting', 'SellMinRate')
+SELL_RATE = config.getfloat('setting', 'SellRate')
+SECOND_SELL_RATE = config.getfloat('setting', 'SecondSellRate')
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
@@ -92,16 +93,28 @@ class User:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
 
-    def sell_limit(self, targets, amounts, min_rate=SELL_MIN_RATE):
-        sell_order_list = [{
-            "symbol": target.symbol,
-            "account_id": self.account_id,
-            "order_type": OrderType.SELL_LIMIT,
-            "source": OrderSource.SPOT_API,
-            "price": self._check_price((1 + min_rate / 100) * target.buy_price, target),
-            "amount": self._check_amount(amount, target)}
-            for target, amount in zip(targets, amounts)
-        ]
+    def sell_limit(self, targets, amounts, rate=SELL_RATE, prices=None):
+        if not prices:
+            sell_order_list = [{
+                "symbol": target.symbol,
+                "account_id": self.account_id,
+                "order_type": OrderType.SELL_LIMIT,
+                "source": OrderSource.SPOT_API,
+                "price": self._check_price((1 + rate / 100) * target.buy_price, target),
+                "amount": self._check_amount(amount, target)}
+                for target, amount in zip(targets, amounts)
+            ]
+        else:
+            sell_order_list = [{
+                "symbol": target.symbol,
+                "account_id": self.account_id,
+                "order_type": OrderType.SELL_LIMIT,
+                "source": OrderSource.SPOT_API,
+                "price": self._check_price(price, target),
+                "amount": self._check_amount(amount, target)}
+                for target, amount, price in zip(targets, amounts, prices)
+            ]
+
         sell_order_list = [
             order for order, target in zip(sell_order_list, targets)
             if order['amount'] >= target.limit_order_min_order_amt
@@ -145,7 +158,34 @@ class User:
         
         self.get_balance(targets)
         amounts = [self.balance[target.base_currency] for target in targets]
-        self.sell(targets, amounts)
+
+
+    def high_cancel_and_sell(self, targets, symbol, price):
+        open_orders = self.get_open_orders(targets)
+        if open_orders:
+            all_symbols = [target.symbol for target in targets]
+            for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
+                self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
+            logger.info(f'User {self.account_id} cancel all open sell orders')
+
+        self.get_balance(targets)
+        symbol_targets = [target for target in targets if target.symbol == symbol]
+        symbol_amounts = [self.balance[target.base_currency] for target in symbol_targets]
+        other_targets = [target for target in targets if target.symbol == symbol]
+        other_amounts = [self.balance[target.base_currency] for target in other_targets]
+        self.sell_limit(symbol_targets, symbol_amounts, prices=[price])
+        self.sell_limit(other_targets, other_amounts, rate=SECOND_SELL_RATE)
+
+        target_currencies = [target.base_currency for target in targets]
+        while True:
+            frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
+            if not any(frozen_balance.values()):
+                break
+            else:
+                time.sleep(0.1)
+        
+        self.get_balance(targets)
+        amounts = [self.balance[target.base_currency] for target in targets]
 
     def buy_and_sell(self, targets):
         self.buy(targets, [self.buy_amount for _ in targets])
@@ -178,6 +218,7 @@ class User:
                 target.buy_price = buy_price
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {buy_price}')
             else:
+                target.buy_price = 0
                 logger.debug(f'Get 0 {target.base_currency.upper()}')
 
     def report(self):

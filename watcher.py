@@ -3,13 +3,11 @@ import time
 import csv
 
 from wampyapp import SELL_AFTER, WatcherClient, WatcherMasterClient
-from huobi.constant.definition import CandlestickInterval
-from huobi.model.market.candlestick_event import CandlestickEvent
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 
 from market import MarketClient
 from utils import config, kill_all_threads, logger
-from record import write_kline_csv, get_csv_handler, scp_targets
+from record import get_csv_handler, scp_targets
 from retry import retry
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
@@ -20,7 +18,7 @@ SELL_AFTER = config.getfloat('setting', 'SellAfter')
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client, symbol, vol, open_, price, now, boot_price, end_price):
+def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price):
     if vol < MIN_VOL:
         return
 
@@ -30,64 +28,22 @@ def check_buy_signal(client, symbol, vol, open_, price, now, boot_price, end_pri
         except Exception as e:
             logger.error(e)
 
-def check_sell_signal(client, symbol, vol, open_, close, now):
+def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
     target = client.market_client.targets[symbol]
     if not target.own or now < target.sell_least_time:
         return
+
+    if close > client.high_price[symbol]:
+        try:
+            client.send_high_sell_signal(symbol)
+        except Exception as e:
+            logger.error(e)
 
     if close < target.sell_least_price:
         try:
             client.send_sell_signal(symbol, close, open_, now, vol)
         except Exception as e:
             logger.error(e)
-
-# def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
-#     def warpper(event: TradeDetailEvent):
-#         if not client.run or event.ts / 1000 < client.target_time:
-#             return
-
-#         with open(csv_path, 'a+') as fcsv:
-#             writer = csv.writer(fcsv)
-
-#             for detail in reversed(event.data):
-#                 now = detail.ts / 1000
-#                 last = now // interval
-#                 price = detail.price
-#                 if last > info['last']:
-#                     info['last'] = last
-#                     info['high'] = info['open_'] = price
-#                     info['vol'] = 0
-#                     info['boot_price'] = price * (1 + BOOT_RATE / 100)
-#                     info['end_price'] = price * (1 + END_RATE / 100)
-
-#                 info['vol'] += price * detail.amount
-#                 info['high'] = max(info['high'], price)
-
-#                 if symbol in client.market_client.targets.keys():
-#                     check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
-#                     writer.writerow([
-#                         now - target_time, price, info['vol'],
-#                         info['open_'], info['high']
-#                     ])
-
-#                 elif now < client.target_time + SELL_AFTER:
-#                     check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
-#                     writer.writerow([
-#                         now - target_time, price, info['vol'],
-#                         info['open_'], info['high']
-#                     ])
-
-#     info = {
-#         'last': 0,
-#         'vol': 0,
-#         'open_': 0,
-#         'high': 0,
-#         'boot_price': 0,
-#         'end_price': 0
-#     }
-#     target_time = client.target_time
-#     csv_path = get_csv_handler(symbol, target_time)
-#     return warpper
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
     def warpper(event: TradeDetailEvent):
@@ -162,10 +118,6 @@ def main():
 
     logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
     for i, symbol in enumerate(task):
-        # client.market_client.sub_candlestick(
-        #     symbol, CandlestickInterval.MIN5,
-        #     kline_callback(symbol, client), error_callback
-        # )
         client.market_client.sub_trade_detail(
             symbol, trade_detail_callback(symbol, client), error_callback
         )

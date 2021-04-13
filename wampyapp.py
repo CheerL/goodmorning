@@ -17,6 +17,7 @@ DEALER_NUM = config.getint('setting', 'DealerNum')
 WATCHER_NUM = config.getint('setting', 'WatcherNum')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MAX_BUY = config.getint('setting', 'MaxBuy')
+SELL_RATE = config.getfloat('setting', 'SellRate')
 
 WS_HOST = config.get('setting', 'WsHost')
 WS_PORT = config.getint('setting', 'WsPort')
@@ -26,6 +27,10 @@ RUN_TOPIC = 'run'
 CLIENT_INFO_TOPIC = 'info'
 BUY_SIGNAL_TOPIC = 'buy'
 SELL_SIGNAL_TOPIC = 'sell'
+AFTER_BUY_TOPIC = 'afterbuy'
+HIGH_TOPIC = 'high'
+
+HIGH_SELL_SLEEP = 0.5
 
 quite_logger(all_logger=True)
 
@@ -82,6 +87,8 @@ class WatcherClient(ControlledClient):
         )
         self.market_client = market_client
         self.client_type = 'watcher'
+        self.buy_price = {}
+        self.high_price = {}
 
     def get_task(self, num) -> 'list[str]':
         return self.rpc.get_task(num)
@@ -97,6 +104,19 @@ class WatcherClient(ControlledClient):
         self.market_client.targets[symbol].own = False
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Sell {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}')
+
+    def send_high_sell_signal(self, symbol):
+        self.publish(topic=HIGH_TOPIC, symbol=symbol, price=self.high_price[symbol])
+        for target in self.market_client.targets:
+            target.own = False
+        logger.info(f'{symbol} comes to stop profit points {self.high_price[symbol]}, sell all')
+
+    @subscribe(topic=AFTER_BUY_TOPIC)
+    def after_buy_handler(self, symbol, price, *args, **kwargs):
+        original_price = self.buy_price.get(symbol, 1e10)
+        new_price = min(original_price, price)
+        self.buy_price[symbol] = new_price
+        self.high_price[symbol] = new_price * (1 + SELL_RATE / 100)
 
 class WatcherMasterClient(WatcherClient):
     def __init__(
@@ -134,7 +154,6 @@ class WatcherMasterClient(WatcherClient):
     def info_handler(self, client_type, remove=False, *args, **kwargs):
         self.client_info[client_type] += 1 if not remove else -1
 
-        
         if self.client_info['watcher'] >= WATCHER_NUM and self.client_info['dealer'] >= DEALER_NUM:
             if not self.run:
                 self.target_time = get_target_time()
@@ -160,6 +179,7 @@ class DealerClient(ControlledClient):
         self.user = user
         self.client_type = 'dealer'
 
+
     @subscribe(topic=BUY_SIGNAL_TOPIC)
     def buy_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
         if not self.run or len(self.targets) >= MAX_BUY:
@@ -167,12 +187,13 @@ class DealerClient(ControlledClient):
 
         target = self.market_client.symbols_info[symbol]
         target.init_price = init_price
-        target.buy_price = price
+        # target.buy_price = price
 
         self.user.buy_and_sell([target])
         self.targets.append(target)
-        increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
+        self.publish(topic=AFTER_BUY_TOPIC, symbol=symbol, price=target.buy_price)
+        # increase = round((price - init_price) / init_price * 100, 4)
+        # logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
 
     @subscribe(topic=SELL_SIGNAL_TOPIC)
     def sell_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
@@ -181,5 +202,13 @@ class DealerClient(ControlledClient):
 
         target = self.market_client.symbols_info[symbol]
         self.user.cancel_and_sell([target])
-        increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Sell {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
+        # increase = round((price - init_price) / init_price * 100, 4)
+        # logger.info(f'Sell {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
+
+    @subscribe(topic=HIGH_TOPIC)
+    def high_sell_handler(self, symbol, price, *args, **kwargs):
+        if not self.run:
+            return
+
+        time.sleep(HIGH_SELL_SLEEP)
+        self.user.high_cancel_and_sell(self.targets, symbol, price)
