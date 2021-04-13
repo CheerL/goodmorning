@@ -30,7 +30,7 @@ def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot
 
 def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
     target = client.market_client.targets[symbol]
-    if not target.own or now < target.sell_least_time:
+    if not target.own:
         return
 
     if close > client.high_price[symbol]:
@@ -39,7 +39,7 @@ def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
         except Exception as e:
             logger.error(e)
 
-    if close < target.sell_least_price:
+    if close < target.sell_least_price and now > target.sell_least_time:
         try:
             client.send_sell_signal(symbol, close, open_, now, vol)
         except Exception as e:
