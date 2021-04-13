@@ -173,6 +173,8 @@ class User:
         symbol_amounts = [self.balance[target.base_currency] for target in symbol_targets]
         other_targets = [target for target in targets if target.symbol == symbol]
         other_amounts = [self.balance[target.base_currency] for target in other_targets]
+        print(symbol_targets, symbol_amounts)
+        print(other_targets, other_amounts)
         self.sell_limit(symbol_targets, symbol_amounts, prices=[price])
         self.sell_limit(other_targets, other_amounts, rate=SECOND_SELL_RATE)
 
