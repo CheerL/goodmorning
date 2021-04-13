@@ -118,7 +118,7 @@ class WatcherClient(ControlledClient):
         high_price = new_price * (1 + SELL_RATE / 100)
         self.buy_price[symbol] = new_price
         self.high_price[symbol] = high_price
-        print(f'high, buy: {high_price}, {new_price}')
+        # print(f'high, buy: {high_price}, {new_price}')
 
 class WatcherMasterClient(WatcherClient):
     def __init__(

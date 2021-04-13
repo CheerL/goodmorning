@@ -3,21 +3,9 @@ import os
 import time
 
 from data2excel import create_excel
-from market import MarketClient
-from utils import ROOT, get_target_time, kill_all_threads
-# from target import Target
-from huobi.model.market.candlestick_event import CandlestickEvent
-from huobi.model.market.trade_detail_event import TradeDetailEvent
+from utils import ROOT, get_target_time
 
 DB_PATH = os.path.join(ROOT, 'test', 'db', 'csv')
-
-def writerow(csv_path, row):
-    with open(csv_path, 'a+') as fcsv:
-        csv.writer(fcsv).writerow(row)
-
-def writerows(csv_path, rows):
-    with open(csv_path, 'a+') as fcsv:
-        csv.writer(fcsv).writerows(rows)
 
 def get_csv_path(symbol, target_time):
     target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
@@ -26,31 +14,10 @@ def get_csv_path(symbol, target_time):
 def get_csv_handler(symbol, target_time):
     csv_path = get_csv_path(symbol, target_time)
     if not os.path.exists(csv_path):
-        writerow(csv_path, ['时间', '价格', '成交额', '开盘价', '高'])
+        with open(csv_path, 'a+') as fcsv:
+            csv.writer(fcsv).writerow(['time', 'price', 'amount', 'direction'])
 
     return csv_path
-
-def write_kline_csv(csv_path, target_time: float, kline: CandlestickEvent):
-    now = kline.ts / 1000 - target_time
-    close = kline.tick.close
-    high = kline.tick.high
-    open_ = kline.tick.open
-    vol = kline.tick.vol
-    writerow(csv_path, [now, close, vol, open_, high])
-
-def write_detail_csv(csv_path, target_time: float, detail: TradeDetailEvent):
-    writerows(csv_path, [[detail_item.ts/1000 - target_time, detail_item.price, detail_item.amount, 0, 0] for detail_item in detail.data])
-
-def kline_callback(csv_path, target_time):
-    def wrapper(kline):
-        now = kline.ts / 1000 - target_time
-        close = kline.tick.close
-        high = kline.tick.high
-        open_ = kline.tick.open
-        vol = kline.tick.vol
-        writerow(csv_path, [now, close, vol, open_, high])
-    
-    return wrapper
 
 def detail_callback(csv_path, target_time, interval=60):
     def wrapper(detail):
@@ -67,7 +34,6 @@ def detail_callback(csv_path, target_time, interval=60):
                 info['high'] = max(info['high'], detail_item.price)
 
                 csv.writer(fcsv).writerow([detail_item.ts/1000 - target_time, detail_item.price, info['vol'], info['open_'], info['high']])
-        # print(time.time() - detail.ts / 1000)
     
     info = {
         'last': 0,
@@ -87,17 +53,6 @@ def scp_targets(targets, target_time):
         scp(file_path)
 
 def main():
-    # m = MarketClient()
-    # target_time = time.time()
-    # symbol = 'btcusdt'
-
-    # kline_path = get_csv_handler('kline', target_time)
-    # detail_path = get_csv_handler('detail', target_time)
-    # m.sub_candlestick(symbol, '1min', kline_callback(kline_path, target_time), None)
-    # m.sub_trade_detail(symbol, detail_callback(detail_path, target_time), None)
-    # time.sleep(30)
-    # # close_csv_handler()
-    # kill_all_threads()
     target_time = get_target_time()
     target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
     create_excel(target_time_str, DB_PATH)
