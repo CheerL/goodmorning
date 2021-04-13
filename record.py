@@ -36,13 +36,10 @@ def write_kline_csv(csv_path, target_time: float, kline: CandlestickEvent):
     high = kline.tick.high
     open_ = kline.tick.open
     vol = kline.tick.vol
-    # fcsv_writer.writerow([now, close, vol, open_, high])
     writerow(csv_path, [now, close, vol, open_, high])
-    # print(time.time() - kline.ts / 1000)
 
 def write_detail_csv(csv_path, target_time: float, detail: TradeDetailEvent):
     writerows(csv_path, [[detail_item.ts/1000 - target_time, detail_item.price, detail_item.amount, 0, 0] for detail_item in detail.data])
-    # print(time.time() - detail.ts / 1000)
 
 def kline_callback(csv_path, target_time):
     def wrapper(kline):
@@ -51,9 +48,7 @@ def kline_callback(csv_path, target_time):
         high = kline.tick.high
         open_ = kline.tick.open
         vol = kline.tick.vol
-        # fcsv_writer.writerow([now, close, vol, open_, high])
         writerow(csv_path, [now, close, vol, open_, high])
-        # print(time.time() - kline.ts / 1000)
     
     return wrapper
 
