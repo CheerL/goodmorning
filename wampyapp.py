@@ -193,7 +193,9 @@ class DealerClient(ControlledClient):
 
         self.user.buy_and_sell([target])
         self.targets.append(target)
-        self.publish(topic=AFTER_BUY_TOPIC, symbol=symbol, price=target.buy_price)
+
+        if target.buy_price > 0:
+            self.publish(topic=AFTER_BUY_TOPIC, symbol=symbol, price=target.buy_price)
         # increase = round((price - init_price) / init_price * 100, 4)
         # logger.info(f'Buy {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {time.time()}')
 
