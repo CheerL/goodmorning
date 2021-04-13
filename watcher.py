@@ -33,7 +33,7 @@ def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
     if not target.own:
         return
 
-    if close > client.high_price[symbol]:
+    if symbol in client.high_price and close > client.high_price[symbol]:
         try:
             client.send_high_sell_signal(symbol)
         except Exception as e:
