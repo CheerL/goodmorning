@@ -109,7 +109,7 @@ class WatcherClient(ControlledClient):
         self.publish(topic=HIGH_TOPIC, symbol=symbol, price=self.high_price[symbol])
         for target in self.market_client.targets.values():
             target.own = False
-        logger.info(f'{symbol} comes to stop profit points {self.high_price[symbol]}, sell all')
+        logger.info(f'Stop profit, {symbol} comes to stop profit points {self.high_price[symbol]}, sell all')
 
     @subscribe(topic=AFTER_BUY_TOPIC)
     def after_buy_handler(self, symbol, price, *args, **kwargs):
