@@ -3,7 +3,7 @@ __pycache__
 log/*
 *.ini
 *.db
-test
+test*
 node/.crossbar/*
 !node/.crossbar/config.json
 !.gitkeep

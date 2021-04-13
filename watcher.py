@@ -20,15 +20,13 @@ SELL_AFTER = config.getfloat('setting', 'SellAfter')
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client, symbol, vol, open_, close, now):
+def check_buy_signal(client, symbol, vol, open_, price, now, boot_price, end_price):
     if vol < MIN_VOL:
         return
 
-    increase = round((close - open_) / open_ * 100, 4)
-
-    if BOOT_RATE < increase < END_RATE:
+    if boot_price < price < end_price:
         try:
-            client.send_buy_signal(symbol, close, open_, now, vol)
+            client.send_buy_signal(symbol, price, open_, now, vol)
         except Exception as e:
             logger.error(e)
 
@@ -43,65 +41,94 @@ def check_sell_signal(client, symbol, vol, open_, close, now):
         except Exception as e:
             logger.error(e)
 
-def kline_callback(symbol: str, client: WatcherClient):
-    def warpper(kline: CandlestickEvent):
-        now = kline.ts / 1000
-        if not client.run or now < client.target_time:
-            return
+# def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
+#     def warpper(event: TradeDetailEvent):
+#         if not client.run or event.ts / 1000 < client.target_time:
+#             return
 
-        vol = kline.tick.vol
-        open_ = kline.tick.open
-        close = kline.tick.close
-        if symbol in client.market_client.targets.keys():
-            check_sell_signal(client, symbol, vol, open_, close, now)
-            write_kline_csv(csv_path, client.target_time, kline)
+#         with open(csv_path, 'a+') as fcsv:
+#             writer = csv.writer(fcsv)
 
-        elif now < client.target_time + SELL_AFTER:
-            check_buy_signal(client, symbol, vol, open_, close, now)
-            write_kline_csv(csv_path, client.target_time, kline)
+#             for detail in reversed(event.data):
+#                 now = detail.ts / 1000
+#                 last = now // interval
+#                 price = detail.price
+#                 if last > info['last']:
+#                     info['last'] = last
+#                     info['high'] = info['open_'] = price
+#                     info['vol'] = 0
+#                     info['boot_price'] = price * (1 + BOOT_RATE / 100)
+#                     info['end_price'] = price * (1 + END_RATE / 100)
 
-    csv_path = get_csv_handler(symbol, client.target_time)
-    return warpper
+#                 info['vol'] += price * detail.amount
+#                 info['high'] = max(info['high'], price)
+
+#                 if symbol in client.market_client.targets.keys():
+#                     check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
+#                     writer.writerow([
+#                         now - target_time, price, info['vol'],
+#                         info['open_'], info['high']
+#                     ])
+
+#                 elif now < client.target_time + SELL_AFTER:
+#                     check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
+#                     writer.writerow([
+#                         now - target_time, price, info['vol'],
+#                         info['open_'], info['high']
+#                     ])
+
+#     info = {
+#         'last': 0,
+#         'vol': 0,
+#         'open_': 0,
+#         'high': 0,
+#         'boot_price': 0,
+#         'end_price': 0
+#     }
+#     target_time = client.target_time
+#     csv_path = get_csv_handler(symbol, target_time)
+#     return warpper
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
     def warpper(event: TradeDetailEvent):
         if not client.run or event.ts / 1000 < client.target_time:
             return
 
+        detail = event.data[0]
+        now = detail.ts / 1000
+        last = now // interval
+        price = detail.price
+        vol = sum([each.price * each.amount for each in event.data])
+
+        if last > info['last']:
+            info['last'] = last
+            info['open_'] = event.data[-1].price
+            info['vol'] = vol
+            info['boot_price'] = info['open_'] * (1 + BOOT_RATE / 100)
+            info['end_price'] = info['open_'] * (1 + END_RATE / 100)
+        else:
+            info['vol'] += vol
+            
+        if symbol in client.market_client.targets.keys():
+            check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
+
+        elif now < client.target_time + SELL_AFTER:
+            check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
+            
         with open(csv_path, 'a+') as fcsv:
             writer = csv.writer(fcsv)
-
-            for detail in reversed(event.data):
-                now = detail.ts / 1000
-                last = now // interval
-                price = detail.price
-                if last > info['last']:
-                    info['last'] = last
-                    info['high'] = info['open_'] = price
-                    info['vol'] = 0
-
-                info['vol'] += price * detail.amount
-                info['high'] = max(info['high'], price)
-
-                if symbol in client.market_client.targets.keys():
-                    check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
-                    writer.writerow([
-                        now - target_time, price, info['vol'],
-                        info['open_'], info['high']
-                    ])
-
-                elif now < client.target_time + SELL_AFTER:
-                    check_buy_signal(client, symbol, info['vol'], info['open_'], price, now)
-                    writer.writerow([
-                        now - target_time, price, info['vol'],
-                        info['open_'], info['high']
-                    ])
+            writer.writerows([
+                [each.ts / 1000 - target_time, each.price, each.amount, each.direction]
+                for each in reversed(event.data)
+            ])
 
     info = {
         'last': 0,
         'vol': 0,
         'open_': 0,
-        'high': 0
+        'high': 0,
+        'boot_price': 0,
+        'end_price': 0
     }
     target_time = client.target_time
     csv_path = get_csv_handler(symbol, target_time)
@@ -111,7 +138,7 @@ def error_callback(error):
     logger.error(error)
 
 @retry(tries=5, delay=1, logger=logger)
-def init_watcher(Client) -> WatcherClient:
+def init_watcher(Client=WatcherClient) -> WatcherClient:
     market_client = MarketClient()
     client = Client(market_client)
     client.start()

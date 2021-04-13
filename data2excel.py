@@ -15,14 +15,21 @@ def add_sheet(wb, db_path, csv_path):
     ws = wb[sheetname]
     with open(os.path.join(db_path, csv_path), 'r') as csv_file:
         reader = csv.reader(csv_file)
+        open_ = 0
+        high = 0
+        vol = 0
         for index, row in enumerate(reader):
             if index == 0:
                 ws.append(['时间', '价格', '成交额', '涨幅', '高', '回撤'])
             if index > 0:
-                time_, price, vol, open_, high = [float(each) for each in row]
+                time_, price, amount = [float(each) for each in row[:3]]
                 time_ = round(time_, 3)
+                if index == 1:
+                    open_ = price
                 increase = price / open_ - 1
+                high = max(high, price)
                 back = 1 - high / price
+                vol += price * amount
                 ws.append([time_, price, vol, increase, high, back])
 
     increase_data = Reference(ws, range_string=f'{sheetname}!$D$1:$D${reader.line_num}')
