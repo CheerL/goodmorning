@@ -39,5 +39,5 @@ def main(user: User):
 if __name__ == '__main__':
     logger.info('Dealer')
     users = init_users()
-    time.sleep(25)
+    time.sleep(20)
     run_process([(main, (user,), user.username) for user in users], is_lock=True, limit_num=len(users)+2)
