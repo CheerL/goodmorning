@@ -40,16 +40,6 @@ class User:
         self.username = wx_name(self.wxuid[0])
         self.high = True
 
-    @staticmethod
-    def _check_amount(amount, symbol_info):
-        precision_num = 10 ** symbol_info.amount_precision
-        return math.floor(amount * precision_num) / precision_num
-
-    @staticmethod
-    def _check_price(price, symbol_info):
-        precision_num = 10 ** symbol_info.price_precision
-        return math.floor(price * precision_num) / precision_num
-
     def buy(self, targets, amounts):
         buy_order_list = [{
             "symbol": target.symbol,
@@ -57,10 +47,10 @@ class User:
             "order_type": OrderType.BUY_MARKET,
             "source": OrderSource.SPOT_API,
             "price": 1,
-            "amount": self._check_amount(max(
+            "amount": target.check_amount(max(
                 amount,
                 target.min_order_value
-            ), target)}
+            ))}
             for target, amount in zip(targets, amounts)
             if amount > 0
         ]
@@ -78,7 +68,7 @@ class User:
             "order_type": OrderType.SELL_MARKET,
             "source": OrderSource.SPOT_API,
             "price": 1,
-            "amount": self._check_amount(amount, target)}
+            "amount": target.check_amount(amount)}
             for target, amount in zip(targets, amounts)
         ]
         sell_order_list = [
@@ -102,8 +92,8 @@ class User:
                 "account_id": self.account_id,
                 "order_type": OrderType.SELL_LIMIT,
                 "source": OrderSource.SPOT_API,
-                "price": self._check_price((1 + rate / 100) * target.buy_price, target),
-                "amount": self._check_amount(amount, target)}
+                "price": target.check_price((1 + rate / 100) * target.buy_price),
+                "amount": target.check_amount(amount)}
                 for target, amount in zip(targets, amounts)
             ]
         else:
@@ -112,8 +102,8 @@ class User:
                 "account_id": self.account_id,
                 "order_type": OrderType.SELL_LIMIT,
                 "source": OrderSource.SPOT_API,
-                "price": self._check_price(price, target),
-                "amount": self._check_amount(amount, target)}
+                "price": target.check_price(price),
+                "amount": target.check_amount(amount)}
                 for target, amount, price in zip(targets, amounts, prices)
             ]
 
