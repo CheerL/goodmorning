@@ -57,7 +57,7 @@ class User:
         if buy_order_list:
             self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
             self.buy_order_list.extend(buy_order_list)
-            logger.debug(f'User {self.account_id} buy report')
+            # logger.debug(f'User {self.account_id} buy report')
             for order in buy_order_list:
                 logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
 
@@ -79,7 +79,7 @@ class User:
         if sell_order_list:
             self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
             self.sell_order_list.extend(sell_order_list)
-            logger.debug(f'User {self.account_id} sell report')
+            # logger.debug(f'User {self.account_id} sell report')
             for order in sell_order_list:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
@@ -115,7 +115,7 @@ class User:
         if sell_order_list:
             self.sell_id.extend(self.trade_client.batch_create_order(sell_order_list))
             self.sell_order_list.extend(sell_order_list)
-            logger.debug(f'User {self.account_id} sell report')
+            # logger.debug(f'User {self.account_id} sell report')
             for order in sell_order_list:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
 
@@ -134,7 +134,7 @@ class User:
             all_symbols = [target.symbol for target in targets]
             for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
                 self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
-            logger.info(f'User {self.account_id} cancel open sell orders for {", ".join(all_symbols)}')
+            logger.info(f'Cancel open sell orders for {", ".join(all_symbols)}')
 
         self.get_balance(targets)
         amounts = [self.balance[target.base_currency] for target in targets]
@@ -159,7 +159,7 @@ class User:
             all_symbols = [target.symbol for target in targets]
             for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
                 self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
-            logger.info(f'User {self.account_id} cancel all open sell orders')
+            logger.info(f'Cancel open sell orders for {", ".join(all_symbols)}')
 
         self.get_balance(targets)
         symbol_targets = [target for target in targets if target.symbol == symbol]
@@ -203,7 +203,7 @@ class User:
     def check_balance(self, targets):
         self.get_balance(targets)
 
-        logger.debug(f'User {self.account_id} balance report')
+        # logger.debug(f'User {self.account_id} balance report')
         for target, order in zip(targets, self.buy_order_list):
             target_balance = self.balance[target.base_currency]
             if target_balance > 10 ** -target.amount_precision:
