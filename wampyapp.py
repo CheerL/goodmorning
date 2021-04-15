@@ -101,7 +101,7 @@ class WatcherClient(ControlledClient):
         self.task = self.rpc.req_task(num)
 
     def send_buy_signal(self, symbol, price, init_price, now, vol):
-        self.publish(topic=BUY_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol)
+        self.publish(topic=BUY_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         target = Target(symbol, price, init_price, now)
         self.targets[symbol] = target
         increase = round((price - init_price) / init_price * 100, 4)
@@ -112,7 +112,7 @@ class WatcherClient(ControlledClient):
             del self.targets[symbol]
 
     def send_sell_signal(self, symbol, price, init_price, now, vol):
-        self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol)
+        self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         self.targets[symbol].own = False
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Sell {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}')
@@ -208,11 +208,11 @@ class DealerClient(ControlledClient):
 
 
     @subscribe(topic=BUY_SIGNAL_TOPIC)
-    def buy_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
+    def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
         if not self.run or symbol in self.targets or len(self.targets) >= MAX_BUY:
             return
 
-        target = Target(symbol, price, init_price)
+        target = Target(symbol, price, init_price, now)
         target.set_info(self.market_client.symbols_info[symbol])
 
         self.user.buy_and_sell([target])
@@ -222,7 +222,7 @@ class DealerClient(ControlledClient):
             self.targets[symbol] = target
 
     @subscribe(topic=SELL_SIGNAL_TOPIC)
-    def sell_signal_handler(self, symbol, price, init_price, vol, *args, **kwargs):
+    def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
         if not self.run or symbol not in self.targets:
             return
 
