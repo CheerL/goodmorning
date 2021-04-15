@@ -7,7 +7,7 @@ from utils import timeout_handle
 
 
 class MarketClient(_MarketClient):
-    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
+    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt', 'bttusdt']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

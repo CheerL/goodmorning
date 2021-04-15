@@ -229,7 +229,7 @@ class DealerClient(ControlledClient):
 
         target = self.targets[symbol]
         self.user.cancel_and_sell([target])
-        logger.info(f'{symbol.upper()} stop loss at {price} USDT')
+        logger.info(f'Stop loss{symbol} at {price} USDT')
 
     @subscribe(topic=HIGH_TOPIC)
     def high_sell_handler(self, symbol, price, *args, **kwargs):
@@ -238,4 +238,4 @@ class DealerClient(ControlledClient):
 
         time.sleep(HIGH_SELL_SLEEP)
         self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
-        logger.info(f'{symbol.upper()} stop profit at {price} USDT')
+        logger.info(f'Stop profit {symbol} at {price} USDT')

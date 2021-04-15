@@ -169,16 +169,16 @@ class User:
         self.sell_limit(symbol_targets, symbol_amounts, prices=[price])
         self.sell_limit(other_targets, other_amounts)
 
-        target_currencies = [target.base_currency for target in targets]
-        while True:
-            frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
-            if not any(frozen_balance.values()):
-                break
-            else:
-                time.sleep(0.1)
+        # target_currencies = [target.base_currency for target in targets]
+        # while True:
+        #     frozen_balance = self.get_currency_balance(target_currencies, 'frozen')
+        #     if not any(frozen_balance.values()):
+        #         break
+        #     else:
+        #         time.sleep(0.1)
         
-        self.get_balance(targets)
-        amounts = [self.balance[target.base_currency] for target in targets]
+        # self.get_balance(targets)
+        # amounts = [self.balance[target.base_currency] for target in targets]
 
     def buy_and_sell(self, targets):
         self.buy(targets, [self.buy_amount for _ in targets])
