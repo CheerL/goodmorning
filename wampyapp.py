@@ -126,12 +126,12 @@ class WatcherClient(ControlledClient):
             target.own = False
 
         self.stop_profit = True
-        self.publish(topic=STOP_PROFIT)
+        self.publish(topic=STOP_PROFIT, status=True)
         logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all')
 
     @subscribe(topic=STOP_PROFIT)
-    def stop_profit_handler(self, *arg, **kwargs):
-        self.stop_profit = True
+    def stop_profit_handler(self, status, *arg, **kwargs):
+        self.stop_profit = status
 
 
     @subscribe(topic=AFTER_BUY_TOPIC)
