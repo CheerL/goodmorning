@@ -134,7 +134,7 @@ class User:
             all_symbols = [target.symbol for target in targets]
             for symbols in [all_symbols[i:i+10] for i in range(0, len(all_symbols), 10)]:
                 self.trade_client.cancel_orders(','.join(symbols), [order.id for order in open_orders if order.symbol in symbols])
-            logger.info(f'User {self.account_id} cancel all open sell orders')
+            logger.info(f'User {self.account_id} cancel open sell orders for {", ".join(all_symbols)}')
 
         self.get_balance(targets)
         amounts = [self.balance[target.base_currency] for target in targets]
