@@ -121,7 +121,7 @@ class WatcherClient(ControlledClient):
         if self.stop_profit:
             return
 
-        self.publish(topic=HIGH_TOPIC, symbol=symbol, price=self.high_price[symbol])
+        self.publish(topic=HIGH_TOPIC, symbol=symbol, price=self.targets[symbol].high_price)
         for target in self.targets.values():
             target.own = False
 
