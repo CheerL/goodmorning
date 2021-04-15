@@ -44,6 +44,14 @@ def detail_callback(csv_path, target_time, interval=60):
     interval *= 1000
     return wrapper
 
+def write_csv(csv_path, data, target_time):
+    with open(csv_path, 'a+') as fcsv:
+        writer = csv.writer(fcsv)
+        writer.writerows([
+            [each.ts / 1000 - target_time, each.price, each.amount, each.direction]
+            for each in reversed(data)
+        ])
+
 def scp(file_path):
     os.system(f'scp {file_path} aws:{file_path}')
 

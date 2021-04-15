@@ -2,7 +2,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-FMT = "%(asctime)s {%(processName)s} %(name)s-%(levelname)s: %(message)s"
+FMT = "%(asctime)s {%(processName)s} [%(pathname)s:%(lineno)d] %(name)s-%(levelname)s: %(message)s"
 
 def quite_logger(name=None, all_logger=False):
     if all_logger:

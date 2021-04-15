@@ -1,13 +1,12 @@
 import sys
 import time
-import csv
 
-from wampyapp import SELL_AFTER, WatcherClient, WatcherMasterClient
+from wampyapp import WatcherClient, WatcherMasterClient
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 
 from market import MarketClient
 from utils import config, kill_all_threads, logger
-from record import get_csv_handler, scp_targets
+from record import get_csv_handler, scp_targets, write_csv
 from retry import retry
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
@@ -29,11 +28,11 @@ def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot
             logger.error(e)
 
 def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
-    target = client.market_client.targets[symbol]
+    target = client.targets[symbol]
     if not target.own:
         return
 
-    if symbol in client.high_price and close > client.high_price[symbol]:
+    if close > target.high_price:
         try:
             client.send_high_sell_signal(symbol)
         except Exception as e:
@@ -65,18 +64,14 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
         else:
             info['vol'] += vol
             
-        if symbol in client.market_client.targets.keys():
+        if symbol in client.targets:
             check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
+            write_csv(csv_path, event.data, target_time)
 
         elif now < client.target_time + SELL_AFTER:
             check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
-            
-        with open(csv_path, 'a+') as fcsv:
-            writer = csv.writer(fcsv)
-            writer.writerows([
-                [each.ts / 1000 - target_time, each.price, each.amount, each.direction]
-                for each in reversed(event.data)
-            ])
+            write_csv(csv_path, event.data, target_time)
+
 
     info = {
         'last': 0,
@@ -104,20 +99,20 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == 'master':
         logger.info('Master watcher')
         client = init_watcher(WatcherMasterClient)
-        task = client.get_task(WATCHER_TASK_NUM)
+        client.get_task(WATCHER_TASK_NUM)
         client.wait_to_run()
     else:
         logger.info('Sub watcher')
         time.sleep(25)
         client = init_watcher(WatcherClient)
         client.wait_to_run()
-        task = client.get_task(WATCHER_TASK_NUM)
+        client.get_task(WATCHER_TASK_NUM)
 
-    if not task:
+    if not client.task:
         return
 
-    logger.info(f'Watcher task are:\n{", ".join(task)}, {len(task)}')
-    for i, symbol in enumerate(task):
+    logger.info(f'Watcher task are: {", ".join(client.task)}')
+    for i, symbol in enumerate(client.task):
         client.market_client.sub_trade_detail(
             symbol, trade_detail_callback(symbol, client), error_callback
         )
@@ -132,7 +127,7 @@ def main():
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')
-    scp_targets(client.market_client.targets.keys(), client.target_time)
+    scp_targets(client.targets.keys(), client.target_time)
 
 if __name__ == '__main__':
     main()

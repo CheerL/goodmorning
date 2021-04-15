@@ -38,6 +38,7 @@ class User:
         self.buy_id = []
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
+        self.high = True
 
     @staticmethod
     def _check_amount(amount, symbol_info):
@@ -93,8 +94,9 @@ class User:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with market price')
 
 
-    def sell_limit(self, targets, amounts, rate=SELL_RATE, prices=None):
+    def sell_limit(self, targets, amounts, prices=None):
         if not prices:
+            rate = SELL_RATE if self.high else SECOND_SELL_RATE
             sell_order_list = [{
                 "symbol": target.symbol,
                 "account_id": self.account_id,
@@ -161,6 +163,7 @@ class User:
 
 
     def high_cancel_and_sell(self, targets, symbol, price):
+        self.high = False
         open_orders = self.get_open_orders(targets)
         if open_orders:
             all_symbols = [target.symbol for target in targets]
@@ -174,7 +177,7 @@ class User:
         other_targets = [target for target in targets if target.symbol != symbol]
         other_amounts = [self.balance[target.base_currency] for target in other_targets]
         self.sell_limit(symbol_targets, symbol_amounts, prices=[price])
-        self.sell_limit(other_targets, other_amounts, rate=SECOND_SELL_RATE)
+        self.sell_limit(other_targets, other_amounts)
 
         target_currencies = [target.base_currency for target in targets]
         while True:

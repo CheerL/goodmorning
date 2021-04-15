@@ -8,14 +8,15 @@ from user import User
 from utils import config, get_target_time, logger, user_config
 
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
-ACCESSKEY = user_config.get('setting', 'AccessKey')
-SECRETKEY = user_config.get('setting', 'SecretKey')
-BUY_AMOUNT = user_config.get('setting', 'BuyAmount')
-WXUIDS = user_config.get('setting', 'WxUid')
-TEST = config.getboolean('setting', 'Test')
+
 
 def init_users():
-    
+    ACCESSKEY = user_config.get('setting', 'AccessKey')
+    SECRETKEY = user_config.get('setting', 'SecretKey')
+    BUY_AMOUNT = user_config.get('setting', 'BuyAmount')
+    WXUIDS = user_config.get('setting', 'WxUid')
+    TEST = user_config.getboolean('setting', 'Test')
+
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]

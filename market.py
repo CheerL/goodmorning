@@ -7,7 +7,7 @@ from utils import timeout_handle
 
 
 class MarketClient(_MarketClient):
-    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt', 'bttusdt']
+    exclude_list = ['htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt', 'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt','yamv2usdt']
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -18,8 +18,6 @@ class MarketClient(_MarketClient):
             for info in generic_client.get_exchange_symbols()
             if info.symbol.endswith('usdt') and info.symbol not in self.exclude_list
         }
-        self.targets = {}
-        
 
     def exclude_expensive(self, base_price):
         self.symbols_info = {
