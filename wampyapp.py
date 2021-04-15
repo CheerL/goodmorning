@@ -89,13 +89,11 @@ class WatcherClient(ControlledClient):
         super().__init__(
             url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
         )
-        self.market_client = market_client
+        self.market_client : MarketClient = market_client
         self.client_type = 'watcher'
-        self.buy_price = {}
-        self.high_price = {}
         self.stop_profit = False
-        self.task = []
-        self.targets = {}
+        self.task : list[str] = []
+        self.targets : list[Target] = {}
 
     def get_task(self, num) -> 'list[str]':
         self.task = self.rpc.req_task(num)
@@ -133,7 +131,6 @@ class WatcherClient(ControlledClient):
     def stop_profit_handler(self, status, *arg, **kwargs):
         self.stop_profit = status
 
-
     @subscribe(topic=AFTER_BUY_TOPIC)
     def after_buy_handler(self, symbol, price, *args, **kwargs):
         if symbol not in self.targets:
@@ -154,7 +151,7 @@ class WatcherMasterClient(WatcherClient):
         )
         price = market_client.get_price()
         market_client.exclude_expensive(price)
-        self.symbols = sorted(
+        self.symbols : list[str] = sorted(
             market_client.symbols_info.keys(),
             key=lambda s: price[s][1],
             reverse=True)
@@ -180,16 +177,20 @@ class WatcherMasterClient(WatcherClient):
 
     @subscribe(topic=CLIENT_INFO_TOPIC)
     def info_handler(self, client_type, remove=False, *args, **kwargs):
-        self.client_info[client_type] += 1 if not remove else -1
+        if remove:
+            self.client_info[client_type] -= 1
 
-        if self.client_info['watcher'] >= WATCHER_NUM and self.client_info['dealer'] >= DEALER_NUM:
-            if not self.run:
-                self.target_time = get_target_time()
-                self.run = True
-                logger.info('Run all')
-            else:
-                logger.info('Run new')
-            self.publish(topic=RUN_TOPIC, target_time=self.target_time)
+        else:
+            self.client_info[client_type] += 1
+
+            if self.client_info['watcher'] >= WATCHER_NUM and self.client_info['dealer'] >= DEALER_NUM:
+                if not self.run:
+                    self.target_time = get_target_time()
+                    self.run = True
+                    logger.info('Run all')
+                else:
+                    logger.info('Run new')
+                self.publish(topic=RUN_TOPIC, target_time=self.target_time)
 
 class DealerClient(ControlledClient):
     def __init__(
@@ -202,9 +203,9 @@ class DealerClient(ControlledClient):
         super().__init__(
             url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
         )
-        self.market_client = market_client
-        self.targets = {}
-        self.user = user
+        self.market_client : MarketClient = market_client
+        self.targets : list[Target] = {}
+        self.user : User = user
         self.client_type = 'dealer'
 
 

@@ -4,7 +4,6 @@ from parallel import run_process
 from wampyapp import DealerClient as Client
 from utils import config, kill_all_threads, logger, user_config
 from market import MarketClient
-# from goodmorning import init_users
 from retry import retry
 from user import User
 
