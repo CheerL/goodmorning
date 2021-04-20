@@ -36,7 +36,7 @@ def write_redis(symbol: str, data: 'list[TradeDetail]'):
 def write_target(symbol):
     now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
     name = f'target_{now_str}'
-    targets = redis_conn.get(name)
+    targets = redis_conn.get(name).decode('utf-8')
     
     if symbol not in targets:
         redis_conn.set(name, ','.join([targets, symbol]))

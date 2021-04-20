@@ -2,8 +2,9 @@ from wampy.peers.clients import Client
 from wampy.roles.subscriber import subscribe
 from wampy.roles.callee import callee
 from market import MarketClient
-from user import SECOND_SELL_RATE, User
+from user import User
 import time
+from enum import Enum
 
 from logger import quite_logger
 from utils import config, logger, get_target_time
@@ -25,15 +26,19 @@ WS_HOST = config.get('setting', 'WsHost')
 WS_PORT = config.getint('setting', 'WsPort')
 WS_URL = f'ws://{WS_HOST}:{WS_PORT}'
 
-RUN_TOPIC = 'run'
-CLIENT_INFO_TOPIC = 'info'
-BUY_SIGNAL_TOPIC = 'buy'
-SELL_SIGNAL_TOPIC = 'sell'
-AFTER_BUY_TOPIC = 'afterbuy'
-HIGH_TOPIC = 'high'
-STOP_PROFIT = 'stop_profit'
-
 HIGH_SELL_SLEEP = 0.5
+
+Topic = Enum('TOPIC', (
+    'CLIENT_INFO', 'STATE', 'TIME',
+    'BUY_SIGNAL', 'SELL_SIGNAL', 
+    'AFTER_BUY', 'HIGH',
+    'STOP_PROFIT', 'STOP_LOSS'
+))
+
+State = Enum('STATE', (
+    'STOPPED', 'STARTED', 'RUNNING'
+))
+
 
 quite_logger(all_logger=True)
 
@@ -45,21 +50,24 @@ class ControlledClient(Client):
         message_handler_cls=None
     ):
         super().__init__(
-            url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
+            url=url, cert_path=cert_path, ipv=ipv, name=name,
+            realm=realm, roles=roles, call_timeout=call_timeout,
+            message_handler_cls=message_handler_cls
         )
-        self.run = False
+        self.state = State.STOPPED
         self.target_time = None
         self.client_type = 'unknown'
 
-    @subscribe(topic=RUN_TOPIC)
-    def run_handler(self, target_time,  *args, **kwargs):
-        if not self.run:
-            self.run = True
-            self.target_time = target_time
-            logger.info(f'Run {self.client_type}')
+    @subscribe(topic=Topic.STATE)
+    def state_handler(self, state, *args, **kwargs):
+        self.state = state
 
-    def wait_to_run(self):
-        while not self.run:
+    @subscribe(topic=Topic.TIME)
+    def time_handler(self, target_time,  *args, **kwargs):
+        self.target_time = target_time
+
+    def wait_state(self, state=State.STARTED):
+        while self.state != state:
             time.sleep(1)
 
     def start(self):
@@ -67,7 +75,7 @@ class ControlledClient(Client):
         self.after_start()
 
     def after_start(self):
-        self.publish(topic=CLIENT_INFO_TOPIC, client_type=self.client_type, remove=False)
+        self.publish(topic=Topic.CLIENT_INFO, client_type=self.client_type, remove=False)
 
     def stop(self):
         self.before_stop()
@@ -75,10 +83,9 @@ class ControlledClient(Client):
             super().stop()
         except Exception as e:
             logger.error(e)
-        
 
     def before_stop(self):
-        self.publish(topic=CLIENT_INFO_TOPIC, client_type=self.client_type, remove=True)
+        self.publish(topic=Topic.CLIENT_INFO, client_type=self.client_type, remove=True)
 
 
 class WatcherClient(ControlledClient):
@@ -88,7 +95,9 @@ class WatcherClient(ControlledClient):
         message_handler_cls=None
     ):
         super().__init__(
-            url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
+            url=url, cert_path=cert_path, ipv=ipv, name=name,
+            realm=realm, roles=roles, call_timeout=call_timeout,
+            message_handler_cls=message_handler_cls
         )
         self.market_client : MarketClient = market_client
         self.client_type = 'watcher'
@@ -100,7 +109,7 @@ class WatcherClient(ControlledClient):
         self.task = self.rpc.req_task(num)
 
     def send_buy_signal(self, symbol, price, init_price, now, vol):
-        self.publish(topic=BUY_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
+        self.publish(topic=Topic.BUY_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         target = Target(symbol, price, init_price, now)
         self.targets[symbol] = target
         increase = round((price - init_price) / init_price * 100, 4)
@@ -112,7 +121,7 @@ class WatcherClient(ControlledClient):
         write_target(symbol)
 
     def send_sell_signal(self, symbol, price, init_price, now, vol):
-        self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
+        self.publish(topic=Topic.SELL_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         self.targets[symbol].own = False
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Sell signal. {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}')
@@ -121,19 +130,19 @@ class WatcherClient(ControlledClient):
         if self.stop_profit:
             return
 
-        self.publish(topic=HIGH_TOPIC, symbol=symbol, price=self.targets[symbol].high_price)
+        self.publish(topic=Topic.HIGH, symbol=symbol, price=self.targets[symbol].high_price)
         for target in self.targets.values():
             target.own = False
 
         self.stop_profit = True
-        self.publish(topic=STOP_PROFIT, status=True)
+        self.publish(topic=Topic.STOP_PROFIT, status=True)
         logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all')
 
-    @subscribe(topic=STOP_PROFIT)
+    @subscribe(topic=Topic.STOP_PROFIT)
     def stop_profit_handler(self, status, *arg, **kwargs):
         self.stop_profit = status
 
-    @subscribe(topic=AFTER_BUY_TOPIC)
+    @subscribe(topic=Topic.AFTER_BUY)
     def after_buy_handler(self, symbol, price, *args, **kwargs):
         if symbol not in self.targets:
             return
@@ -149,7 +158,9 @@ class WatcherMasterClient(WatcherClient):
         message_handler_cls=None
     ):
         super().__init__(
-            market_client=market_client, url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
+            market_client=market_client, url=url, cert_path=cert_path, ipv=ipv,
+            name=name, realm=realm, roles=roles, call_timeout=call_timeout,
+            message_handler_cls=message_handler_cls
         )
         price = market_client.get_price()
         market_client.exclude_expensive(price)
@@ -161,6 +172,14 @@ class WatcherMasterClient(WatcherClient):
             'watcher': 0,
             'dealer': 0
         }
+
+    def set_state(self, state):
+        self.state = state
+        self.publish(topic=Topic.STATE, state=state)
+
+    def set_time(self, target_time):
+        self.target_time = target_time
+        self.publish(topic=Topic.TIME, target_time=target_time)
 
     def after_start(self):
         self.info_handler(self.client_type)
@@ -177,7 +196,7 @@ class WatcherMasterClient(WatcherClient):
         self.symbols = self.symbols[num:]
         return task
 
-    @subscribe(topic=CLIENT_INFO_TOPIC)
+    @subscribe(topic=Topic.CLIENT_INFO)
     def info_handler(self, client_type, remove=False, *args, **kwargs):
         if remove:
             self.client_info[client_type] -= 1
@@ -185,14 +204,22 @@ class WatcherMasterClient(WatcherClient):
         else:
             self.client_info[client_type] += 1
 
-            if self.client_info['watcher'] >= WATCHER_NUM and self.client_info['dealer'] >= DEALER_NUM:
-                if not self.run:
-                    self.target_time = get_target_time()
-                    self.run = True
-                    logger.info('Run all')
-                else:
-                    logger.info('Run new')
-                self.publish(topic=RUN_TOPIC, target_time=self.target_time)
+    def starting(self):
+        if self.state == State.STOPPED:
+            self.set_state(State.STARTED)
+
+    def running(self):
+        if self.state != State.RUNNING:
+            self.set_state(State.RUNNING)
+            self.set_time(get_target_time())
+
+    def stopping(self):
+        if self.state != State.STOPPED:
+            self.set_state(State.STOPPED)
+
+    def stop_running(self):
+        if self.state == State.RUNNING:
+            self.set_state(State.STARTED)
 
 class DealerClient(ControlledClient):
     def __init__(
@@ -203,7 +230,9 @@ class DealerClient(ControlledClient):
         message_handler_cls=None
     ):
         super().__init__(
-            url=url, cert_path=cert_path, ipv=ipv, name=name, realm=realm, roles=roles, call_timeout=call_timeout, message_handler_cls=message_handler_cls
+            url=url, cert_path=cert_path, ipv=ipv, name=name,
+            realm=realm, roles=roles, call_timeout=call_timeout,
+            message_handler_cls=message_handler_cls
         )
         self.market_client : MarketClient = market_client
         self.targets : list[Target] = {}
@@ -211,9 +240,9 @@ class DealerClient(ControlledClient):
         self.client_type = 'dealer'
 
 
-    @subscribe(topic=BUY_SIGNAL_TOPIC)
+    @subscribe(topic=Topic.BUY_SIGNAL)
     def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        if not self.run or symbol in self.targets or len(self.targets) >= MAX_BUY:
+        if not self.state == State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
             return
 
         target = Target(symbol, price, init_price, now)
@@ -222,21 +251,21 @@ class DealerClient(ControlledClient):
         self.user.buy_and_sell([target])
 
         if target.buy_price > 0:
-            self.publish(topic=AFTER_BUY_TOPIC, symbol=symbol, price=target.buy_price)
+            self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=target.buy_price)
             self.targets[symbol] = target
 
-    @subscribe(topic=SELL_SIGNAL_TOPIC)
+    @subscribe(topic=Topic.SELL_SIGNAL)
     def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        if not self.run or symbol not in self.targets:
+        if self.state != State.RUNNING or symbol not in self.targets:
             return
 
         target = self.targets[symbol]
         self.user.cancel_and_sell([target])
         logger.info(f'Stop loss{symbol} at {price} USDT')
 
-    @subscribe(topic=HIGH_TOPIC)
+    @subscribe(topic=Topic.HIGH)
     def high_sell_handler(self, symbol, price, *args, **kwargs):
-        if not self.run:
+        if self.state != State.RUNNING:
             return
 
         time.sleep(HIGH_SELL_SLEEP)

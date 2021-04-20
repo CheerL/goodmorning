@@ -1,9 +1,8 @@
 import sys
 import time
 
-from huobi.connection.impl.websocket_watchdog import watch_dog_job
 
-from wampyapp import WatcherClient, WatcherMasterClient
+from wampyapp import WatcherClient, WatcherMasterClient, State
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 
 from market import MarketClient
@@ -11,11 +10,14 @@ from utils import config, kill_all_threads, logger
 from record import write_redis
 from retry import retry
 from websocket_handler import replace_watch_dog
+from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
+
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
+MAX_WAIT = config.getfloat('setting', 'MaxWait')
 
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
@@ -49,33 +51,29 @@ def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
     def warpper(event: TradeDetailEvent):
-        if not client.run or event.ts / 1000 < client.target_time:
-            return
+        if client.state == State.RUNNING and 0 < event.ts / 1000 - client.target_time < MAX_WAIT:
+            detail = event.data[0]
+            now = detail.ts / 1000
+            last = now // interval
+            price = detail.price
+            vol = sum([each.price * each.amount for each in event.data])
 
-        detail = event.data[0]
-        now = detail.ts / 1000
-        last = now // interval
-        price = detail.price
-        vol = sum([each.price * each.amount for each in event.data])
+            if last > info['last']:
+                info['last'] = last
+                info['open_'] = event.data[-1].price
+                info['vol'] = vol
+                info['boot_price'] = info['open_'] * (1 + BOOT_RATE / 100)
+                info['end_price'] = info['open_'] * (1 + END_RATE / 100)
+            else:
+                info['vol'] += vol
+                
+            if symbol in client.targets:
+                check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
 
-        if last > info['last']:
-            info['last'] = last
-            info['open_'] = event.data[-1].price
-            info['vol'] = vol
-            info['boot_price'] = info['open_'] * (1 + BOOT_RATE / 100)
-            info['end_price'] = info['open_'] * (1 + END_RATE / 100)
-        else:
-            info['vol'] += vol
-            
-        if symbol in client.targets:
-            check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
-            # write_csv(csv_path, event.data, target_time)
-            write_redis(symbol, event.data)
+            elif now < client.target_time + SELL_AFTER:
+                check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
 
-        elif now < client.target_time + SELL_AFTER:
-            check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
-            # write_csv(csv_path, event.data, target_time)
-            write_redis(symbol, event.data)
+        write_redis(symbol, event.data)
 
 
     info = {
@@ -86,8 +84,6 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
         'boot_price': 0,
         'end_price': 0
     }
-    # target_time = client.target_time
-    # csv_path = get_csv_handler(symbol, target_time)
     return warpper
 
 def error_callback(error):
@@ -101,16 +97,21 @@ def init_watcher(Client=WatcherClient) -> WatcherClient:
     return client
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == 'master':
+    is_master = len(sys.argv) > 1 and sys.argv[1] == 'master'
+    
+    if is_master:
         logger.info('Master watcher')
         client = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
-        client.wait_to_run()
+        scheduler = Scheduler()
+        scheduler.add_job(lambda _: client.running(), trigger='cron', hour=23, minute=59, second=30)
+        scheduler.add_job(lambda _: client.stopping(), trigger='cron', hour=23, minute=55, second=0)
+        scheduler.add_job(lambda _: client.stop_running(), trigger='cron', hour=0, minute=0, second=SELL_AFTER)
+        client.starting()
     else:
         logger.info('Sub watcher')
-        time.sleep(25)
         client = init_watcher(WatcherClient)
-        client.wait_to_run()
+        client.wait_state(State.STARTED)
         client.get_task(WATCHER_TASK_NUM)
 
     if not client.task:
@@ -126,11 +127,7 @@ def main():
         if not i % 10:
             time.sleep(0.5)
 
-
-    time.sleep(client.target_time - time.time())
-    logger.info(f"Watcher stop in {WATCHER_SLEEP}s")
-    time.sleep(WATCHER_SLEEP)
-
+    client.wait_state(State.STOPPED)
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')

@@ -8,7 +8,6 @@ import pytz
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
-# from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic
 
