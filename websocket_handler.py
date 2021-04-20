@@ -8,6 +8,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
 from huobi.connection.impl.private_def import ConnectionState
 from huobi.utils.time_service import get_current_timestamp
 from huobi.connection.subscribe_client import SubscribeClient
+from utils import logger
 
 HEART_BEAT_MS = 10000
 RECONNECT_MS = 12000
@@ -43,11 +44,11 @@ def check_reconnect(watch_dog: 'WatchDog'):
         elif websocket_manage.state == ConnectionState.CONNECTED:
             if watch_dog.is_auto_connect:
                 if ts >websocket_manage.last_receive_time + watch_dog.heart_beat_limit_ms:
-                    watch_dog.logger.warning("[Sub][" + str(websocket_manage.id) + "] No response from server")
+                    watch_dog.logger.warning("[Sub][" + str(websocket_manage.id) + name + "] No response from server")
                     close_and_wait_reconnect(websocket_manage, watch_dog.wait_reconnect_millisecond())
 
                 elif ts > watch_dog.get_random_restart_at(websocket_manage):
-                    watch_dog.logger.warning(f'reconnect websocket {name}')
+                    watch_dog.logger.warning(f'[Sub] reconnect websocket {name}')
                     close_and_wait_reconnect(websocket_manage, ts+100)
                     
 
@@ -79,7 +80,8 @@ class WatchDog(WebSocketWatchDog):
         self.heart_beat_limit_ms = heart_beat_limit_ms
         self.reconnect_after_ms = reconnect_after_ms if reconnect_after_ms > heart_beat_limit_ms else heart_beat_limit_ms
         self.restart_ms = restart_ms
-        self.logger = logging.getLogger("huobi-client")
+        # self.logger = logging.getLogger("huobi-client")
+        self.logger = logger
         self.scheduler = Scheduler()
         self.scheduler.add_job(check_reconnect, "interval", max_instances=1, seconds=1, args=[self])
         self.start()
