@@ -8,6 +8,7 @@ import time
 from logger import quite_logger
 from utils import config, logger, get_target_time
 from target import Target
+from record import write_target
 
 from wampy.constants import (
     DEFAULT_TIMEOUT, DEFAULT_ROLES, DEFAULT_REALM,
@@ -108,6 +109,7 @@ class WatcherClient(ControlledClient):
         time.sleep(1)
         if target.buy_price == 0:
             del self.targets[symbol]
+        write_target(symbol)
 
     def send_sell_signal(self, symbol, price, init_price, now, vol):
         self.publish(topic=SELL_SIGNAL_TOPIC, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)

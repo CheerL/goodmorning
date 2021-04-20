@@ -1,13 +1,16 @@
 import sys
 import time
 
+from huobi.connection.impl.websocket_watchdog import watch_dog_job
+
 from wampyapp import WatcherClient, WatcherMasterClient
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 
 from market import MarketClient
 from utils import config, kill_all_threads, logger
-from record import get_csv_handler, scp_targets, write_csv
+from record import write_redis
 from retry import retry
+from websocket_handler import replace_watch_dog
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
@@ -66,11 +69,13 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
             
         if symbol in client.targets:
             check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
-            write_csv(csv_path, event.data, target_time)
+            # write_csv(csv_path, event.data, target_time)
+            write_redis(symbol, event.data)
 
         elif now < client.target_time + SELL_AFTER:
             check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
-            write_csv(csv_path, event.data, target_time)
+            # write_csv(csv_path, event.data, target_time)
+            write_redis(symbol, event.data)
 
 
     info = {
@@ -81,8 +86,8 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
         'boot_price': 0,
         'end_price': 0
     }
-    target_time = client.target_time
-    csv_path = get_csv_handler(symbol, target_time)
+    # target_time = client.target_time
+    # csv_path = get_csv_handler(symbol, target_time)
     return warpper
 
 def error_callback(error):
@@ -111,11 +116,13 @@ def main():
     if not client.task:
         return
 
+    watch_dog = replace_watch_dog()
     logger.info(f'Watcher task are: {", ".join(client.task)}')
     for i, symbol in enumerate(client.task):
         client.market_client.sub_trade_detail(
             symbol, trade_detail_callback(symbol, client), error_callback
         )
+        watch_dog.after_connection_created(symbol)
         if not i % 10:
             time.sleep(0.5)
 
@@ -127,7 +134,7 @@ def main():
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')
-    scp_targets(client.targets.keys(), client.target_time)
+    # scp_targets(client.targets.keys(), client.target_time)
 
 if __name__ == '__main__':
     main()

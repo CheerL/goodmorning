@@ -1,11 +1,18 @@
 import csv
 import os
 import time
+import redis
 
 from data2excel import create_excel
-from utils import ROOT, get_target_time
+from utils import ROOT, get_target_time, config, user_config
+from huobi.model.market.trade_detail import TradeDetail
 
 DB_PATH = os.path.join(ROOT, 'test', 'db', 'csv')
+RHOST = config.get('config', 'RHost')
+RPORT = config.get('config', 'RPort')
+RPASSWORD = user_config.get('config', 'RPassword')
+
+redis_conn = redis.Redis(host=RHOST, port=RPORT, db=0, password=RPASSWORD)
 
 def get_csv_path(symbol, target_time):
     target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
@@ -19,32 +26,22 @@ def get_csv_handler(symbol, target_time):
 
     return csv_path
 
-def detail_callback(csv_path, target_time, interval=60):
-    def wrapper(detail):
-        with open(csv_path, 'a+') as fcsv:
-            for detail_item in detail.data:
-                now = detail_item.ts // interval
-                if now > info['last']:
-                    info['last'] = now
-                    info['open_'] = detail_item.price
-                    info['vol'] = 0
-                    info['high'] = info['open_']
-                
-                info['vol'] += detail_item.price * detail_item.amount
-                info['high'] = max(info['high'], detail_item.price)
 
-                csv.writer(fcsv).writerow([detail_item.ts/1000 - target_time, detail_item.price, info['vol'], info['open_'], info['high']])
+def write_redis(symbol: str, data: 'list[TradeDetail]'):
+    redis_conn.mset({
+        f'trade_{symbol}_{each.ts}_{i}' : f'{each.ts},{each.price},{each.amount},{each.direction}'
+        for i, each in enumerate(reversed(data))
+    })
+
+def write_target(symbol):
+    now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
+    name = f'target_{now_str}'
+    targets = redis_conn.get(name)
     
-    info = {
-        'last': 0,
-        'vol': 0,
-        'open_': 0,
-        'high': 0
-    }
-    interval *= 1000
-    return wrapper
+    if symbol not in targets:
+        redis_conn.set(name, ','.join([targets, symbol]))
 
-def write_csv(csv_path, data, target_time):
+def write_csv(csv_path, data: 'list[TradeDetail]', target_time):
     with open(csv_path, 'a+') as fcsv:
         writer = csv.writer(fcsv)
         writer.writerows([
