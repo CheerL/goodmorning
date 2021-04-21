@@ -9,7 +9,7 @@ from huobi.model.market.trade_detail import TradeDetail
 
 DB_PATH = os.path.join(ROOT, 'test', 'db', 'csv')
 RHOST = config.get('setting', 'RHost')
-RPORT = config.get('setting', 'RPort')
+RPORT = config.getint('setting', 'RPort')
 RPASSWORD = user_config.get('setting', 'RPassword')
 
 redis_conn = redis.Redis(host=RHOST, port=RPORT, db=0, password=RPASSWORD)

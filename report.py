@@ -114,6 +114,26 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
     conn.commit()
     conn.close()
 
+# def add_profit(account_id, pay, income, profit, percent, now=None):
+#     if not now:
+#         now = time.time()
+
+#     Session = get_pgsql_session()
+#     day = datetime.date.fromtimestamp(now)
+#     month = day.strftime('%Y-%m')
+#     with Session() as session:
+#         session.add(Profit(
+#             account=account_id,
+#             month=month,
+#             time=now,
+#             pay=pay,
+#             income=income,
+#             profit=profit,
+#             percent=percent
+#         ))
+#         session.commit()
+    
+
 def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:
         return
