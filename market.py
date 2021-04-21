@@ -49,5 +49,4 @@ class MarketClient(_MarketClient):
         return {
             pair.symbol: pair.close
             for pair in self.get_market_tickers()
-            if pair.symbol in self.symbols_info
         }

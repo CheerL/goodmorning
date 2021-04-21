@@ -120,7 +120,7 @@ def main():
         client.starting()
     else:
         logger.info('Sub watcher')
-        client = init_watcher(WatcherClient)
+        client : WatcherClient = init_watcher(WatcherClient)
         client.wait_state(State.STARTED)
         client.get_task(WATCHER_TASK_NUM)
 

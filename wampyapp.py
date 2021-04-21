@@ -173,9 +173,10 @@ class WatcherMasterClient(WatcherClient):
             'dealer': 0
         }
         self.symbols : list[str] = sorted(
-            market_client.symbols_info.keys(),
+            self.market_client.symbols_info.keys(),
             key=lambda symbol: self.market_client.mark_price[symbol],
-            reverse=True)
+            reverse=True
+        )
 
     def set_state(self, state):
         self.state = state
