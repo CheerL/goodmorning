@@ -1,18 +1,21 @@
-from huobi.connection.impl.websocket_manage import WebsocketManage, websocket_connection_handler as WEBSOCKET_CONNECTION_HANDLER
-from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-import threading
 import logging
 import random
-# from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
-from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
+import threading
+
+from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
+# from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
 from huobi.connection.impl.private_def import ConnectionState
-from huobi.utils.time_service import get_current_timestamp
+from huobi.connection.impl.websocket_manage import WebsocketManage
+from huobi.connection.impl.websocket_manage import websocket_connection_handler as WEBSOCKET_CONNECTION_HANDLER
+from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.connection.subscribe_client import SubscribeClient
+from huobi.utils.time_service import get_current_timestamp
+
 from utils import logger
 
-HEART_BEAT_MS = 10000
-RECONNECT_MS = 12000
-RESTART_MS = 72100
+HEART_BEAT_MS = 30000
+RECONNECT_MS = 32000
+RESTART_MS = 92100
 ConnectionState.RECONNECTING = 6
 
 def replace_watch_dog():
@@ -43,18 +46,19 @@ def check_reconnect(watch_dog: 'WatchDog'):
 
         elif websocket_manage.state == ConnectionState.CONNECTED:
             if watch_dog.is_auto_connect:
-                if ts >websocket_manage.last_receive_time + watch_dog.heart_beat_limit_ms:
-                    watch_dog.logger.warning("[Sub][" + str(websocket_manage.id) + name + "] No response from server")
+                if ts > websocket_manage.last_receive_time + watch_dog.heart_beat_limit_ms:
+                    print(websocket_manage.last_receive_time, watch_dog.heart_beat_limit_ms)
+                    watch_dog.logger.warning(f"[Sub][{name}] No response from server")
                     close_and_wait_reconnect(websocket_manage, watch_dog.wait_reconnect_millisecond())
 
                 elif ts > watch_dog.get_random_restart_at(websocket_manage):
-                    watch_dog.logger.warning(f'[Sub] reconnect websocket {name}')
+                    watch_dog.logger.warning(f'[Sub][{name}] reconnect websocket')
                     close_and_wait_reconnect(websocket_manage, ts+100)
                     
 
         elif websocket_manage.state == ConnectionState.WAIT_RECONNECT:
             if ts > websocket_manage.reconnect_at:
-                watch_dog.logger.warning("[Sub] call re_connect")
+                watch_dog.logger.warning(f"[Sub][{name}] call re_connect")
                 websocket_manage.state = ConnectionState.RECONNECTING
                 websocket_manage.re_connect()
                 websocket_manage.created_at = ts

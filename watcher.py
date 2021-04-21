@@ -1,17 +1,16 @@
 import sys
 import time
 
-
-from wampyapp import WatcherClient, WatcherMasterClient, State
+# from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
+from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from huobi.model.market.trade_detail_event import TradeDetailEvent
+from retry import retry
 
 from market import MarketClient
-from utils import config, kill_all_threads, logger
 from record import write_redis
-from retry import retry
-from websocket_handler import replace_watch_dog
-from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
-
+from utils import config, kill_all_threads, logger
+from wampyapp import State, WatcherClient, WatcherMasterClient
+from websocket_handler import replace_watch_dog, WatchDog
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
@@ -89,6 +88,17 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
 def error_callback(error):
     logger.error(error)
 
+def update_symbols(client: WatcherClient, watch_dog: WatchDog):
+    new_symbols, _ = client.market_client.update_symbols_info()
+    if new_symbols:
+        for i, symbol in enumerate(new_symbols):
+            client.market_client.sub_trade_detail(
+                symbol, trade_detail_callback(symbol, client), error_callback
+            )
+            watch_dog.after_connection_created(symbol)
+            if not i % 10:
+                time.sleep(0.5)
+
 @retry(tries=5, delay=1, logger=logger)
 def init_watcher(Client=WatcherClient) -> WatcherClient:
     market_client = MarketClient()
@@ -98,15 +108,17 @@ def init_watcher(Client=WatcherClient) -> WatcherClient:
 
 def main():
     is_master = len(sys.argv) > 1 and sys.argv[1] == 'master'
-    
+    watch_dog = replace_watch_dog()
+
     if is_master:
         logger.info('Master watcher')
         client = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
         scheduler = Scheduler()
-        scheduler.add_job(lambda _: client.running(), trigger='cron', hour=23, minute=59, second=30)
-        scheduler.add_job(lambda _: client.stopping(), trigger='cron', hour=23, minute=55, second=0)
-        scheduler.add_job(lambda _: client.stop_running(), trigger='cron', hour=0, minute=0, second=SELL_AFTER)
+        scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
+        scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=55, second=0)
+        scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
+        scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
         client.starting()
     else:
         logger.info('Sub watcher')
@@ -117,7 +129,6 @@ def main():
     if not client.task:
         return
 
-    watch_dog = replace_watch_dog()
     logger.info(f'Watcher task are: {", ".join(client.task)}')
     for i, symbol in enumerate(client.task):
         client.market_client.sub_trade_detail(
@@ -131,7 +142,6 @@ def main():
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')
-    # scp_targets(client.targets.keys(), client.target_time)
 
 if __name__ == '__main__':
     main()

@@ -1,19 +1,16 @@
-from wampy.peers.clients import Client
-from wampy.roles.subscriber import subscribe
-from wampy.roles.callee import callee
-from market import MarketClient
-from user import User
 import time
-from enum import Enum
+
+from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT
+from wampy.peers.clients import Client
+from wampy.roles.callee import callee
+from wampy.roles.subscriber import subscribe
 
 from logger import quite_logger
-from utils import config, logger, get_target_time
-from target import Target
+from market import MarketClient
 from record import write_target
-
-from wampy.constants import (
-    DEFAULT_TIMEOUT, DEFAULT_ROLES, DEFAULT_REALM,
-)
+from target import Target
+from user import User
+from utils import config, get_target_time, logger
 
 DEALER_NUM = config.getint('setting', 'DealerNum')
 WATCHER_NUM = config.getint('setting', 'WatcherNum')
@@ -26,21 +23,26 @@ WS_HOST = config.get('setting', 'WsHost')
 WS_PORT = config.getint('setting', 'WsPort')
 WS_URL = f'ws://{WS_HOST}:{WS_PORT}'
 
-HIGH_SELL_SLEEP = 0.5
+HIGH_SELL_SLEEP = 1
 
-Topic = Enum('TOPIC', (
-    'CLIENT_INFO', 'STATE', 'TIME',
-    'BUY_SIGNAL', 'SELL_SIGNAL', 
-    'AFTER_BUY', 'HIGH',
-    'STOP_PROFIT', 'STOP_LOSS'
-))
+class Topic:
+    CLIENT_INFO = 'CLIENT_INFO'
+    STATE = 'STATE'
+    TIME = 'TIME'
+    BUY_SIGNAL = 'BUY_SIGNAL'
+    SELL_SIGNAL = 'SELL_SIGNAL'
+    AFTER_BUY = 'AFTER_BUY'
+    HIGH = 'HIGH'
+    STOP_PROFIT = 'STOP_PROFIT'
+    STOP_LOSS = 'STOP_LOSS'
 
-State = Enum('STATE', (
-    'STOPPED', 'STARTED', 'RUNNING'
-))
+class State:
+    STOPPED = 0
+    STARTED = 1
+    RUNNING = 2
 
 
-quite_logger(all_logger=True)
+# quite_logger(all_logger=True)
 
 
 class ControlledClient(Client):
@@ -60,11 +62,15 @@ class ControlledClient(Client):
 
     @subscribe(topic=Topic.STATE)
     def state_handler(self, state, *args, **kwargs):
-        self.state = state
+        if self.state != state:
+            self.state = state
+            logger.info(f"Change state to {['stopped', 'started', 'running'][self.state]}")
 
     @subscribe(topic=Topic.TIME)
     def time_handler(self, target_time,  *args, **kwargs):
-        self.target_time = target_time
+        if self.target_time != target_time:
+            self.target_time = target_time
+            logger.info(f'Change target time {self.target_time}')
 
     def wait_state(self, state=State.STARTED):
         while self.state != state:
@@ -162,16 +168,14 @@ class WatcherMasterClient(WatcherClient):
             name=name, realm=realm, roles=roles, call_timeout=call_timeout,
             message_handler_cls=message_handler_cls
         )
-        price = market_client.get_price()
-        market_client.exclude_expensive(price)
-        self.symbols : list[str] = sorted(
-            market_client.symbols_info.keys(),
-            key=lambda s: price[s][1],
-            reverse=True)
         self.client_info = {
             'watcher': 0,
             'dealer': 0
         }
+        self.symbols : list[str] = sorted(
+            market_client.symbols_info.keys(),
+            key=lambda symbol: self.market_client.mark_price[symbol],
+            reverse=True)
 
     def set_state(self, state):
         self.state = state
@@ -203,23 +207,30 @@ class WatcherMasterClient(WatcherClient):
 
         else:
             self.client_info[client_type] += 1
+        
+        self.publish(topic=Topic.STATE, state=self.state)
+        self.publish(topic=Topic.TIME, target_time=self.target_time)
 
     def starting(self):
         if self.state == State.STOPPED:
             self.set_state(State.STARTED)
+            logger.info(f"Change state to started")
 
     def running(self):
         if self.state != State.RUNNING:
             self.set_state(State.RUNNING)
             self.set_time(get_target_time())
+            logger.info(f"Change state to running")
 
     def stopping(self):
         if self.state != State.STOPPED:
             self.set_state(State.STOPPED)
+            logger.info(f"Change state to stopped")
 
     def stop_running(self):
         if self.state == State.RUNNING:
             self.set_state(State.STARTED)
+            logger.info(f"Change state to not running")
 
 class DealerClient(ControlledClient):
     def __init__(

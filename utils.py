@@ -30,11 +30,13 @@ user_config = configparser.ConfigParser()
 if os.path.exists(USER_CONFIG_PATH):
     user_config.read(USER_CONFIG_PATH)
 
+
 session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=1, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
 PrintBasic.print_basic = lambda data, name=None: None
+
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
