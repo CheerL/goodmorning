@@ -2,6 +2,7 @@ import sys
 import time
 
 # from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
+from wampyapp import State, WatcherClient, WatcherMasterClient
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 from retry import retry
@@ -9,7 +10,6 @@ from retry import retry
 from market import MarketClient
 from record import write_redis
 from utils import config, kill_all_threads, logger
-from wampyapp import State, WatcherClient, WatcherMasterClient
 from websocket_handler import replace_watch_dog, WatchDog
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
