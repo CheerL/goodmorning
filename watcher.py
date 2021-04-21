@@ -117,9 +117,9 @@ def main():
         logger.info('Master watcher')
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
-        watch_dog.scheduler.add_job(client.running, trigger='cron', hour=19, minute=5, second=0)
-        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=19, minute=5, second=int(SELL_AFTER))
-        watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=19, minute=6, second=0)
+        watch_dog.scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
+        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
+        watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=56, second=0)
         watch_dog.scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
         client.starting()
     else:
