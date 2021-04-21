@@ -42,7 +42,7 @@ class State:
     RUNNING = 2
 
 
-# quite_logger(all_logger=True)
+quite_logger(all_logger=True)
 
 
 class ControlledClient(Client):
