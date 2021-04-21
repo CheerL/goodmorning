@@ -84,15 +84,19 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
     }
     return warpper
 
-def error_callback(error):
-    logger.error(error)
+def error_callback(symbol):
+    def warpper(error):
+        logger.error(f'[{symbol}] {error}')
+    
+    return warpper
 
 def update_symbols(client: WatcherClient, watch_dog: WatchDog):
     new_symbols, _ = client.market_client.update_symbols_info()
     if new_symbols:
+        logger.info(f'Find new symbols: {", ".join(new_symbols)}')
         for i, symbol in enumerate(new_symbols):
             client.market_client.sub_trade_detail(
-                symbol, trade_detail_callback(symbol, client), error_callback
+                symbol, trade_detail_callback(symbol, client), error_callback(symbol)
             )
             watch_dog.after_connection_created(symbol)
             if not i % 10:
@@ -113,9 +117,9 @@ def main():
         logger.info('Master watcher')
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
-        watch_dog.scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
-        watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=55, second=0)
-        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
+        watch_dog.scheduler.add_job(client.running, trigger='cron', hour=19, minute=5, second=0)
+        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=19, minute=5, second=int(SELL_AFTER))
+        watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=19, minute=6, second=0)
         watch_dog.scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
         client.starting()
     else:

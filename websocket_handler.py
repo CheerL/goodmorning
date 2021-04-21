@@ -48,18 +48,17 @@ def check_reconnect(watch_dog: 'WatchDog'):
         elif websocket_manage.state == ConnectionState.CONNECTED:
             if watch_dog.is_auto_connect:
                 if ts > websocket_manage.last_receive_time + watch_dog.heart_beat_limit_ms:
-                    print(websocket_manage.last_receive_time, watch_dog.heart_beat_limit_ms)
-                    watch_dog.logger.warning(f"[Sub][{name}] No response from server")
+                    watch_dog.logger.warning(f"[{name}] No response from server")
                     close_and_wait_reconnect(websocket_manage, watch_dog.wait_reconnect_millisecond())
 
                 elif ts > watch_dog.get_random_restart_at(websocket_manage):
-                    watch_dog.logger.warning(f'[Sub][{name}] reconnect websocket')
+                    watch_dog.logger.warning(f'[{name}] reconnect websocket')
                     close_and_wait_reconnect(websocket_manage, ts+100)
                     
 
         elif websocket_manage.state == ConnectionState.WAIT_RECONNECT:
             if ts > websocket_manage.reconnect_at:
-                watch_dog.logger.warning(f"[Sub][{name}] call re_connect")
+                watch_dog.logger.warning(f"[{name}] call re_connect")
                 websocket_manage.state = ConnectionState.RECONNECTING
                 websocket_manage.re_connect()
                 websocket_manage.created_at = ts

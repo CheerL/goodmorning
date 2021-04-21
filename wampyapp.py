@@ -254,7 +254,7 @@ class DealerClient(ControlledClient):
 
     @subscribe(topic=Topic.BUY_SIGNAL)
     def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        if not self.state == State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
+        if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
             return
 
         target = Target(symbol, price, init_price, now)

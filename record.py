@@ -36,9 +36,12 @@ def write_redis(symbol: str, data: 'list[TradeDetail]'):
 def write_target(symbol):
     now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
     name = f'target_{now_str}'
-    targets = redis_conn.get(name).decode('utf-8')
+    targets = redis_conn.get(name)
+    targets = targets.decode('utf-8') if targets else ''
     
-    if symbol not in targets:
+    if not targets:
+        redis_conn.set(name, symbol)
+    elif symbol not in targets:
         redis_conn.set(name, ','.join([targets, symbol]))
 
 def write_csv(csv_path, data: 'list[TradeDetail]', target_time):
