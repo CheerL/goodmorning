@@ -16,7 +16,7 @@ from utils import logger
 HEART_BEAT_MS = 30000
 RECONNECT_MS = 32000
 RESTART_MS = 621500
-RESTART_RANGE = 30000
+RESTART_RANGE = 60000
 ConnectionState.RECONNECTING = 6
 
 def replace_watch_dog():
@@ -52,13 +52,11 @@ def check_reconnect(watch_dog: 'WatchDog'):
                     close_and_wait_reconnect(websocket_manage, watch_dog.wait_reconnect_millisecond())
 
                 elif ts > watch_dog.get_random_restart_at(websocket_manage):
-                    watch_dog.logger.warning(f'[{name}] reconnect websocket')
                     close_and_wait_reconnect(websocket_manage, ts+100)
-                    
 
         elif websocket_manage.state == ConnectionState.WAIT_RECONNECT:
             if ts > websocket_manage.reconnect_at:
-                watch_dog.logger.warning(f"[{name}] call re_connect")
+                watch_dog.logger.warning(f"[{name}] Reconnect")
                 websocket_manage.state = ConnectionState.RECONNECTING
                 websocket_manage.re_connect()
                 websocket_manage.created_at = ts
@@ -84,14 +82,13 @@ class WatchDog(WebSocketWatchDog):
         self.heart_beat_limit_ms = heart_beat_limit_ms
         self.reconnect_after_ms = reconnect_after_ms if reconnect_after_ms > heart_beat_limit_ms else heart_beat_limit_ms
         self.restart_ms = restart_ms
-        # self.logger = logging.getLogger("huobi-client")
         self.logger = logger
         self.scheduler = Scheduler()
         self.scheduler.add_job(check_reconnect, "interval", max_instances=1, seconds=1, args=[self])
         self.start()
 
     def get_random_restart_at(self, wm):
-        return wm.created_at + self.restart_ms + random.randint(-RESTART_RANGE, RESTART_RANGE)
+        return wm.created_at + self.restart_ms + hash(wm) % RESTART_RANGE
 
     def on_connection_closed(self, websocket_manage):
         self.mutex.acquire()
