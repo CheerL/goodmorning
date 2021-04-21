@@ -89,11 +89,12 @@ def write_trade(redis_conn: redis.Redis, session):
 
 def write_target(redis_conn: redis.Redis, session):
     keys = redis_conn.keys('target_*')
-    values = redis_conn.mget(keys)
-    targets = [Target.get(key, value) for key, value in zip(keys, values)]
-    session.add_all(targets)
-    session.commit()
-    redis_conn.delete(*keys)
+    if keys:
+        values = redis_conn.mget(keys)
+        targets = [Target.get(key, value) for key, value in zip(keys, values)]
+        session.add_all(targets)
+        session.commit()
+        redis_conn.delete(*keys)
 
 def main():
     redis_conn = get_redis_conn()
