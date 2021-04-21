@@ -3,7 +3,6 @@ import time
 
 # from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
 from wampyapp import State, WatcherClient, WatcherMasterClient
-from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 from retry import retry
 
@@ -112,14 +111,12 @@ def main():
 
     if is_master:
         logger.info('Master watcher')
-        client = init_watcher(WatcherMasterClient)
+        client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
-        scheduler = Scheduler()
-        scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
-        scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=55, second=0)
-        scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
-        scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
-        scheduler.start()
+        watch_dog.scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
+        watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=55, second=0)
+        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
+        watch_dog.scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
         client.starting()
     else:
         logger.info('Sub watcher')
