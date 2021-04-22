@@ -68,7 +68,7 @@ class Profit(Base):
 
     @staticmethod
     def get_sum_profit(session, account, month=None):
-        result = session.query(func.sum(Profit.profit)).filter(Profit.account == account)
+        result = session.query(func.sum(Profit.profit)).filter(Profit.account == str(account))
         if month:
             result = result.filter(Profit.month == month)
         return result.scalar()
@@ -82,7 +82,7 @@ class Record(Base):
     id = Column(INTEGER, primary_key=True)
     profit_id = Column(INTEGER)
     currency = Column(VARCHAR(10))
-    tm = Column(REAL)
+    tm = Column(VARCHAR(40))
     price = Column(REAL)
     amount = Column(REAL)
     vol = Column(REAL)
@@ -108,7 +108,7 @@ class Message(Base):
     id = Column(INTEGER, primary_key=True)
     summary = Column(VARCHAR(100))
     msg = Column(TEXT)
-    type = Column(INTEGER)
+    msg_type = Column(INTEGER)
     uids = Column(VARCHAR(200))
 
 def get_redis_conn():

@@ -53,7 +53,7 @@ class WxPusher(_WxPusher):
 def wx_push(content, uids, content_type=1, summary=None):
     summary = summary or content[:20]
     WxPusher.send_message(content, uids=uids, content_type=content_type, summary=summary)
-    message = Message(summary=summary, msg=content, uids=';'.join(uids), type=content_type)
+    message = Message(summary=summary, msg=content, uids=';'.join(uids), msg_type=content_type)
 
     with get_pgsql_session() as session:
         session.add(message)
