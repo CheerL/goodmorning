@@ -270,4 +270,4 @@ class User:
         logger.info(f'Totally pay {pay} USDT, get {income} USDT, profit {profit} USDT, {percent}%')
         add_profit(self.account_id, pay, income, profit, percent)
         total_profit, month_profit = get_profit(self.account_id)
-        wx_report(self.wxuid, self.username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)
+        wx_report(self.account_id, self.wxuid, self.username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit)
