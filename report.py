@@ -49,13 +49,16 @@ class WxPusher(_WxPusher):
         return name
 
 
-@retry(tries=5, delay=1, logger=logger)
 def wx_push(content, uids, content_type=1, summary=None):
+    @retry(tries=5, delay=1, logger=logger)
+    def _wx_push(content, uids, content_type, summary):
+        WxPusher.send_message(content, uids=uids, content_type=content_type, summary=summary)
+
     summary = summary or content[:20]
-    WxPusher.send_message(content, uids=uids, content_type=content_type, summary=summary)
-    message = Message(summary=summary, msg=content, uids=';'.join(uids), msg_type=content_type)
+    _wx_push(content, uids, content_type, summary)
 
     with get_pgsql_session() as session:
+        message = Message(summary=summary, msg=content, uids=';'.join(uids), msg_type=content_type)
         session.add(message)
         session.commit()
 
@@ -132,6 +135,7 @@ def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_inf
 - 总累计收益: **{total_profit} USDT**
 '''
     wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
+
     with get_pgsql_session() as session:
         profit_id = Profit.get_id(session, account_id, pay, income)
         buy_records = Record.from_record_info(buy_info, profit_id, 'buy')
