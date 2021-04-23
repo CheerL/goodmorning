@@ -11,6 +11,7 @@ RPASSWORD = user_config.get('setting', 'RPassword')
 
 PGHOST = config.get('setting', 'PGHost')
 PGPORT = config.getint('setting', 'PGPort')
+PGUSER = 'postgres'
 PGPASSWORD = user_config.get('setting', 'PGPassword')
 PGNAME = 'goodmorning'
 
@@ -111,12 +112,12 @@ class Message(Base):
     msg_type = Column(INTEGER)
     uids = Column(VARCHAR(200))
 
-def get_redis_conn():
-    redis_conn = redis.StrictRedis(host=RHOST, port=RPORT, db=0, password=RPASSWORD)
+def get_redis_conn(host=RHOST, port=RPORT, password=RPASSWORD, db=0):
+    redis_conn = redis.StrictRedis(host=host, port=port, db=db, password=password)
     return redis_conn
 
-def get_pgsql_session():
-    engine = create_engine(f'postgresql://postgres:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGNAME}')
+def get_pgsql_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD):
+    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
     Session = sessionmaker(bind=engine)
     Base.metadata.create_all(engine)
     return Session()
