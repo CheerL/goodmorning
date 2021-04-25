@@ -30,15 +30,24 @@ class Trade(Base):
     def from_redis(key, value):
         key = key.decode('utf-8')
         value = value.decode('utf-8')
-        symbol = key.split('_')[1]
+        _, symbol, num = key.split('_')
         ts, price, amount, direction = value.split(',')
         return Trade(
             symbol=symbol,
-            ts=ts,
+            ts=str(int(ts)+int(num)/1000),
             price=float(price),
             amount=float(amount),
             direction = direction
         )
+
+    @staticmethod
+    def get_data(session, symbol, start, end):
+        data = session.query(Trade).filter(
+            Trade.symbol == symbol,
+            Trade.ts >= str(start),
+            Trade.ts <= str(end)
+        ).order_by(Trade.ts)
+        return data
 
 class Target(Base):
     __tablename__ = 'target'

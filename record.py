@@ -1,4 +1,5 @@
 import csv
+import sys
 import os
 import time
 import redis
@@ -61,8 +62,7 @@ def scp_targets(targets, target_time):
         scp(file_path)
 
 def main():
-    target_time = get_target_time()
-    target_time_str = time.strftime('%Y-%m-%d-%H', time.localtime(target_time))
+    target_time_str = sys.argv[1]
     create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':
