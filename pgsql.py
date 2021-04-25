@@ -30,7 +30,7 @@ class Trade(Base):
     def from_redis(key, value):
         key = key.decode('utf-8')
         value = value.decode('utf-8')
-        _, symbol, num = key.split('_')
+        _, symbol, _, num = key.split('_')
         ts, price, amount, direction = value.split(',')
         return Trade(
             symbol=symbol,

@@ -97,6 +97,7 @@ def create_excel(target_time_str, db_path):
     target_time = time.strptime(target_time_str, '%Y-%m-%d %H:%M:%S')
     target_time_ts = time.mktime(target_time)
     target_tm = time.strftime('%Y-%m-%d-%H', target_time)
+    # target_tm = '2021-04-26-00'
     
     wb = Workbook()
     wb.remove(wb['Sheet'])
@@ -105,7 +106,7 @@ def create_excel(target_time_str, db_path):
         print(targets)
         for symbol in targets:
             add_sheet(wb, session, symbol, target_time_ts, target_time_ts + 300)
-    wb.save(os.path.join(db_path, f'{target_time_str}.xlsx'))
+    wb.save(os.path.join(db_path, f'{target_tm}.xlsx'))
 
 
 def main():
