@@ -11,6 +11,7 @@ from report import wx_report, add_profit, get_profit, wx_name
 
 SELL_RATE = config.getfloat('setting', 'SellRate')
 SECOND_SELL_RATE = config.getfloat('setting', 'SecondSellRate')
+MAX_BUY_RATE = config.getfloat('setting', 'MaxBuyRate')
 
 class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
@@ -54,6 +55,44 @@ class User:
             for target, amount in zip(targets, amounts)
             if amount > 0
         ]
+        if buy_order_list:
+            self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
+            self.buy_order_list.extend(buy_order_list)
+            # logger.debug(f'User {self.account_id} buy report')
+            for order in buy_order_list:
+                logger.debug(f'Speed {order["amount"]} USDT to buy {order["symbol"][:-4].upper()}')
+
+    def buy_limit(self, targets, amounts, prices=None):
+        if not prices:
+            rate = MAX_BUY_RATE
+            buy_order_list = [{
+                "symbol": target.symbol,
+                "account_id": self.account_id,
+                "order_type": OrderType.BUY_LIMIT,
+                "source": OrderSource.SPOT_API,
+                "price": target.check_price((1 + rate / 100) * target.init_price),
+                "amount": target.check_amount(max(
+                    amount,
+                    target.min_order_value
+                ))}
+                for target, amount in zip(targets, amounts)
+                if amount > 0
+            ]
+        else:
+            buy_order_list = [{
+                "symbol": target.symbol,
+                "account_id": self.account_id,
+                "order_type": OrderType.BUY_LIMIT,
+                "source": OrderSource.SPOT_API,
+                "price": target.check_price(price),
+                "amount": target.check_amount(max(
+                    amount,
+                    target.min_order_value
+                ))}
+                for target, amount, price in zip(targets, amounts, prices)
+                if amount > 0
+            ]
+
         if buy_order_list:
             self.buy_id.extend(self.trade_client.batch_create_order(buy_order_list))
             self.buy_order_list.extend(buy_order_list)
@@ -183,7 +222,7 @@ class User:
         # amounts = [self.balance[target.base_currency] for target in targets]
 
     def buy_and_sell(self, targets):
-        self.buy(targets, [self.buy_amount for _ in targets])
+        self.buy_limit(targets, [self.buy_amount for _ in targets])
         self.check_balance(targets)
         sell_amounts = [self.balance[target.base_currency] for target in targets]
         self.sell_limit(targets, sell_amounts)

@@ -21,7 +21,7 @@ class Trade(Base):
     __tablename__ = 'trade'
     id = Column(INTEGER, primary_key=True)
     symbol = Column(VARCHAR(10))
-    ts = Column(VARCHAR(15))
+    ts = Column(VARCHAR(20))
     price = Column(REAL)
     amount = Column(REAL)
     direction = Column(VARCHAR(5))
