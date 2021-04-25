@@ -16,12 +16,13 @@ END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
 SELL_AFTER = config.getfloat('setting', 'SellAfter')
 MAX_WAIT = config.getfloat('setting', 'MaxWait')
+MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price):
-    if vol < MIN_VOL:
+def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price, high):
+    if vol < MIN_VOL or price < (1 - MAX_BUY_BACK_RATE / 100) * high:
         return
 
     if boot_price < price < end_price:
@@ -62,14 +63,20 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
                 info['vol'] = vol
                 info['boot_price'] = info['open_'] * (1 + BOOT_RATE / 100)
                 info['end_price'] = info['open_'] * (1 + END_RATE / 100)
+                info['high'] = max(info['open_'], price)
             else:
                 info['vol'] += vol
+                info['high'] = max(info['high'], price)
                 
             if symbol in client.targets:
                 check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
 
             elif now < client.target_time + SELL_AFTER:
-                check_buy_signal(client, symbol, info['vol'], info['open_'], price, now, info['boot_price'], info['end_price'])
+                check_buy_signal(
+                    client, symbol, info['vol'], info['open_'],
+                    price, now, info['boot_price'], info['end_price'],
+                    info['high']
+                )
 
         write_redis(symbol, event.data)
 
