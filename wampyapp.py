@@ -1,4 +1,5 @@
 import time
+from huobi.model.generic.symbol import Symbol
 
 from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT
 from wampy.peers.clients import Client
@@ -199,6 +200,13 @@ class WatcherMasterClient(WatcherClient):
     def req_task(self, num) -> 'list[str]':
         task = self.symbols[:num]
         self.symbols = self.symbols[num:]
+
+        if not self.symbols:
+            self.symbols = sorted(
+                self.market_client.symbols_info.keys(),
+                # key=lambda symbol: symbol,
+                reverse=True
+            )
         return task
 
     @subscribe(topic=Topic.CLIENT_INFO)

@@ -48,7 +48,7 @@ def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
         except Exception as e:
             logger.error(e)
 
-def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
+def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redis=True):
     def warpper(event: TradeDetailEvent):
         if client.state == State.RUNNING and 0 < event.ts / 1000 - client.target_time < MAX_WAIT:
             detail = event.data[0]
@@ -78,7 +78,8 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300):
                     info['high']
                 )
 
-        write_redis(symbol, event.data)
+        if redis:
+            write_redis(symbol, event.data)
 
 
     info = {
@@ -118,6 +119,7 @@ def init_watcher(Client=WatcherClient) -> WatcherClient:
 
 def main():
     is_master = len(sys.argv) > 1 and sys.argv[1] == 'master'
+    is_wait_stop = len(sys.argv) <= 1 or sys.argv[1] != 'nowait'
     watch_dog = replace_watch_dog()
 
     if is_master:
@@ -141,13 +143,17 @@ def main():
     logger.info(f'Watcher task are: {", ".join(client.task)}')
     for i, symbol in enumerate(client.task):
         client.market_client.sub_trade_detail(
-            symbol, trade_detail_callback(symbol, client), error_callback
+            symbol, trade_detail_callback(symbol, client, redis=is_wait_stop), error_callback
         )
         watch_dog.after_connection_created(symbol)
         if not i % 10:
             time.sleep(0.5)
 
-    client.wait_state(State.STOPPED)
+    client.wait_state(State.RUNNING)
+    client.wait_state(State.STARTED)
+    if is_wait_stop:
+        client.wait_state(State.STOPPED)
+
     client.stop()
     kill_all_threads()
     logger.info('Watcher stop')

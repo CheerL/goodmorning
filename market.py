@@ -1,4 +1,5 @@
 import time
+import re
 
 from huobi.client.generic import GenericClient
 from huobi.client.market import MarketClient as _MarketClient
@@ -26,6 +27,7 @@ class MarketClient(_MarketClient):
             symbol: info
             for symbol, info in infos.items()
             if symbol not in self.exclude_list
+            and not re.search('\d', symbol)
             and symbol in base_price
             and base_price[symbol] < 10
         }
