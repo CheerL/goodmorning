@@ -65,15 +65,22 @@ class User:
     def buy_limit(self, targets, amounts, prices=None):
         if not prices:
             rate = MAX_BUY_RATE
+            rate2 = 9
             buy_order_list = [{
                 "symbol": target.symbol,
                 "account_id": self.account_id,
                 "order_type": OrderType.BUY_LIMIT,
                 "source": OrderSource.SPOT_API,
-                "price": target.check_price((1 + rate / 100) * target.init_price),
+                "price": target.check_price(min(
+                    (1 + rate / 100) * target.init_price
+                    (1 + rate2 / 100) * target.price
+                )),
                 "amount": target.check_amount(max(
-                    amount / (1 + rate / 100) / target.init_price,
-                    target.min_order_value
+                    amount / min(
+                        (1 + rate / 100) * target.init_price
+                        (1 + rate2 / 100) * target.price
+                    ),
+                    target.limit_order_min_order_amt
                 ))}
                 for target, amount in zip(targets, amounts)
                 if amount > 0
@@ -86,8 +93,8 @@ class User:
                 "source": OrderSource.SPOT_API,
                 "price": target.check_price(price),
                 "amount": target.check_amount(max(
-                    amount,
-                    target.min_order_value
+                    amount / price,
+                    target.limit_order_min_order_amt
                 ))}
                 for target, amount, price in zip(targets, amounts, prices)
                 if amount > 0
