@@ -4,6 +4,7 @@ import time
 # from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
 from wampyapp import State, WatcherClient, WatcherMasterClient
 from huobi.model.market.trade_detail_event import TradeDetailEvent
+from huobi.model.market.trade_detail import TradeDetail
 from retry import retry
 
 from market import MarketClient
@@ -21,38 +22,42 @@ MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price, high):
+def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price, high, start_time):
     if vol < MIN_VOL or price < (1 - MAX_BUY_BACK_RATE / 100) * high:
         return
 
     if boot_price < price < end_price:
         try:
-            client.send_buy_signal(symbol, price, open_, now, vol)
+            client.send_buy_signal(symbol, price, open_, now, vol, start_time)
         except Exception as e:
             logger.error(e)
 
-def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now):
+def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now, start_time):
     target = client.targets[symbol]
     if not target.own:
         return
 
     if close > target.high_price:
         try:
-            client.send_high_sell_signal(symbol)
+            client.send_high_sell_signal(symbol, start_time)
         except Exception as e:
             logger.error(e)
 
     if close < target.sell_least_price and now > target.sell_least_time:
         try:
-            client.send_sell_signal(symbol, close, open_, now, vol)
+            client.send_sell_signal(symbol, close, open_, now, vol, start_time)
         except Exception as e:
             logger.error(e)
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redis=True):
     def warpper(event: TradeDetailEvent):
-        if client.state == State.RUNNING and 0 < event.ts / 1000 - client.target_time < MAX_WAIT:
-            detail = event.data[0]
-            now = detail.ts / 1000
+        if not event.data:
+            return
+        
+        start_time = time.time()
+        detail: TradeDetail = event.data[0]
+        now = detail.ts / 1000
+        if client.state == State.RUNNING and 0 < now - client.target_time < MAX_WAIT and start_time - now < 0.1:
             last = now // interval
             price = detail.price
             vol = sum([each.price * each.amount for each in event.data])
@@ -69,13 +74,13 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 info['high'] = max(info['high'], price)
                 
             if symbol in client.targets:
-                check_sell_signal(client, symbol, info['vol'], info['open_'], price, now)
+                check_sell_signal(client, symbol, info['vol'], info['open_'], price, now, start_time)
 
             elif now < client.target_time + SELL_AFTER:
                 check_buy_signal(
                     client, symbol, info['vol'], info['open_'],
                     price, now, info['boot_price'], info['end_price'],
-                    info['high']
+                    info['high'], start_time
                 )
 
         if redis:

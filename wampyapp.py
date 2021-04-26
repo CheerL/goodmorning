@@ -115,25 +115,25 @@ class WatcherClient(ControlledClient):
     def get_task(self, num) -> 'list[str]':
         self.task = self.rpc.req_task(num)
 
-    def send_buy_signal(self, symbol, price, init_price, now, vol):
+    def send_buy_signal(self, symbol, price, init_price, now, vol, start_time):
         self.publish(topic=Topic.BUY_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         target = Target(symbol, price, init_price, now)
         self.targets[symbol] = target
         increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Buy signal. {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {now}')
+        logger.info(f'Buy signal. {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {now}. recieved at {start_time}')
 
         time.sleep(1)
         if target.buy_price == 0:
             del self.targets[symbol]
         write_target(symbol)
 
-    def send_sell_signal(self, symbol, price, init_price, now, vol):
+    def send_sell_signal(self, symbol, price, init_price, now, vol, start_time):
         self.publish(topic=Topic.SELL_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         self.targets[symbol].own = False
         increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Sell signal. {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}')
+        logger.info(f'Sell signal. {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}. recieved at {start_time}')
 
-    def send_high_sell_signal(self, symbol):
+    def send_high_sell_signal(self, symbol, start_time):
         if self.stop_profit:
             return
 
@@ -143,7 +143,7 @@ class WatcherClient(ControlledClient):
 
         self.stop_profit = True
         self.publish(topic=Topic.STOP_PROFIT, status=True)
-        logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all')
+        logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all. recieved at {start_time}')
 
     @subscribe(topic=Topic.STOP_PROFIT)
     def stop_profit_handler(self, status, *arg, **kwargs):
@@ -266,13 +266,15 @@ class DealerClient(ControlledClient):
             return
 
         target = Target(symbol, price, init_price, now)
+        self.targets[symbol] = target
         target.set_info(self.market_client.symbols_info[symbol])
 
         self.user.buy_and_sell([target])
 
         if target.buy_price > 0:
             self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=target.buy_price)
-            self.targets[symbol] = target
+        else:
+            del self.targets[symbol]
 
     @subscribe(topic=Topic.SELL_SIGNAL)
     def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
