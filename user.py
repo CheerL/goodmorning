@@ -72,12 +72,12 @@ class User:
                 "order_type": OrderType.BUY_LIMIT,
                 "source": OrderSource.SPOT_API,
                 "price": target.check_price(min(
-                    (1 + rate / 100) * target.init_price
+                    (1 + rate / 100) * target.init_price,
                     (1 + rate2 / 100) * target.price
                 )),
                 "amount": target.check_amount(max(
                     amount / min(
-                        (1 + rate / 100) * target.init_price
+                        (1 + rate / 100) * target.init_price,
                         (1 + rate2 / 100) * target.price
                     ),
                     target.limit_order_min_order_amt
@@ -165,7 +165,7 @@ class User:
             for order in sell_order_list:
                 logger.debug(f'Sell {order["amount"]} {order["symbol"][:-4].upper()} with price {order["price"]}')
 
-
+ 
     @timeout_handle([])
     def get_open_orders(self, targets, side=OrderSide.SELL) -> 'list[huobi.model.trade.order.Order]':
         open_orders = []
@@ -252,15 +252,21 @@ class User:
         self.get_balance(targets)
 
         # logger.debug(f'User {self.account_id} balance report')
-        for target, order in zip(targets, self.buy_order_list):
+        for target in targets:
+            for order_id, order in zip(self.buy_id, self.buy_order_list):
+                if order['symbol'] == target.symbol:
+                    break
+
+            
             target_balance = self.balance[target.base_currency]
             if target_balance > 10 ** -target.amount_precision:
-                buy_price = order["amount"] / target_balance * 0.998
+                order_detail = self.trade_client.get_order(order_id.order_id)
+                buy_price = float(order_detail.filled_cash_amount) / float(order_detail.filled_amount)
                 target.buy_price = buy_price
                 logger.debug(f'Get {target_balance} {target.base_currency.upper()} with average price {buy_price}')
             else:
                 target.buy_price = 0
-                logger.debug(f'Get 0 {target.base_currency.upper()}')
+                logger.debug(f'Get no {target.base_currency.upper()}')
 
     def report(self):
         orders = [
