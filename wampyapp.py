@@ -264,7 +264,7 @@ class DealerClient(ControlledClient):
     def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
         if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
             return
-
+        start_time = time.time()
         target = Target(symbol, price, init_price, now)
         self.targets[symbol] = target
         target.set_info(self.market_client.symbols_info[symbol])
@@ -275,6 +275,7 @@ class DealerClient(ControlledClient):
             self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=target.buy_price)
         else:
             del self.targets[symbol]
+        logger.info(f'Buy {symbol}, recieved at {start_time}')
 
     @subscribe(topic=Topic.SELL_SIGNAL)
     def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):

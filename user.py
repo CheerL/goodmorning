@@ -72,7 +72,7 @@ class User:
                 "source": OrderSource.SPOT_API,
                 "price": target.check_price((1 + rate / 100) * target.init_price),
                 "amount": target.check_amount(max(
-                    amount,
+                    amount / (1 + rate / 100) / target.init_price,
                     target.min_order_value
                 ))}
                 for target, amount in zip(targets, amounts)
