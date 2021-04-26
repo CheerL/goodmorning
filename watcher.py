@@ -22,8 +22,8 @@ MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
-def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price, high, start_time):
-    if vol < MIN_VOL or price < (1 - MAX_BUY_BACK_RATE / 100) * high:
+def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot_price, end_price, start_time, max_back):
+    if vol < MIN_VOL or max_back > MAX_BUY_BACK_RATE:
         return
 
     if boot_price < price < end_price:
@@ -57,7 +57,8 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         start_time = time.time()
         detail: TradeDetail = event.data[0]
         now = detail.ts / 1000
-        if client.state == State.RUNNING and 0 < now - client.target_time < MAX_WAIT and start_time - now < 0.1:
+
+        if client.state == State.RUNNING and 0 < now - client.target_time < MAX_WAIT:
             last = now // interval
             price = detail.price
             vol = sum([each.price * each.amount for each in event.data])
@@ -72,6 +73,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
             else:
                 info['vol'] += vol
                 info['high'] = max(info['high'], price)
+                info['max_back'] = max(info['max_back'], 1 - price / info['high'])
                 
             if symbol in client.targets:
                 check_sell_signal(client, symbol, info['vol'], info['open_'], price, now, start_time)
@@ -80,7 +82,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 check_buy_signal(
                     client, symbol, info['vol'], info['open_'],
                     price, now, info['boot_price'], info['end_price'],
-                    info['high'], start_time
+                    start_time, info['max_back']
                 )
 
         if redis:
@@ -93,7 +95,8 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         'open_': 0,
         'high': 0,
         'boot_price': 0,
-        'end_price': 0
+        'end_price': 0,
+        'max_back': 0,
     }
     return warpper
 

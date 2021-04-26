@@ -116,6 +116,10 @@ class WatcherClient(ControlledClient):
         self.task = self.rpc.req_task(num)
 
     def send_buy_signal(self, symbol, price, init_price, now, vol, start_time):
+        if start_time - now > 0.2:
+            logger.info(f'Buy signal. {symbol} with price {price}USDT, vol {vol} at {now}. Recieved at {start_time}. Too late')
+            return
+
         self.publish(topic=Topic.BUY_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
         target = Target(symbol, price, init_price, now)
         self.targets[symbol] = target

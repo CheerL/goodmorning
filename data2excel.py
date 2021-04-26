@@ -4,7 +4,6 @@ import os
 import time
 from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
-from sqlalchemy.sql.schema import DEFAULT_NAMING_CONVENTION
 from utils import ROOT
 from pgsql import get_pgsql_session, Trade, Target
 
