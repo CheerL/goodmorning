@@ -3,11 +3,12 @@ import time
 from parallel import run_process
 from wampyapp import DealerClient as Client, State
 from utils import config, kill_all_threads, logger, user_config
+from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from market import MarketClient
 from retry import retry
 from user import User
 
-# SELL_AFTER = config.getfloat('setting', 'SellAfter')
+SECOND_SELL_AFTER = config.getfloat('setting', 'SecondSellAfter')
 
 @retry(tries=5, delay=1, logger=logger)
 def init_users() -> 'list[User]':
@@ -39,6 +40,11 @@ def init_dealer(user) -> Client:
 def main(user: User):
     logger.info('Start run sub process')
     client = init_dealer(user)
+
+    scheduler = Scheduler()
+    scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
+    scheduler.start()
+
     client.wait_state(State.RUNNING)
     client.wait_state(State.STARTED)
     client.stop()
