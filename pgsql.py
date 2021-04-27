@@ -1,6 +1,6 @@
 import redis
 from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 
 from utils import config, user_config
@@ -121,11 +121,11 @@ class Message(Base):
     msg_type = Column(INTEGER)
     uids = Column(VARCHAR(200))
 
-def get_redis_conn(host=RHOST, port=RPORT, password=RPASSWORD, db=0):
+def get_redis_conn(host=RHOST, port=RPORT, password=RPASSWORD, db=0) -> redis.StrictRedis:
     redis_conn = redis.StrictRedis(host=host, port=port, db=db, password=password)
     return redis_conn
 
-def get_pgsql_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD):
+def get_pgsql_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
     Session = sessionmaker(bind=engine)
     Base.metadata.create_all(engine)

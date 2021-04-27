@@ -1,10 +1,21 @@
-from pgsql import get_pgsql_session, Trade
+from pgsql import get_pgsql_session, Trade, Session
 from sqlalchemy import Column, VARCHAR, INTEGER, REAL, func
 import time
 from sqlalchemy.ext.declarative import declarative_base
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT 
 
 MS_IN_DAY = 60*60*24*1000
 Base = declarative_base()
+
+def vacuum(session: Session, table: str):
+    engine = session.bind
+    connection = engine.raw_connection() 
+    connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) 
+    cursor = connection.cursor() 
+    cursor.execute(f"VACUUM FULL {table}")
+    cursor.close()
+    connection.close() 
+
 
 def create_kline(symbol, start, end, interval=60):
     mark_day = start // MS_IN_DAY
@@ -66,6 +77,10 @@ def create_table(session, day):
     Base.metadata.create_all(session.bind)
     return DayTrade
 
+def delete_many(session: Session, ids: 'list[int]'):
+    ids_str = ','.join(ids)
+    sql = f'DELETE FROM trade WHERE id IN ({ids_str})'
+    session.execute(sql)
 
 def main():
     now_day = int(time.time() * 1000 // MS_IN_DAY)
@@ -90,8 +105,7 @@ def main():
 
                 new_trades = [DayTrade.from_trade(trade) for trade in trades]
                 session.bulk_save_objects(new_trades)
-                for trade in trades:
-                    session.delete(trade)
+                delete_many(session, [trade.id for trade in trades])
                 session.commit()
 
 if __name__ == '__main__':
