@@ -101,12 +101,15 @@ def main():
 
                 print(len(trades))
                 if not trades:
+                    vacuum(session, 'trade')
                     break
 
                 new_trades = [DayTrade.from_trade(trade) for trade in trades]
                 session.bulk_save_objects(new_trades)
-                delete_many(session, [trade.id for trade in trades])
+                delete_many(session, [str(trade.id) for trade in trades])
                 session.commit()
+
+            
 
 if __name__ == '__main__':
     main()
