@@ -344,7 +344,7 @@ class DealerClientV2(DealerClient):
 
     def check_sell(self):
         print(self.state)
-        if self.state != State.RUNING or not self.targets:
+        if self.state != State.RUNNING or not self.targets:
             return
 
         now = time.time()
