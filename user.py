@@ -195,7 +195,8 @@ class User:
                 time.sleep(0.1)
         
         self.get_balance(targets)
-        amounts = [self.balance[target.base_currency] for target in targets]
+        # for target in targets:
+        #     target.own = False
 
 
     def high_cancel_and_sell(self, targets, symbol, price):
@@ -228,11 +229,13 @@ class User:
         # self.get_balance(targets)
         # amounts = [self.balance[target.base_currency] for target in targets]
 
-    def buy_and_sell(self, targets):
+    def buy_and_sell(self, targets, sell=True):
         self.buy_limit(targets, [self.buy_amount for _ in targets])
         self.check_balance(targets)
-        sell_amounts = [self.balance[target.base_currency] for target in targets]
-        self.sell_limit(targets, sell_amounts)
+
+        if sell:
+            sell_amounts = [self.balance[target.base_currency] for target in targets]
+            self.sell_limit(targets, sell_amounts)
 
     def get_currency_balance(self, currencies, balance_type='trade'):
         return {

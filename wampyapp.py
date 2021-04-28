@@ -15,8 +15,9 @@ from utils import config, get_target_time, logger
 
 DEALER_NUM = config.getint('setting', 'DealerNum')
 WATCHER_NUM = config.getint('setting', 'WatcherNum')
-SELL_AFTER = config.getfloat('setting', 'SellAfter')
+SELL_LEAST_AFTER = config.getfloat('setting', 'SellLeastAfter')
 MAX_BUY = config.getint('setting', 'MaxBuy')
+MAX_BUY_WAIT = config.getfloat('setting', 'MaxBuyWait')
 SELL_RATE = config.getfloat('setting', 'SellRate')
 SECOND_SELL_RATE = config.getfloat('setting', 'SecondSellRate')
 
@@ -36,6 +37,7 @@ class Topic:
     HIGH = 'HIGH'
     STOP_PROFIT = 'STOP_PROFIT'
     STOP_LOSS = 'STOP_LOSS'
+    SELL_DELAY = 'SELL_DELAY'
 
 class State:
     STOPPED = 0
@@ -142,12 +144,10 @@ class WatcherClient(ControlledClient):
         if self.stop_profit:
             return
 
-        self.publish(topic=Topic.HIGH, symbol=symbol, price=self.targets[symbol].high_price)
-        for target in self.targets.values():
-            target.own = False
-
+        target = self.targets[symbol]
+        self.publish(topic=Topic.STOP_PROFIT, status=True, symbol=symbol, price=target.high_price)
         self.stop_profit = True
-        self.publish(topic=Topic.STOP_PROFIT, status=True)
+        target.own = False
         logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all. recieved at {start_time}')
 
     @subscribe(topic=Topic.STOP_PROFIT)
@@ -161,6 +161,12 @@ class WatcherClient(ControlledClient):
 
         rate = SECOND_SELL_RATE if self.stop_profit else SELL_RATE
         self.targets[symbol].set_buy_price(price, rate)
+
+    def send_delay_sell(self, symbol, close, now):
+        next_sell_at = now + SELL_LEAST_AFTER
+        self.publish(topic=Topic.SELL_DELAY, symbol=symbol, price=close, time=next_sell_at)
+        self.targets[symbol].sell_least_time = next_sell_at
+        logger.info(f'Delay sell {symbol} with price {close} at {now}, next sell at {next_sell_at}')
 
 
 class WatcherMasterClient(WatcherClient):
@@ -291,7 +297,7 @@ class DealerClient(ControlledClient):
         self.user.cancel_and_sell([target])
         logger.info(f'Stop loss{symbol} at {price} USDT')
 
-    @subscribe(topic=Topic.HIGH)
+    @subscribe(topic=Topic.STOP_PROFIT)
     def high_sell_handler(self, symbol, price, *args, **kwargs):
         if self.state != State.RUNNING:
             return
@@ -299,3 +305,58 @@ class DealerClient(ControlledClient):
         time.sleep(HIGH_SELL_SLEEP)
         self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
         logger.info(f'Stop profit {symbol} at {price} USDT')
+
+class DealerClientV2(DealerClient):
+    @subscribe(topic=Topic.SELL_SIGNAL)
+    def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
+        pass
+
+    @subscribe(topic=Topic.STOP_PROFIT)
+    def high_sell_handler(self, symbol, price, *args, **kwargs):
+        pass
+
+    @subscribe(topic=Topic.BUY_SIGNAL)
+    def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
+        if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
+            return
+        start_time = time.time()
+        target = Target(symbol, price, init_price, now)
+        self.targets[symbol] = target
+        target.set_info(self.market_client.symbols_info[symbol])
+
+        self.user.buy_and_sell([target], False)
+
+        if target.buy_price > 0:
+            self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=target.buy_price)
+        else:
+            del self.targets[symbol]
+        logger.info(f'Buy {symbol}, recieved at {start_time}')
+
+    @subscribe(topic=Topic.SELL_DELAY)
+    def delay_sell_handler(self, symbol, price, time, *args, **kwargs):
+        if self.state != State.RUNING or symbol not in self.targets:
+            return
+
+        target = self.targets[symbol]
+        if target.own:
+            target.sell_least_time = time
+        logger.info(f'Delay sell {symbol}, next sell at {time}')
+
+    def check_sell(self):
+        if self.state != State.RUNING or not self.targets:
+            return
+
+        now = time.time()
+        own_targets = [target for target in self.targets if target.own]
+        if now > self.target_time + MAX_BUY_WAIT and not own_targets:
+            self.state = State.STARTED
+            return
+
+        sell_targets = [target for target in own_targets if now > target.sell_least_time]
+        if sell_targets:
+            amounts = [self.user.balance[target.base_currency] for target in sell_targets]
+            self.user.sell(sell_targets, amounts)
+            for target in sell_targets:
+                target.own = False
+
+

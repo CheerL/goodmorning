@@ -14,8 +14,8 @@ from websocket_handler import replace_watch_dog, WatchDog
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
-SELL_AFTER = config.getfloat('setting', 'SellAfter')
-MAX_WAIT = config.getfloat('setting', 'MaxWait')
+WATCHER_STOP = config.getfint('setting', 'WatcherStop')
+MAX_BUY_WAIT = config.getfloat('setting', 'MaxBuyWait')
 MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
@@ -31,8 +31,15 @@ def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot
         except Exception as e:
             logger.error(e)
 
-def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now, start_time):
+def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now, start_time, back):
     target = client.targets[symbol]
+
+    if back < 0.001 and now < target.sell_least_time:
+        try:
+            client.send_delay_sell(symbol, close, back, now)
+        except Exception as e:
+            logger.error(e)
+
     if not target.own:
         return
 
@@ -42,11 +49,13 @@ def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now, sta
         except Exception as e:
             logger.error(e)
 
-    if close < target.sell_least_price and now > target.sell_least_time:
+    elif close < target.sell_least_price:
         try:
             client.send_sell_signal(symbol, close, open_, now, vol, start_time)
         except Exception as e:
             logger.error(e)
+    
+    
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redis=True):
     def warpper(event: TradeDetailEvent):
@@ -57,7 +66,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         detail: TradeDetail = event.data[0]
         now = detail.ts / 1000
 
-        if client.state == State.RUNNING and 0 < now - client.target_time < MAX_WAIT:
+        if client.state == State.RUNNING and 0 < now - client.target_time < WATCHER_STOP:
             last = now // interval
             price = detail.price
             vol = sum([each.price * each.amount for each in event.data])
@@ -72,12 +81,13 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
             else:
                 info['vol'] += vol
                 info['high'] = max(info['high'], price)
-                info['max_back'] = max(info['max_back'], 1 - price / info['high'])
-                
-            if symbol in client.targets:
-                check_sell_signal(client, symbol, info['vol'], info['open_'], price, now, start_time)
+                info['back'] = 1 - price / info['high']
+                info['max_back'] = max(info['max_back'], info['back'])
 
-            elif now < client.target_time + SELL_AFTER:
+            if symbol in client.targets:
+                check_sell_signal(client, symbol, info['vol'], info['open_'], price, now, start_time, info['back'])
+
+            elif now - client.target_time < MAX_BUY_WAIT:
                 check_buy_signal(
                     client, symbol, info['vol'], info['open_'],
                     price, now, info['boot_price'], info['end_price'],
@@ -96,6 +106,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         'boot_price': 0,
         'end_price': 0,
         'max_back': 0,
+        'back': 0
     }
     return warpper
 
@@ -134,7 +145,7 @@ def main():
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
         watch_dog.scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
-        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=int(SELL_AFTER))
+        watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=int(WATCHER_STOP/60), second=0)
         watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=56, second=0)
         watch_dog.scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
         client.starting()

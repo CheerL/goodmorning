@@ -1,4 +1,5 @@
 import time
+import sys
 
 from wampyapp import DealerClient as Client, State
 from utils.parallel import run_process
@@ -9,6 +10,7 @@ from retry import retry
 from user import User
 
 SECOND_SELL_AFTER = config.getfloat('setting', 'SecondSellAfter')
+DEALER_STOP = config.getint('setting', 'DealerStop')
 
 @retry(tries=5, delay=1, logger=logger)
 def init_users() -> 'list[User]':
@@ -42,11 +44,17 @@ def main(user: User):
     client = init_dealer(user)
 
     scheduler = Scheduler()
-    scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
+    if len(sys.argv) > 1 and sys.argv[1] == 'V2':
+        scheduler.add_job(client.check_sell, trigger='interval', hour=1)
+    else:
+        scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
+        scheduler.add_job(client.state_handler, args=[State.STARTED], trigger='cron', hour=0, minute=0, second=int(DEALER_STOP))
     scheduler.start()
 
     client.wait_state(State.RUNNING)
     client.wait_state(State.STARTED)
+
+    scheduler.shutdown()
     client.stop()
     logger.info('Time to cancel')
     user.cancel_and_sell(client.targets.values())
@@ -58,5 +66,4 @@ def main(user: User):
 if __name__ == '__main__':
     logger.info('Dealer')
     users = init_users()
-    # time.sleep(20)
     run_process([(main, (user,), user.username) for user in users], is_lock=True, limit_num=len(users)+2)
