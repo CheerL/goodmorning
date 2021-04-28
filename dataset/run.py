@@ -1,5 +1,5 @@
 from dataset.redis import Redis
-from dataset.pgsql import get_session, Session, Target, get_trade_from_redis
+from dataset.pgsql import get_session, Session, Target, get_trade_from_redis, get_day
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import sys
 
@@ -41,6 +41,10 @@ def vacuum(session: Session=None, table: str=''):
     else:
         with get_session() as session:
             _vacuum(table)
+
+def check_trade_tables():
+    with get_session() as session:
+        tables = [name for name in session.bind.table_names() if name.startswith('trade')]
 
 def main():
     if len(sys.argv) > 1:

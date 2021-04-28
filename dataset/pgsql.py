@@ -16,7 +16,7 @@ MS_IN_DAY = 60*60*24*1000
 
 def create_Trade(day):
     class Trade(Base):
-        __tablename__ = f'trade_{day}'
+        __tablename__ = f'trade_{day}' if day else 'trade'
         id = Column(INTEGER, primary_key=True)
         symbol = Column(VARCHAR(10))
         ts = Column(VARCHAR(20))
@@ -61,16 +61,21 @@ def create_Trade(day):
     TRADE_CLASS[day] = Trade
     return Trade
 
-def get_Trade(day=None, ts=None):
-    if not day and not ts:
-        return
-    elif ts and not day:
-        day = ts // MS_IN_DAY
+def get_Trade(time):
+    day = get_day(time)
 
     if day in TRADE_CLASS:
         return TRADE_CLASS[day]
     else:
         return create_Trade(day)
+
+def get_day(time):
+    if 0 <= time < 50000:
+        return time
+    elif 1e9 < time < 1e10:
+        return time * 1000 // MS_IN_DAY
+    elif 1e12 < time < 1e13:
+        return time // MS_IN_DAY
 
 def get_trade_from_redis(key, value):
     key = key.decode('utf-8')
