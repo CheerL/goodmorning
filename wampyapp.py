@@ -343,8 +343,8 @@ class DealerClientV2(DealerClient):
         logger.info(f'Delay sell {symbol}, next sell at {time}')
 
     def check_sell(self):
-        print(self.state, self.targets)
         if self.state != State.RUNNING or not self.targets:
+            print(self.state, self.targets, self.state != State.RUNNING, not self.targets)
             return
 
         now = time.time()
