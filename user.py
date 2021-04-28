@@ -17,29 +17,26 @@ class User:
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
         self.sercet_key = secret_key
+        self.balance = {}
+        self.buy_order_list = []
+        self.sell_order_list = []
+        self.buy_id = []
+        self.sell_id = []
+        self.high = True
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         self.account_id = next(filter(
             lambda account: account.type=='spot' and account.state =='working',
             self.account_client.get_accounts()
         )).id
-
         self.usdt_balance = self.get_currency_balance(['usdt'])['usdt']
-
         if buy_amount.startswith('/'):
             self.buy_amount =  max(math.floor(self.usdt_balance / float(buy_amount[1:])), 5)
         else:
             self.buy_amount = float(buy_amount)
 
         self.wxuid = wxuid.split(';')
-
-        self.balance = {}
-        self.buy_order_list = []
-        self.sell_order_list = []
-        self.buy_id = []
-        self.sell_id = []
         self.username = wx_name(self.wxuid[0])
-        self.high = True
 
     def buy(self, targets, amounts):
         buy_order_list = [{
@@ -243,8 +240,8 @@ class User:
             for currency in self.account_client.get_balance(self.account_id)
             if currency.currency in currencies and currency.type == balance_type
         }
-        for currency, balance in balance.items():
-            self.balance[currency] = balance
+        for currency, amount in balance.items():
+            self.balance[currency] = amount
         return balance
 
     def get_balance(self, targets):
