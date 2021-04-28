@@ -50,12 +50,14 @@ def delete_many(session: Session, table:str, ids: 'list[int]'):
 
 def move_trade(Trade, session, start_day, end_day):
     for day in range(start_day, end_day):
+        print(day)
         DayTrade = get_Trade(day)
         start = str(day * MS_IN_DAY)
         end = str((day + 1) * MS_IN_DAY)
 
         while True:
             trades = session.query(Trade).filter(Trade.ts >= start, Trade.ts < end).limit(1000).all()
+            print(len(trades))
             if not trades:
                 vacuum(session, Trade.__tablename__)
                 break
@@ -67,20 +69,27 @@ def move_trade(Trade, session, start_day, end_day):
 
 def check_trade_tables():
     with get_session() as session:
-        tables = [name for name in session.bind.table_names() if name.startswith('trade')]
+        tables = [name for name in session.bind.get_table_names() if name.startswith('trade')]
+        print(tables)
         for table in tables:
             day = int(table.split('_')[1])
             Trade = get_Trade(day)
+            print(day, Trade.__tablename__)
             min_ts = float(session.query(func.min(Trade.ts)).scalar())
+            print(min_ts)
             if min_ts < day * MS_IN_DAY:
+                print('move small')
                 min_day = int(min_ts // MS_IN_DAY)
                 move_trade(Trade, session, min_day, day)
 
             max_ts = float(session.query(func.max(Trade.ts)).scalar())
+            print(max_ts)
             if max_ts > (day + 1) * MS_IN_DAY:
+                print('move big')
                 max_day = int(max_ts // MS_IN_DAY)
                 move_trade(Trade, session, day+1, max_day+1)
 
+            print('vacuum')
             vacuum(session, Trade.__tablename__)
 
 def main():
