@@ -138,7 +138,7 @@ class WatcherClient(ControlledClient):
         if symbol not in self.targets:
             return
 
-        rate = SECOND_SELL_RATE if self.stop_profit else SELL_RATE
+        rate = SELL_RATE
         self.targets[symbol].set_buy_price(price, rate)
 
     def send_delay_sell(self, symbol, close, now):
@@ -281,6 +281,7 @@ class DealerClient(ControlledClient):
 
     def check_sell(self):
         while True:
+            time.sleep(0.01)
             if self.state != State.RUNNING or not self.targets:
                 continue
 
