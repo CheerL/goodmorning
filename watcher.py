@@ -8,7 +8,6 @@ from huobi.model.market.trade_detail import TradeDetail
 from retry import retry
 
 from market import MarketClient
-from record import write_redis
 from utils import config, kill_all_threads, logger
 from websocket_handler import replace_watch_dog, WatchDog
 
@@ -86,7 +85,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 )
 
         if redis:
-            write_redis(symbol, event.data)
+            client.redis_conn.write_trade(symbol, event.data)
 
 
     info = {

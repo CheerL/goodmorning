@@ -5,7 +5,7 @@ import time
 
 import requests
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
-from pgsql import Record, get_pgsql_session, Profit, Message
+from dataset.pgsql import Record, get_session, Profit, Message
 
 from utils import user_config, strftime, logger
 from retry import retry
@@ -57,7 +57,7 @@ def wx_push(content, uids, content_type=1, summary=None):
     summary = summary or content[:20]
     _wx_push(content, uids, content_type, summary)
 
-    with get_pgsql_session() as session:
+    with get_session() as session:
         message = Message(summary=summary, msg=content, uids=';'.join(uids), msg_type=content_type)
         session.add(message)
         session.commit()
@@ -68,7 +68,7 @@ def wx_name(uid):
     return WxPusher.get_user_name(uid=uid)
 
 def get_profit(account_id):
-    with get_pgsql_session() as session:
+    with get_session() as session:
         month = datetime.date.fromtimestamp(time.time()).strftime('%Y-%m')
         total_profit = Profit.get_sum_profit(session, account_id)
         month_profit = Profit.get_sum_profit(session, account_id, month)
@@ -136,7 +136,7 @@ def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_inf
 '''
     wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
 
-    with get_pgsql_session() as session:
+    with get_session() as session:
         profit_id = Profit.get_id(session, account_id, pay, income)
         buy_records = Record.from_record_info(buy_info, profit_id, 'buy')
         sell_records = Record.from_record_info(sell_info, profit_id, 'sell')

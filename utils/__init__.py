@@ -11,10 +11,10 @@ from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic
 
-from logger import create_logger
-from parallel import kill_thread
+from utils.logging import create_logger
+from utils.parallel import kill_thread
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, 'config', 'config.ini')
 USER_CONFIG_PATH = os.path.join(ROOT, 'config', 'user.ini')
 LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')

@@ -1,5 +1,3 @@
-import logging
-import random
 import threading
 
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler

@@ -6,9 +6,9 @@ from wampy.peers.clients import Client
 from wampy.roles.callee import callee
 from wampy.roles.subscriber import subscribe
 
-from logger import quite_logger
+from utils.logging import quite_logger
 from market import MarketClient
-from record import write_target
+from dataset.redis import Redis
 from target import Target
 from user import User
 from utils import config, get_target_time, logger
@@ -111,6 +111,7 @@ class WatcherClient(ControlledClient):
         self.stop_profit = False
         self.task : list[str] = []
         self.targets : list[Target] = {}
+        self.redis_conn: Redis = Redis()
 
     def get_task(self, num) -> 'list[str]':
         self.task = self.rpc.req_task(num)
@@ -129,7 +130,7 @@ class WatcherClient(ControlledClient):
         time.sleep(1)
         if target.buy_price == 0:
             del self.targets[symbol]
-        write_target(symbol)
+        self.redis_conn.write_target(symbol)
 
     def send_sell_signal(self, symbol, price, init_price, now, vol, start_time):
         self.publish(topic=Topic.SELL_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
