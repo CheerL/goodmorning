@@ -59,13 +59,14 @@ def move_trade(Trade, session, start_day, end_day):
             trades = session.query(Trade).filter(Trade.ts >= start, Trade.ts < end).limit(1000).all()
             print(len(trades))
             if not trades:
-                vacuum(session, Trade.__tablename__)
                 break
 
             new_trades = [DayTrade.from_trade(trade) for trade in trades]
             session.bulk_save_objects(new_trades)
             delete_many(session, Trade.__tablename__, [str(trade.id) for trade in trades])
             session.commit()
+    
+    vacuum(session, Trade.__tablename__)
 
 def check_trade_tables():
     with get_session() as session:
@@ -89,9 +90,6 @@ def check_trade_tables():
                 print('move big')
                 max_day = int(max_ts // MS_IN_DAY)
                 move_trade(Trade, session, day+1, max_day+1)
-
-            print('vacuum')
-            vacuum(session, Trade.__tablename__)
 
 def main():
     if len(sys.argv) > 1:
