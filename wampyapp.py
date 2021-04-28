@@ -334,7 +334,7 @@ class DealerClientV2(DealerClient):
 
     @subscribe(topic=Topic.SELL_DELAY)
     def delay_sell_handler(self, symbol, price, time, *args, **kwargs):
-        if self.state != State.RUNING or symbol not in self.targets:
+        if self.state != State.RUNNING or symbol not in self.targets:
             return
 
         target = self.targets[symbol]
