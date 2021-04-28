@@ -277,19 +277,22 @@ class DealerClient(ControlledClient):
         target = self.targets[symbol]
         if target.own:
             target.sell_least_time = time
-        logger.info(f'Delay sell {symbol}, next sell at {time}')
+        logger.info(f'Delay sell {symbol} with {price}, next sell at {time}')
 
     def check_sell(self):
         while True:
             time.sleep(0.01)
-            if self.state != State.RUNNING or not self.targets:
+            if self.state != State.RUNNING:
                 continue
 
             now = time.time()
             own_targets = [target for target in self.targets.values() if target.own]
+
             if now > self.target_time + MAX_BUY_WAIT and not own_targets:
                 self.state = State.STOPPED
                 break
+            elif not own_targets:
+                continue
 
             sell_targets = [target for target in own_targets if now > target.sell_least_time]
             if sell_targets:
