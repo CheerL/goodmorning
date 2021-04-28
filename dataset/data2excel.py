@@ -19,7 +19,7 @@ def add_sheet(wb, session, symbol, start, end):
     open_ = 0
     high = 0
     vol = 0
-    Trade = get_Trade(start)
+    Trade = get_Trade(int(start))
     data = Trade.get_data(session, symbol, start, end).all()
     for index, trade in enumerate(data):
         time_ = round(float(trade.ts) / 1000 - start, 3)
