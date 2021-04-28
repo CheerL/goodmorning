@@ -1,6 +1,6 @@
 from dataset.redis import Redis
 from dataset.pgsql import get_Trade, get_session, Session, Target, get_trade_from_redis, get_day, MS_IN_DAY
-from sqlalchemy import func
+from sqlalchemy import func, inspect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import sys
 
@@ -69,7 +69,8 @@ def move_trade(Trade, session, start_day, end_day):
 
 def check_trade_tables():
     with get_session() as session:
-        tables = [name for name in session.bind.get_table_names() if name.startswith('trade')]
+        inspector = inspect(session.bind)
+        tables = [name for name in inspector.get_table_names() if name.startswith('trade')]
         print(tables)
         for table in tables:
             day = int(table.split('_')[1])
