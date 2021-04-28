@@ -14,7 +14,7 @@ from websocket_handler import replace_watch_dog, WatchDog
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
 MIN_VOL = config.getfloat('setting', 'MinVol')
-WATCHER_STOP = config.getfint('setting', 'WatcherStop')
+WATCHER_STOP = config.getint('setting', 'WatcherStop')
 MAX_BUY_WAIT = config.getfloat('setting', 'MaxBuyWait')
 MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 
