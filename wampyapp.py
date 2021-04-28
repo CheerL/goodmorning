@@ -266,7 +266,7 @@ class DealerClient(ControlledClient):
             message_handler_cls=message_handler_cls
         )
         self.market_client : MarketClient = market_client
-        self.targets : list[Target] = {}
+        self.targets : dict[str, Target] = {}
         self.user : User = user
         self.client_type = 'dealer'
 
@@ -347,7 +347,9 @@ class DealerClientV2(DealerClient):
             print(self.state, self.targets, self.state != State.RUNNING, not self.targets)
             return
 
+        print('?')
         now = time.time()
+        print(self.targets.values())
         own_targets = [target for target in self.targets.values() if target.own]
         print(now, len(self.targts), len(own_targets))
         if now > self.target_time + MAX_BUY_WAIT and not own_targets:
