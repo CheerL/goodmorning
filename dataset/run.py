@@ -27,21 +27,21 @@ def trans():
         write_trade(redis_conn, session)
 
 
-def vacuum(session: Session=None, table: str=''):
-    def _vacuum(table: str):
+def vacuum(session: Session=None, table: str='', full=True):
+    def _vacuum():
         engine = session.bind
         connection = engine.raw_connection() 
         connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) 
         cursor = connection.cursor() 
-        cursor.execute(f"VACUUM FULL {table}")
+        cursor.execute(f"VACUUM {'FULL' if full else ''} {table}")
         cursor.close()
         connection.close()
     
     if session:
-        _vacuum(table)
+        _vacuum()
     else:
         with get_session() as session:
-            _vacuum(table)
+            _vacuum()
 
 def delete_many(session: Session, table:str, ids: 'list[int]'):
     ids_str = ','.join(ids)
@@ -66,7 +66,7 @@ def move_trade(Trade, session, start_day, end_day):
             delete_many(session, Trade.__tablename__, [str(trade.id) for trade in trades])
             session.commit()
     
-    vacuum(session, Trade.__tablename__)
+    vacuum(session, Trade.__tablename__, False)
 
 def check_trade_tables():
     with get_session() as session:
@@ -90,6 +90,8 @@ def check_trade_tables():
                 print('move big')
                 max_day = int(max_ts // MS_IN_DAY)
                 move_trade(Trade, session, day+1, max_day+1)
+
+        vacuum(session)
 
 def main():
     if len(sys.argv) > 1:
