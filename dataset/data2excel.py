@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import datetime
 from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
 from utils import ROOT
@@ -66,7 +67,10 @@ def create_excel(target_time_str, db_path):
 
 
 def main():
-    target_time_str = sys.argv[1]
+    if len(sys.argv) > 1:
+        target_time_str = sys.argv[1]
+    else:
+        target_time_str = datetime.date.today().strftime('%Y-%m-%d %H:%M:%S')
     create_excel(target_time_str, DB_PATH)
 
 if __name__ == '__main__':

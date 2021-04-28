@@ -1,7 +1,7 @@
 import time
 import sys
 
-from wampyapp import DealerClient, DealerClientV2, State
+from wampyapp import DealerClient, State
 from utils.parallel import run_process
 from utils import config, kill_all_threads, logger, user_config
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
@@ -40,21 +40,15 @@ def init_dealer(user, Client):
     return client
 
 def main(user: User):
-    is_v2 = len(sys.argv) > 1 and sys.argv[1] == 'V2'
     logger.info('Start run sub process')
+    client: DealerClient = init_dealer(user, DealerClient)
 
     scheduler = Scheduler()
-    if is_v2:
-        client: DealerClientV2 = init_dealer(user, DealerClientV2)
-        scheduler.add_job(client.check_sell, trigger='interval', seconds=1)
-    else:
-        client: DealerClient = init_dealer(user, DealerClient)
-        scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
-        scheduler.add_job(client.state_handler, args=[State.STARTED], trigger='cron', hour=0, minute=0, second=int(DEALER_STOP))
+    scheduler.add_job(client.check_sell)
     scheduler.start()
 
     client.wait_state(State.RUNNING)
-    client.wait_state(State.STARTED)
+    client.wait_state(State.STOPPED)
 
     scheduler.shutdown()
     client.stop()

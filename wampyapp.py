@@ -110,7 +110,6 @@ class WatcherClient(ControlledClient):
         )
         self.market_client : MarketClient = market_client
         self.client_type = 'watcher'
-        self.stop_profit = False
         self.task : list[str] = []
         self.targets : list[Target] = {}
         self.redis_conn: Redis = Redis()
@@ -133,26 +132,6 @@ class WatcherClient(ControlledClient):
         if target.buy_price == 0:
             del self.targets[symbol]
         self.redis_conn.write_target(symbol)
-
-    def send_sell_signal(self, symbol, price, init_price, now, vol, start_time):
-        self.publish(topic=Topic.SELL_SIGNAL, symbol=symbol, price=price, init_price=init_price, vol=vol, now=now)
-        self.targets[symbol].own = False
-        increase = round((price - init_price) / init_price * 100, 4)
-        logger.info(f'Sell signal. {symbol} with price {price}USDT, vol {vol} increament {increase}% at {now}. recieved at {start_time}')
-
-    def send_high_sell_signal(self, symbol, start_time):
-        if self.stop_profit:
-            return
-
-        target = self.targets[symbol]
-        self.publish(topic=Topic.STOP_PROFIT, status=True, symbol=symbol, price=target.high_price)
-        self.stop_profit = True
-        target.own = False
-        logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all. recieved at {start_time}')
-
-    @subscribe(topic=Topic.STOP_PROFIT)
-    def stop_profit_handler(self, status, *arg, **kwargs):
-        self.stop_profit = status
 
     @subscribe(topic=Topic.AFTER_BUY)
     def after_buy_handler(self, symbol, price, *args, **kwargs):
@@ -225,11 +204,14 @@ class WatcherMasterClient(WatcherClient):
         if remove:
             self.client_info[client_type] -= 1
 
+            if client_type == 'dealer' and self.client_info['dealer'] == 0:
+                self.stop_running()
+
         else:
             self.client_info[client_type] += 1
-        
-        self.publish(topic=Topic.STATE, state=self.state)
-        self.publish(topic=Topic.TIME, target_time=self.target_time)
+            self.publish(topic=Topic.STATE, state=self.state)
+            self.publish(topic=Topic.TIME, target_time=self.target_time)
+
 
     def starting(self):
         if self.state == State.STOPPED:
@@ -270,51 +252,6 @@ class DealerClient(ControlledClient):
         self.user : User = user
         self.client_type = 'dealer'
 
-
-    @subscribe(topic=Topic.BUY_SIGNAL)
-    def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
-            return
-        start_time = time.time()
-        target = Target(symbol, price, init_price, now)
-        self.targets[symbol] = target
-        target.set_info(self.market_client.symbols_info[symbol])
-
-        self.user.buy_and_sell([target])
-
-        if target.buy_price > 0:
-            self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=target.buy_price)
-        else:
-            del self.targets[symbol]
-        logger.info(f'Buy {symbol}, recieved at {start_time}')
-
-    @subscribe(topic=Topic.SELL_SIGNAL)
-    def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        if self.state != State.RUNNING or symbol not in self.targets:
-            return
-
-        target = self.targets[symbol]
-        self.user.cancel_and_sell([target])
-        logger.info(f'Stop loss{symbol} at {price} USDT')
-
-    @subscribe(topic=Topic.STOP_PROFIT)
-    def high_sell_handler(self, symbol, price, *args, **kwargs):
-        if self.state != State.RUNNING:
-            return
-
-        time.sleep(HIGH_SELL_SLEEP)
-        self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
-        logger.info(f'Stop profit {symbol} at {price} USDT')
-
-class DealerClientV2(DealerClient):
-    @subscribe(topic=Topic.SELL_SIGNAL)
-    def sell_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
-        pass
-
-    @subscribe(topic=Topic.STOP_PROFIT)
-    def high_sell_handler(self, symbol, price, *args, **kwargs):
-        pass
-
     @subscribe(topic=Topic.BUY_SIGNAL)
     def buy_signal_handler(self, symbol, price, init_price, vol, now, *args, **kwargs):
         if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= MAX_BUY:
@@ -343,23 +280,21 @@ class DealerClientV2(DealerClient):
         logger.info(f'Delay sell {symbol}, next sell at {time}')
 
     def check_sell(self):
-        if self.state != State.RUNNING or not self.targets:
-            return
+        while True:
+            if self.state != State.RUNNING or not self.targets:
+                continue
 
-        now = time.time()
-        own_targets = [target for target in self.targets.values() if target.own]
-        print(now, len(self.targets), len(own_targets))
-        if now > self.target_time + MAX_BUY_WAIT and not own_targets:
-            self.state = State.STARTED
-            return
+            now = time.time()
+            own_targets = [target for target in self.targets.values() if target.own]
+            if now > self.target_time + MAX_BUY_WAIT and not own_targets:
+                self.state = State.STOPPED
+                break
 
-        sell_targets = [target for target in own_targets if now > target.sell_least_time]
-        print(len(sell_targets))
-        if sell_targets:
-            amounts = [self.user.balance[target.base_currency] for target in sell_targets]
-            print(amounts)
-            self.user.sell(sell_targets, amounts)
-            for target in sell_targets:
-                target.own = False
+            sell_targets = [target for target in own_targets if now > target.sell_least_time]
+            if sell_targets:
+                amounts = [self.user.balance[target.base_currency] for target in sell_targets]
+                self.user.sell(sell_targets, amounts)
+                for target in sell_targets:
+                    target.own = False
 
 
