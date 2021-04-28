@@ -1,5 +1,4 @@
 import configparser
-import ctypes
 import functools
 import os
 import threading
@@ -9,24 +8,31 @@ import pytz
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
-# from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-from huobi.constant.system import WebSocketDefine, RestApiDefine
+from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic
-from logger import create_logger
 
+from utils.logging import create_logger
+from utils.parallel import kill_thread
 
-
-ROOT = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(ROOT, 'config.ini')
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_PATH = os.path.join(ROOT, 'config', 'config.ini')
+USER_CONFIG_PATH = os.path.join(ROOT, 'config', 'user.ini')
 LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
+
 URL = 'https://api-aws.huobi.pro'
 WS_URL = 'wss://api-aws.huobi.pro'
 
 logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
+user_config = configparser.ConfigParser()
+
+if os.path.exists(USER_CONFIG_PATH):
+    user_config.read(USER_CONFIG_PATH)
+
+
 session._request = session.request
-session.request = lambda *args, **kwargs: session._request(timeout=2, *args, **kwargs)
+session.request = lambda *args, **kwargs: session._request(timeout=1, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
 PrintBasic.print_basic = lambda data, name=None: None
@@ -38,7 +44,6 @@ def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
         pytz.datetime.datetime.utcfromtimestamp(timestamp)
     )
     return utc_time.astimezone(tz).strftime(fmt)
-
 
 def get_target_time():
     TIME = config.get('setting', 'Time')
@@ -77,14 +82,6 @@ def timeout_handle(value):
                 return value
         return sub_wrapper
     return wrapper
-
-def kill_thread(thread):
-    thread._reset_internal_locks(False)
-    thread_id = ctypes.c_long(thread._ident)
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(SystemExit)) 
-    if res > 1: 
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0) 
-        print('Exception raise failure') 
 
 def kill_all_threads():
     for manage in websocket_connection_handler.values():

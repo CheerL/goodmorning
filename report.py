@@ -5,11 +5,12 @@ import time
 
 import requests
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
+from dataset.pgsql import Record, get_session, Profit, Message
 
-from utils import ROOT, config, strftime, logger
+from utils import user_config, strftime, logger
 from retry import retry
 
-TOKEN = config.get('setting', 'Token')
+TOKEN = user_config.get('setting', 'Token')
 
 class WxPusher(_WxPusher):
     token = TOKEN
@@ -28,7 +29,6 @@ class WxPusher(_WxPusher):
         }
         url = f'{BASEURL}/send/message'
         return requests.post(url, json=payload).json()
-    
     @classmethod
     def query_user(cls, page=1, page_size=20, uid=None):
         """Query users."""
@@ -48,77 +48,48 @@ class WxPusher(_WxPusher):
         return name
 
 
-@retry(tries=5, delay=1, logger=logger)
-def wx_push(content, uids, content_type=1, summary=None):
-    WxPusher.send_message(content, uids=uids, content_type=content_type, summary=summary or content[:20])
+    summary = summary or content[:20]
+    _wx_push(content, uids, content_type, summary)
+
+    with get_session() as session:
+        message = Message(summary=summary, msg=content, uids=';'.join(uids), msg_type=content_type)
+        session.add(message)
+        session.commit()
+
 
 @retry(tries=5, delay=1, logger=logger)
 def wx_name(uid):
     return WxPusher.get_user_name(uid=uid)
-
 def get_profit(account_id):
-    path = os.path.join(ROOT, 'log', 'profit.sqlite')
-    if not os.path.exists(path):
-        return 0, 0
-    else:
-        conn = sqlite3.connect(path)
-        cursor = conn.cursor()
-        cursor.execute(f'''
-        SELECT SUM (profit) FROM profit WHERE
-        account=\'{account_id}\'
-        ''')
-        total_profit = round(cursor.fetchone()[0], 4)
-        day = datetime.date.fromtimestamp(time.time())
-        month = day.strftime('%Y-%m')
-        cursor.execute(f'''
-        SELECT SUM (profit) FROM profit WHERE
-        (account=\'{account_id}\' AND month=\'{month}\')
-        ''')
-        month_profit = round(cursor.fetchone()[0], 4)
-        cursor.close()
-        conn.close()
+    with get_session() as session:
+        month = datetime.date.fromtimestamp(time.time()).strftime('%Y-%m')
+        total_profit = Profit.get_sum_profit(session, account_id)
+        month_profit = Profit.get_sum_profit(session, account_id, month)
         return total_profit, month_profit
 
 def add_profit(account_id, pay, income, profit, percent, now=None):
     if not now:
         now = time.time()
 
-    path = os.path.join(ROOT, 'log', 'profit.sqlite')
-    if not os.path.exists(path):
-        conn = sqlite3.connect(path)
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE profit (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            account varchar(20),
-            month varchar(20),
-            time DATETIME,
-            pay REAL,
-            income REAL,
-            profit REAL,
-            percent REAL
-        )
-        ''')
-    else:
-        conn = sqlite3.connect(path)
-        cursor = conn.cursor()
-
     day = datetime.date.fromtimestamp(now)
     month = day.strftime('%Y-%m')
-    cursor.execute(f'''
-    INSERT into profit (account, time, pay, income, profit, percent, month) values 
-    (\'{account_id}\', \'{now}\', \'{pay}\',
-    \'{income}\',\'{profit}\', \'{percent}\', \'{month}\')
-    ''')
-    cursor.close()
-    conn.commit()
-    conn.close()
+    with get_pgsql_session() as session:
+        session.add(Profit(
+            account=account_id,
+            month=month,
+            time=now,
+            pay=pay,
+            income=income,
+            profit=profit,
+            percent=percent
+        ))
+        session.commit()
 
-def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
+def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:
         return
 
-    summary = f'{strftime(time.time())} 本次交易支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
+    summary = f'{strftime(time.time())} {username} 今日支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
     msg = f'''
 ### 用户
  
@@ -135,7 +106,6 @@ def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info
     for each in buy_info
 ]) + '''
 ### 卖出记录
-
 | 币种 | 时间 | 价格 | 成交量 | 成交额 | 手续费 |
 | ---- | ---- | ---- | ---- | ---- | ---- |
 ''' + \
@@ -157,4 +127,11 @@ def wx_report(wxuid, username, pay, income, profit, percent, buy_info, sell_info
 
 - 总累计收益: **{total_profit} USDT**
 '''
-    wx_push(content=msg, uids=[wxuid], content_type=3, summary=summary)
+    wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
+
+    with get_session() as session:
+        profit_id = Profit.get_id(session, account_id, pay, income)
+        buy_records = Record.from_record_info(buy_info, profit_id, 'buy')
+        sell_records = Record.from_record_info(sell_info, profit_id, 'sell')
+        session.add_all(buy_records + sell_records)
+        session.commit()
