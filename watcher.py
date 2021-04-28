@@ -34,7 +34,7 @@ def check_buy_signal(client: WatcherClient, symbol, vol, open_, price, now, boot
 def check_sell_signal(client: WatcherClient, symbol, vol, open_, close, now, start_time, back):
     target = client.targets[symbol]
 
-    if back < 0.001 and now < target.sell_least_time:
+    if back < 0.0005 and now < target.sell_least_time:
         try:
             client.send_delay_sell(symbol, close, now)
         except Exception as e:
