@@ -238,18 +238,21 @@ class User:
             self.sell_limit(targets, sell_amounts)
 
     def get_currency_balance(self, currencies, balance_type='trade'):
-        return {
+        balance = {
             currency.currency: float(currency.balance)
             for currency in self.account_client.get_balance(self.account_id)
             if currency.currency in currencies and currency.type == balance_type
         }
+        for currency, balance in balance.items():
+            self.balance[currency] = balance
+        return balance
 
     def get_balance(self, targets):
         while self.get_open_orders(targets, side=None):
             pass
 
         target_currencies = [target.base_currency for target in targets]
-        self.balance = self.get_currency_balance(target_currencies)
+        self.get_currency_balance(target_currencies)
 
     def check_balance(self, targets):
         self.get_balance(targets)

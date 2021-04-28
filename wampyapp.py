@@ -357,6 +357,7 @@ class DealerClientV2(DealerClient):
         print(len(sell_targets))
         if sell_targets:
             amounts = [self.user.balance[target.base_currency] for target in sell_targets]
+            print(amounts)
             self.user.sell(sell_targets, amounts)
             for target in sell_targets:
                 target.own = False
