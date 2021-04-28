@@ -46,7 +46,7 @@ def main(user: User):
     scheduler = Scheduler()
     if is_v2:
         client: DealerClientV2 = init_dealer(user, DealerClientV2)
-        scheduler.add_job(client.check_sell, trigger='interval', hour=1)
+        scheduler.add_job(client.check_sell, trigger='interval', seconds=1)
     else:
         client: DealerClient = init_dealer(user, DealerClient)
         scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
