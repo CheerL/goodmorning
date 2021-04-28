@@ -80,7 +80,7 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
 
     day = datetime.date.fromtimestamp(now)
     month = day.strftime('%Y-%m')
-    with get_pgsql_session() as session:
+    with get_session() as session:
         session.add(Profit(
             account=account_id,
             month=month,
