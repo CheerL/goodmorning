@@ -344,19 +344,17 @@ class DealerClientV2(DealerClient):
 
     def check_sell(self):
         if self.state != State.RUNNING or not self.targets:
-            print(self.state, self.targets, self.state != State.RUNNING, not self.targets)
             return
 
-        print('?')
         now = time.time()
-        print(self.targets.values())
         own_targets = [target for target in self.targets.values() if target.own]
-        print(now, len(self.targts), len(own_targets))
+        print(now, len(self.targets), len(own_targets))
         if now > self.target_time + MAX_BUY_WAIT and not own_targets:
             self.state = State.STARTED
             return
 
         sell_targets = [target for target in own_targets if now > target.sell_least_time]
+        print(len(sell_targets))
         if sell_targets:
             amounts = [self.user.balance[target.base_currency] for target in sell_targets]
             self.user.sell(sell_targets, amounts)
