@@ -135,7 +135,7 @@ def main():
     parser.add_argument('command', default='trans')
     parser.add_argument('-t', '--table', default='')
     parser.add_argument('-s', '--symbol', default='')
-    parser.add_argument('-d', '--day', '')
+    parser.add_argument('-d', '--day', default='')
     args = parser.parse_args()
 
     if args.command == 'trans':
