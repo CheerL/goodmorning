@@ -2,7 +2,7 @@ from dataset.redis import Redis
 from dataset.pgsql import get_Trade, get_session, Session, Target, get_trade_from_redis, get_day, MS_IN_DAY
 from sqlalchemy import func, inspect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-import sys
+import argparse
 
 def write_trade(redis_conn: Redis, session: Session):
     for keys, values in redis_conn.scan_iter_with_data('trade_*', 500):
@@ -26,7 +26,6 @@ def trans():
         write_target(redis_conn, session)
         write_trade(redis_conn, session)
 
-
 def vacuum(session: Session=None, table: str='', full=True):
     def _vacuum():
         engine = session.bind
@@ -36,7 +35,7 @@ def vacuum(session: Session=None, table: str='', full=True):
         cursor.execute(f"VACUUM {'FULL' if full else ''} {table}")
         cursor.close()
         connection.close()
-    
+
     if session:
         _vacuum()
     else:
@@ -65,7 +64,7 @@ def move_trade(Trade, session, start_day, end_day):
             session.bulk_save_objects(new_trades)
             delete_many(session, Trade.__tablename__, [str(trade.id) for trade in trades])
             session.commit()
-    
+
     vacuum(session, Trade.__tablename__, False)
 
 def check_trade_tables():
@@ -94,15 +93,17 @@ def check_trade_tables():
         vacuum(session)
 
 def main():
-    if len(sys.argv) > 1:
-        arg = sys.argv[1]
-        if arg == 'trans':
-            trans()
-        elif arg == 'vacuum':
-            table = sys.argv[2] if len(sys.argv) > 2 else ''
-            vacuum(table=table)
-        elif arg == 'check':
-            check_trade_tables()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', default='trans')
+    parser.add_argument('-t', '--table', default='')
+    args = parser.parse_args()
+
+    if args.command == 'trans':
+        trans()
+    elif args.command == 'vacuum':
+        vacuum(table=args.table)
+    elif args.command == 'check':
+        check_trade_tables()
 
 if __name__ == '__main__':
     main()
