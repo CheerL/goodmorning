@@ -10,25 +10,25 @@ def create_kline(symbol, start, end, interval=60):
         mark = ''
     else:
         mark = f'_{int(mark_day)}'
-    f'''
+    f"""
 SELECT
-  DIV(CAST("ts" AS BIGINT), {interval * 1000}) * {interval} AS "time",
-  MAX("price") AS "high",
-  MIN("price") AS "low",
-  SUM("amount" * "price") AS "vol",
-  SUM(CASE WHEN "ts" IN (SELECT MIN("ts") FROM "trade{mark}"
-    WHERE "ts" > '{start}' AND "ts" < '{end}' AND "symbol"='{symbol}'
-    GROUP BY DIV(CAST("ts" AS BIGINT), {interval * 1000})) THEN "price" ELSE 0 END) AS "open",
-  SUM(CASE WHEN "ts" IN (SELECT MAX("ts") FROM "trade{mark}"
-    WHERE "ts" > '{start}' AND "ts" < '{end}' AND "symbol"='{symbol}'
-    GROUP BY DIV(CAST("ts" AS BIGINT), {interval * 1000})) THEN "price" ELSE 0 END) AS "close",
-  MIN("ts") AS "start",
-  MAX("ts") AS "end",
-  COUNT("price") AS "count"
-FROM "trade{mark}"
-WHERE "ts" > '{start}' AND "ts" < '{end}' AND "symbol"='{symbol}'
-GROUP BY "{interval * 1000}"
-'''
+  DIV(CAST(ts AS BIGINT), {interval * 1000}) * {interval} AS time,
+  MAX(price) AS high,
+  MIN(price) AS low,
+  SUM(amount * price) AS vol,
+  SUM(CASE WHEN ts IN (SELECT MIN(ts) FROM trade{mark}
+    WHERE ts > '{start}' AND ts < '{end}' AND symbol='{symbol}'
+    GROUP BY DIV(CAST(ts AS BIGINT), {interval * 1000})) THEN price ELSE 0 END) AS open,
+  SUM(CASE WHEN ts IN (SELECT MAX(ts) FROM trade{mark}
+    WHERE ts > '{start}' AND ts < '{end}' AND symbol='{symbol}'
+    GROUP BY DIV(CAST(ts AS BIGINT), {interval * 1000})) THEN price ELSE 0 END) AS close,
+  MIN(ts) AS start,
+  MAX(ts) AS end,
+  COUNT(price) AS count
+FROM trade{mark}
+WHERE ts > '{start}' AND ts < '{end}' AND symbol='{symbol}'
+GROUP BY time
+"""
 
 def order(limit=100, reverse=False):
     mark = ''

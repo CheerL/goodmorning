@@ -92,10 +92,50 @@ def check_trade_tables():
 
         vacuum(session)
 
+def reorder(days, symbols):
+    with get_session() as session:
+        for day in days.split(','):
+            day = int(day)
+            Trade = get_Trade(day)
+            if symbols:
+                symbols = symbols.split(',')
+            else:
+                symbols = [each[0] for each in session.execute(f'SELECT DISTINCT symbol FROM trade_{day}')]
+
+            for symbol in symbols:
+                ts = ''
+                count = 0
+                trades = session.execute(f"""
+                SELECT id, ts
+                FROM trade_{day} as tb
+                WHERE tb.symbol='{symbol}'
+                ORDER BY tb.ts ASC,
+                CASE WHEN tb.direction='buy' THEN tb.price END ASC,
+                CASE WHEN tb.direction='sell' THEN tb.price END DESC
+                """)
+                update_mappings = []
+                for trade_id, trade_ts in trades:
+                    if '.' in trade_ts:
+                        continue
+
+                    if ts == trade_ts:
+                        count += 1
+                    else:
+                        count = 0
+                    update_mappings.append({
+                        'id': trade_id,
+                        'ts': str(int(trade_ts)+count/1000)
+                    })
+                session.bulk_update_mappings(Trade, update_mappings)
+                session.commit()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', default='trans')
     parser.add_argument('-t', '--table', default='')
+    parser.add_argument('-s', '--symbol', default='')
+    parser.add_argument('-d', '--day', '')
     args = parser.parse_args()
 
     if args.command == 'trans':
@@ -104,6 +144,8 @@ def main():
         vacuum(table=args.table)
     elif args.command == 'check':
         check_trade_tables()
+    elif args.command == 'reorder':
+        reorder(args.day, args.symbol)
 
 if __name__ == '__main__':
     main()
