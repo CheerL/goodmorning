@@ -3,6 +3,9 @@ from dataset.pgsql import get_Trade, get_session, Session, Target, get_trade_fro
 from sqlalchemy import func, inspect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import argparse
+from utils import config
+
+PGHOST = config.get('setting', 'PGHost')
 
 def write_trade(redis_conn: Redis, session: Session):
     for keys, values in redis_conn.scan_iter_with_data('trade_*', 500):
@@ -20,13 +23,13 @@ def write_target(redis_conn: Redis, session: Session):
         session.commit()
         redis_conn.delete(*keys)
 
-def trans():
-    redis_conn = Redis()
-    with get_session() as session:
+def trans(host):
+    redis_conn = Redis(host=host)
+    with get_session(host=host) as session:
         write_target(redis_conn, session)
         write_trade(redis_conn, session)
 
-def vacuum(session: Session=None, table: str='', full=True):
+def vacuum(session: Session=None, table: str='', full=True, host=''):
     def _vacuum():
         engine = session.bind
         connection = engine.raw_connection() 
@@ -39,7 +42,7 @@ def vacuum(session: Session=None, table: str='', full=True):
     if session:
         _vacuum()
     else:
-        with get_session() as session:
+        with get_session(host=host) as session:
             _vacuum()
 
 def delete_many(session: Session, table:str, ids: 'list[int]'):
@@ -67,8 +70,8 @@ def move_trade(Trade, session, start_day, end_day):
 
     vacuum(session, Trade.__tablename__, False)
 
-def check_trade_tables():
-    with get_session() as session:
+def check_trade_tables(host):
+    with get_session(host=host) as session:
         inspector = inspect(session.bind)
         tables = [name for name in inspector.get_table_names() if name.startswith('trade')]
         print(tables)
@@ -92,17 +95,19 @@ def check_trade_tables():
 
         vacuum(session)
 
-def reorder(days, symbols):
-    with get_session() as session:
+def reorder(days, symbols, host):
+    with get_session(host=host) as session:
         for day in days.split(','):
             day = int(day)
             Trade = get_Trade(day)
+            print(Trade.__tablename__)
             if symbols:
                 symbols = symbols.split(',')
             else:
                 symbols = [each[0] for each in session.execute(f'SELECT DISTINCT symbol FROM trade_{day}')]
 
             for symbol in symbols:
+                print(symbol)
                 ts = ''
                 count = 0
                 trades = session.execute(f"""
@@ -112,22 +117,32 @@ def reorder(days, symbols):
                 ORDER BY tb.ts ASC,
                 CASE WHEN tb.direction='buy' THEN tb.price END ASC,
                 CASE WHEN tb.direction='sell' THEN tb.price END DESC
-                """)
+                """).all()
                 update_mappings = []
                 for trade_id, trade_ts in trades:
+                    print(trade_ts)
                     if '.' in trade_ts:
-                        continue
+                        trade_ts = trade_ts.split('.')[0]
 
                     if ts == trade_ts:
                         count += 1
+                        update_mappings.append({
+                            'id': trade_id,
+                            'ts': str(int(trade_ts)+count/1000)
+                        })
                     else:
+                        ts = trade_ts
                         count = 0
-                    update_mappings.append({
-                        'id': trade_id,
-                        'ts': str(int(trade_ts)+count/1000)
-                    })
-                session.bulk_update_mappings(Trade, update_mappings)
-                session.commit()
+                    if len(update_mappings) > 100:
+                        session.bulk_update_mappings(Trade, update_mappings)
+                        session.commit()
+                        update_mappings = []
+
+                if update_mappings:
+                    session.bulk_update_mappings(Trade, update_mappings)
+                    session.commit()
+
+            symbols = ''
 
 
 def main():
@@ -136,16 +151,17 @@ def main():
     parser.add_argument('-t', '--table', default='')
     parser.add_argument('-s', '--symbol', default='')
     parser.add_argument('-d', '--day', default='')
+    parser.add_argument('-H', '--host', default=PGHOST)
     args = parser.parse_args()
 
     if args.command == 'trans':
-        trans()
+        trans(host=args.host)
     elif args.command == 'vacuum':
-        vacuum(table=args.table)
+        vacuum(table=args.table, host=args.host)
     elif args.command == 'check':
-        check_trade_tables()
+        check_trade_tables(host=args.host)
     elif args.command == 'reorder':
-        reorder(args.day, args.symbol)
+        reorder(args.day, args.symbol, host=args.host)
 
 if __name__ == '__main__':
     main()
