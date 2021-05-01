@@ -4,19 +4,23 @@ import math
 SELL_LEAST_AFTER = config.getfloat('setting', 'SellLeastAfter')
 SELL_BACK_RATE = config.getfloat('setting', 'SellBackRate')
 
+DELAY = config.getfloat('setting', 'Delay')
+SECOND_DELAY = config.getfloat('setting', 'SecondDelay')
+SELL_RATE = config.getfloat('setting', 'SellRate')
+SECOND_SELL_RATE = config.getfloat('setting', 'SecondSellRate')
+
 class Target:
-    def __init__(self, symbol, price, init_price=None, time=None):
-        self.symbol = symbol
-        self.price = price
-        self.init_price = init_price
-        self.buy_price = 0
-        self.high_price = 0
-
-        self.time = time
-
-        self.sell_least_time = time + SELL_LEAST_AFTER
-        self.sell_least_price = init_price * (1 - SELL_BACK_RATE / 100)
-        self.own = True
+    def __init__(self, symbol, price, init_price, time=None):
+        self.symbol: str = symbol
+        self.price: float = price
+        self.init_price: float = init_price
+        self.buy_price: float = 0
+        self.stop_profit_price: float = 0
+        self.stop_loss_price = init_price * (1 - SELL_BACK_RATE / 100)
+        self.new_high_time: float = time
+        self.new_high_price: float = price
+        self.own: bool = True
+        self.high: bool = True
 
     def set_buy_price(self, price, rate):
         if not self.buy_price:
@@ -24,7 +28,8 @@ class Target:
         else:
             self.buy_price = min(self.buy_price, price)
         
-        self.high_price = self.buy_price * (1 + rate / 100)
+        rate = SELL_RATE if self.high else SECOND_SELL_RATE
+        self.stop_profit_price = self.buy_price * (1 + rate / 100)
 
     def set_info(self, info):
         self.base_currency = info.base_currency

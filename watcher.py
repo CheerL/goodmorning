@@ -10,6 +10,7 @@ from retry import retry
 from market import MarketClient
 from utils import config, kill_all_threads, logger
 from websocket_handler import replace_watch_dog, WatchDog
+from target import Target
 
 BOOT_RATE = config.getfloat('setting', 'BootRate')
 END_RATE = config.getfloat('setting', 'EndRate')
@@ -18,32 +19,47 @@ WATCHER_STOP = config.getint('setting', 'WatcherStop')
 MAX_BUY_WAIT = config.getfloat('setting', 'MaxBuyWait')
 MAX_BUY_BACK_RATE = config.getfloat('setting', 'MaxBuyBackRate')
 
+DELAY = config.getfloat('setting', 'Delay')
+SECOND_DELAY = config.getfloat('setting', 'SecondDelay')
+
 WATCHER_TASK_NUM = config.getint('setting', 'WatcherTaskNum')
 WATCHER_SLEEP = config.getint('setting', 'WatcherSleep')
 
 def check_buy_signal(client: WatcherClient, symbol, vol, open_, price,
                     now, boot_price, end_price, start_time, max_back):
-    if vol < MIN_VOL or max_back > MAX_BUY_BACK_RATE:
-        return
-
-    if boot_price < price < end_price:
+    if vol > MIN_VOL and max_back < MAX_BUY_BACK_RATE and boot_price < price < end_price:
         try:
             client.send_buy_signal(symbol, price, open_, now, vol, start_time)
         except Exception as e:
             logger.error(e)
 
-def check_sell_signal(client: WatcherClient, symbol, price, now, start_time, back):
-    target = client.targets[symbol]
-    if not target.own:
-        return
-
-    if now > target.sell_least_time:
-        target.own = False
-    elif back < 1e-6:
+def check_sell_signal(client: WatcherClient, target: Target, price: float, now: float, start_time: float):
+    if price > target.high_price:
         try:
-            client.send_delay_sell(symbol, price, now)
+            client.send_high_sell_signal(target, start_time)
         except Exception as e:
             logger.error(e)
+
+    elif price < target.sell_least_price:
+        try:
+            client.send_sell_signal(target, price, now, start_time)
+        except Exception as e:
+            logger.error(e)
+
+def check_delay(client: WatcherClient, target: Target, now: float, high: float, price: float):
+    delay_time = DELAY if not client.stop_profit else SECOND_DELAY
+    if now < target.new_high_time + delay_time:
+        if high > target.new_high_price:
+            try:
+                client.send_delay_sell(target, price, now)
+            except Exception as e:
+                logger.error(e)
+    else:
+        try:
+            client.send_not_delay_sell(target, price, now)
+        except Exception as e:
+            logger.error(e)
+
 
 def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redis=True):
     def warpper(event: TradeDetailEvent):
@@ -54,7 +70,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         detail: TradeDetail = event.data[0]
         now = detail.ts / 1000
 
-        if client.state == State.RUNNING and now - client.target_time > 0:
+        if client.state == State.RUNNING and now > client.target_time:
             last = now // interval
             price = detail.price
             vol = sum([each.price * each.amount for each in event.data])
@@ -72,10 +88,16 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 info['back'] = 1 - price / info['high']
                 info['max_back'] = max(info['max_back'], info['back'])
 
-            if symbol in client.targets:
-                check_sell_signal(client, symbol, price, now, start_time, info['back'])
+            if symbol in client.targets and client.targets[symbol].buy_price == 0 and now > client.targets[symbol].time + 2:
+                del client.targets[symbol]
 
-            elif now - client.target_time < MAX_BUY_WAIT:
+            if symbol in client.targets:
+                target = client.targets[symbol]
+                if target.own:
+                    check_delay(client, target, now, info['high'], price)
+                    check_sell_signal(client, target, price, now, start_time)
+
+            elif now < client.target_time + MAX_BUY_WAIT:
                 check_buy_signal(
                     client, symbol, info['vol'], info['open_'],
                     price, now, info['boot_price'], info['end_price'],
@@ -94,7 +116,8 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         'boot_price': 0,
         'end_price': 0,
         'max_back': 0,
-        'back': 0
+        'back': 0,
+        'old_high': 0
     }
     return warpper
 
