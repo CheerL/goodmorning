@@ -110,7 +110,7 @@ class WatcherClient(ControlledClient):
         self.client_type = 'watcher'
         self.stop_profit = False
         self.task : list[str] = []
-        self.targets : list[Target] = {}
+        self.targets : dict[str, Target] = {}
         self.redis_conn: Redis = Redis()
 
     def get_task(self, num) -> 'list[str]':
@@ -127,7 +127,7 @@ class WatcherClient(ControlledClient):
         increase = round((price - init_price) / init_price * 100, 4)
         logger.info(f'Buy signal. {symbol} with price {price}USDT, vol {vol}, increament {increase}% at {now}. recieved at {start_time}')
 
-        time.sleep(1)
+        time.sleep(2)
         if target.buy_price == 0:
             del self.targets[symbol]
         self.redis_conn.write_target(symbol)
@@ -142,10 +142,9 @@ class WatcherClient(ControlledClient):
         if self.stop_profit:
             return
 
-        self.publish(topic=Topic.HIGH, symbol=symbol, price=self.targets[symbol].high_price)
-        for target in self.targets.values():
-            target.own = False
-
+        target = self.targets[symbol]
+        self.publish(topic=Topic.HIGH, symbol=symbol, price=target.high_price)
+        target.own = False
         self.stop_profit = True
         self.publish(topic=Topic.STOP_PROFIT, status=True)
         logger.info(f'Stop profit. {symbol} comes to stop profit point {target.high_price}, sell all. recieved at {start_time}')
@@ -218,12 +217,13 @@ class WatcherMasterClient(WatcherClient):
     def info_handler(self, client_type, remove=False, *args, **kwargs):
         if remove:
             self.client_info[client_type] -= 1
-
+            if client_type == 'dealer' and self.client_info[client_type] == 0:
+                self.stop_running()
         else:
             self.client_info[client_type] += 1
         
-        self.publish(topic=Topic.STATE, state=self.state)
-        self.publish(topic=Topic.TIME, target_time=self.target_time)
+            self.publish(topic=Topic.STATE, state=self.state)
+            self.publish(topic=Topic.TIME, target_time=self.target_time)
 
     def starting(self):
         if self.state == State.STOPPED:
