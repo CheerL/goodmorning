@@ -4,8 +4,8 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from utils import config, user_config
 
-PGHOST = config.get('setting', 'PGHost')
-PGPORT = config.getint('setting', 'PGPort')
+PGHOST = config.get('data', 'PGHost')
+PGPORT = config.getint('data', 'PGPort')
 PGUSER = 'postgres'
 PGPASSWORD = user_config.get('setting', 'PGPassword')
 PGNAME = 'goodmorning'

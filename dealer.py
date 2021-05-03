@@ -7,8 +7,59 @@ from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from market import MarketClient
 from retry import retry
 from user import User
+from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 
-SECOND_SELL_AFTER = config.getfloat('setting', 'SecondSellAfter')
+LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
+STOP_PROFIT_SLEEP = int(config.getint('time', 'STOP_PROFIT_SLEEP'))
+
+
+
+def trade_update_callback(client: Client):
+    def warpper(event: OrderUpdateEvent):
+        update: OrderUpdate = event.data
+        symbol = update.symbol
+        direction = 'buy' if 'buy' in update.type else 'sell'
+        etype = update.eventType
+        order_id = update.orderId
+        if direction == 'buy':
+            if order_id not in client.user.buy_id:
+                client.user.buy_id.append(order_id)
+        else:
+            if order_id not in client.user.sell_id:
+                client.user.sell_id.append(order_id)
+
+        try:
+            if etype == 'creation':
+                for summary in client.user.orders[direction][symbol]:
+                    if summary.order_id == None:
+                        summary.create(update)
+                        break
+
+            elif etype == 'trade':
+                for summary in client.user.orders[direction][symbol]:
+                    if summary.order_id == order_id:
+                        summary.update(update)
+                        if update.orderStatus == 'filled' and summary.filled_callback:
+                            summary.filled_callback(*summary.filled_callback_args)
+                        break
+
+            elif etype == 'cancellation':
+                for summary in client.user.orders[direction][symbol]:
+                    if summary.order_id == order_id:
+                        summary.cancel_update(update)
+                        if summary.cancel_callback:
+                            summary.cancel_callback(*summary.cancel_callback_args)
+                        break
+        except Exception as e:
+            logger.error(e)
+
+    return warpper
+
+def error_callback(symbol):
+    def warpper(error):
+        logger.error(f'[{symbol}] {error}')
+    
+    return warpper
 
 @retry(tries=5, delay=1, logger=logger)
 def init_users() -> 'list[User]':
@@ -42,14 +93,17 @@ def main(user: User):
     client = init_dealer(user)
 
     scheduler = Scheduler()
-    scheduler.add_job(client.high_sell_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=int(SECOND_SELL_AFTER))
+    scheduler_time = LOW_STOP_PROFIT_TIME - STOP_PROFIT_SLEEP
+    scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=scheduler_time)
     scheduler.start()
+    client.user.start(trade_update_callback(client), error_callback('order'))
 
     client.wait_state(State.RUNNING)
     client.wait_state(State.STARTED)
     client.stop()
     logger.info('Time to cancel')
-    user.cancel_and_sell(client.targets.values())
+    for target in client.targets.values():
+        user.cancel_and_sell(target)
     time.sleep(2)
     user.report()
     kill_all_threads()
@@ -58,5 +112,4 @@ def main(user: User):
 if __name__ == '__main__':
     logger.info('Dealer')
     users = init_users()
-    # time.sleep(20)
-    run_process([(main, (user,), user.username) for user in users], is_lock=True, limit_num=len(users)+2)
+    run_process([(main, (user,), user.username) for user in users], is_lock=True)

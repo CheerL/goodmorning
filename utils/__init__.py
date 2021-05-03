@@ -9,7 +9,7 @@ import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.constant.system import RestApiDefine, WebSocketDefine
-from huobi.utils import PrintBasic
+from huobi.utils import PrintBasic, input_checker
 
 from utils.logging import create_logger
 from utils.parallel import kill_thread
@@ -31,11 +31,13 @@ if os.path.exists(USER_CONFIG_PATH):
     user_config.read(USER_CONFIG_PATH)
 
 
+
 session._request = session.request
 session.request = lambda *args, **kwargs: session._request(timeout=1, *args, **kwargs)
 WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
 PrintBasic.print_basic = lambda data, name=None: None
+input_checker.reg_ex = "[ _`~!@#$%^&()+=|{}':;',\\[\\].<>/?~！@#￥%……&（）——+|{}【】‘；：”“’。，、？]|\n|\t"
 
 
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
@@ -46,10 +48,8 @@ def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     return utc_time.astimezone(tz).strftime(fmt)
 
 def get_target_time():
-    TIME = config.get('setting', 'Time')
-    
+    TIME = config.get('time', 'TIME')
     now = time.time()
-
     if TIME.startswith('*/'):
         TIME = int(TIME[2:])
         target_time = (now // (TIME * 60) + 1) * (TIME * 60)

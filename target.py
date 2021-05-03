@@ -1,30 +1,45 @@
 from utils import config
 import math
 
-SELL_LEAST_AFTER = config.getfloat('setting', 'SellLeastAfter')
-SELL_BACK_RATE = config.getfloat('setting', 'SellBackRate')
+MIN_HOLD_TIME = config.getfloat('time', 'MIN_HOLD_TIME')
+STOP_LOSS_RATE = config.getfloat('sell', 'STOP_LOSS_RATE')
+STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
+STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
+BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 
 class Target:
-    def __init__(self, symbol, price, init_price=None, time=None):
+    def __init__(self, symbol, price, init_price, time, high_stop_profit=True):
         self.symbol = symbol
         self.price = price
         self.init_price = init_price
         self.buy_price = 0
         self.high_price = 0
-
         self.time = time
+        self.min_hold_time = time + MIN_HOLD_TIME
+        self.stop_loss_price = init_price * (1 - STOP_LOSS_RATE / 100)
+        self.stop_profit_price = 0
+        self.own = False
+        self.high_stop_profit = high_stop_profit
 
-        self.sell_least_time = time + SELL_LEAST_AFTER
-        self.sell_least_price = init_price * (1 - SELL_BACK_RATE / 100)
-        self.own = True
+    def set_buy_price(self, price):
+        if price <= 0:
+            return
 
-    def set_buy_price(self, price, rate):
         if not self.buy_price:
             self.buy_price = price
         else:
             self.buy_price = min(self.buy_price, price)
-        
-        self.high_price = self.buy_price * (1 + rate / 100)
+        self.set_high_stop_profit(self.high_stop_profit)
+        self.own = True
+
+    def set_high_stop_profit(self, status):
+        self.high_stop_profit = status
+        rate = STOP_PROFIT_RATE_HIGH if self.high_stop_profit else STOP_PROFIT_RATE_LOW
+        self.stop_profit_price = self.buy_price * (1 + rate / 100)
+
+    def get_buy_price(self):
+        buy_price = min((1 + BUY_RATE / 100) * self.init_price, (1 + 9 / 100) * self.price)
+        return self.check_price(buy_price)
 
     def set_info(self, info):
         self.base_currency = info.base_currency

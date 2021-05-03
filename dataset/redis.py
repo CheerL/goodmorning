@@ -2,8 +2,8 @@ import redis
 import time
 from utils import config, user_config
 
-RHOST = config.get('setting', 'RHost')
-RPORT = config.getint('setting', 'RPort')
+RHOST = config.get('data', 'RHost')
+RPORT = config.getint('data', 'RPort')
 RPASSWORD = user_config.get('setting', 'RPassword')
 
 class Redis(redis.StrictRedis):
