@@ -98,6 +98,7 @@ class User:
             logger.error(e)
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)
+            return None
         
 
     def buy_limit(self, target: Target, amount, price=None):
@@ -140,6 +141,7 @@ class User:
             logger.error(e)
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)
+            return None
         
 
 
@@ -239,13 +241,17 @@ class User:
             else:
                 self.sell_limit(target, amount)
 
+        symbol = target.symbol
+        if symbol not in self.orders['sell']:
+            return
+
         callback = callback if callback else _callback
 
-        for summary in self.orders['sell'][target.symbol]:
+        for summary in self.orders['sell'][symbol]:
             if summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]:
                 self.trade_client.cancel_order(summary.symbol, summary.order_id)
                 summary.add_cancel_callback(callback, [summary])
-                logger.info(f'Cancel open sell order for {target.symbol}')
+                logger.info(f'Cancel open sell order for {symbol}')
                 break
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
@@ -264,6 +270,7 @@ class User:
 
         logger.info(f'Stop profit {target.symbol}')
 
+    # @retry(tries=5, delay=0.01)
     def buy_and_sell(self, target: Target, client):
         @retry(tries=5, delay=0.05)
         def callback(summary):
@@ -272,9 +279,10 @@ class User:
             self.sell_limit(target, amount)
 
         summary = self.buy_limit(target, self.buy_amount)
-        summary.check_after_buy(client)
-        summary.add_filled_callback(callback, [summary])
-        summary.add_cancel_callback(callback, [summary])
+        if summary != None:
+            summary.check_after_buy(client)
+            summary.add_filled_callback(callback, [summary])
+            summary.add_cancel_callback(callback, [summary])
 
     def report(self):
         orders = [

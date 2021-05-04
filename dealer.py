@@ -88,24 +88,28 @@ def init_dealer(user) -> Client:
     return client
 
 def main(user: User):
-    logger.info('Start run sub process')
-    client = init_dealer(user)
+    try:
+        logger.info('Start run sub process')
+        client = init_dealer(user)
 
-    scheduler = Scheduler()
-    scheduler_time = LOW_STOP_PROFIT_TIME - STOP_PROFIT_SLEEP
-    scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=scheduler_time)
-    scheduler.start()
-    client.user.start(trade_update_callback(client), error_callback('order'))
+        scheduler = Scheduler()
+        scheduler_time = LOW_STOP_PROFIT_TIME - STOP_PROFIT_SLEEP
+        scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=scheduler_time)
+        scheduler.start()
+        client.user.start(trade_update_callback(client), error_callback('order'))
 
-    client.wait_state(State.RUNNING)
-    client.wait_state(State.STARTED)
-    client.stop()
-    logger.info('Time to cancel')
-    for target in client.targets.values():
-        user.cancel_and_sell(target)
-    time.sleep(2)
-    user.report()
-    kill_all_threads()
+        client.wait_state(State.RUNNING)
+        client.wait_state(State.STARTED)
+    except Exception as e:
+        logger.error(e)
+    finally:
+        client.stop()
+        logger.info('Time to cancel')
+        for target in client.targets.values():
+            user.cancel_and_sell(target)
+        time.sleep(2)
+        user.report()
+        kill_all_threads()
 
 
 if __name__ == '__main__':
