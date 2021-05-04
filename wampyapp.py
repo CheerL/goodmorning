@@ -1,4 +1,5 @@
 import time
+import threading
 from huobi.model.generic.symbol import Symbol
 
 from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT
@@ -130,9 +131,8 @@ class WatcherClient(ControlledClient):
         logger.info(f'Stop loss. {target.symbol}: {price}USDT at {trade_time}. recieved at {now}')
 
     def send_stop_profit_signal(self, target: Target, price, trade_time, now):
-        if self.high_stop_profit:
+        if not self.high_stop_profit:
             return
-
         self.publish(topic=Topic.STOP_PROFIT, status=False, symbol=target.symbol, price=target.stop_profit_price)
         target.own = False
         self.high_stop_profit = False
@@ -147,8 +147,10 @@ class WatcherClient(ControlledClient):
         if symbol not in self.targets:
             return
 
-        target = self.targets[symbol]
-        target.set_buy_price(price)
+        if price == 0:
+            del self.targets[symbol]
+        else:
+            self.targets[symbol].set_buy_price(price)
 
 
 class WatcherMasterClient(WatcherClient):
@@ -269,9 +271,14 @@ class DealerClient(ControlledClient):
         logger.info(f'Buy. {symbol}, recieved at {receive_time}')
 
     def after_buy(self, symbol, price):
+        if self.targets[symbol].buy_price:
+            return
+
         self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=price)
         if price == 0:
             del self.targets[symbol]
+        else:
+            self.targets[symbol].set_buy_price(price)
 
     @subscribe(topic=Topic.STOP_LOSS)
     def stop_loss_handler(self, symbol, price, *args, **kwargs):
@@ -287,6 +294,9 @@ class DealerClient(ControlledClient):
         if self.state != State.RUNNING:
             return
 
-        time.sleep(STOP_PROFIT_SLEEP)
-        self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
+        def high_cancel_and_sell():
+            self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
+
+        self.high_stop_profit = False
+        threading.Timer(STOP_PROFIT_SLEEP, high_cancel_and_sell).start()
         logger.info(f'Stop profit. {symbol}: {price}USDT')

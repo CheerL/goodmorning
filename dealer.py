@@ -74,8 +74,7 @@ def init_users() -> 'list[User]':
     buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]
     wxuids = [uid.strip() for uid in WXUIDS.split(',')]
 
-    users = [User(*user_data) for user_data in zip(access_keys,
-                                                   secret_keys, buy_amounts, wxuids)]
+    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
                                                    
     if TEST:
         users = users[:1]

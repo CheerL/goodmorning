@@ -91,12 +91,13 @@ class User:
             order_id = self.trade_client.create_order(**order)
             self.buy_id.append(order_id)
             self.buy_order_list.append(order)
-            return order_summary
             logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
+            return order_summary
         except Exception as e:
             order_summary.error(e)
             logger.error(e)
-            raise Exception(e)
+            self.orders['buy'][symbol].remove(order_summary)
+            # raise Exception(e)
         
 
     def buy_limit(self, target: Target, amount, price=None):
@@ -137,7 +138,8 @@ class User:
         except Exception as e:
             order_summary.error(e)
             logger.error(e)
-            raise Exception(e)
+            self.orders['buy'][symbol].remove(order_summary)
+            # raise Exception(e)
         
 
 
@@ -228,11 +230,14 @@ class User:
     def get_amount(self, currency):
         return self.balance[currency]
 
-    def cancel_and_sell(self, target: Target, callback=None):
+    def cancel_and_sell(self, target: Target, callback=None, market=True):
         @retry(tries=5, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-            self.sell(target, amount)
+            if market:
+                self.sell(target, amount)
+            else:
+                self.sell_limit(target, amount)
 
         callback = callback if callback else _callback
 
@@ -250,62 +255,28 @@ class User:
             self.sell_limit(target, amount, (price + target.stop_profit_price) / 2)
 
         for target in targets:
-            callback = _callback if target.symbol == symbol else None
-            self.cancel_and_sell(target, callback)
+            if target.symbol == symbol:
+                callback = _callback
+            else:
+                callback = None
+                target.set_high_stop_profit(False)
+            self.cancel_and_sell(target, callback, market=False)
 
         logger.info(f'Stop profit {target.symbol}')
 
     def buy_and_sell(self, target: Target, client):
         @retry(tries=5, delay=0.05)
         def callback(summary):
-            target.set_buy_price(summary.aver_price)
+            client.after_buy(target.symbol, summary.aver_price)
             amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
             self.sell_limit(target, amount)
-            client.after_buy(target.symbol, target.buy_price)
 
         summary = self.buy_limit(target, self.buy_amount)
         summary.check_after_buy(client)
         summary.add_filled_callback(callback, [summary])
         summary.add_cancel_callback(callback, [summary])
 
-    def get_currency_balance(self, currencies, balance_type='trade'):
-        return {
-            currency.currency: float(currency.balance)
-            for currency in self.account_client.get_balance(self.account_id)
-            if currency.currency in currencies and currency.type == balance_type
-        }
-
-    def get_balance(self, targets):
-        while self.get_open_orders(targets, side=None):
-            time.sleep(0.05)
-
-        target_currencies = [target.base_currency for target in targets]
-        for currency, balance in self.get_currency_balance(target_currencies).items():
-            self.balance[currency] = balance
-
-    def check_balance(self, targets):
-        self.get_balance(targets)
-
-        # logger.debug(f'User {self.account_id} balance report')
-        for target in targets:
-            for order_id, order in zip(self.buy_id, self.buy_order_list):
-                if order['symbol'] == target.symbol:
-                    break
-
-            
-            target_balance = self.balance[target.base_currency]
-            if target_balance > 10 ** -target.amount_precision:
-                order_detail = self.trade_client.get_order(order_id.order_id)
-                buy_price = float(order_detail.filled_cash_amount) / float(order_detail.filled_amount)
-                target.buy_price = buy_price
-                logger.debug(f'Get {target_balance} {target.base_currency} with average price {buy_price}')
-            else:
-                target.buy_price = 0
-                logger.debug(f'Get no {target.base_currency}')
-
     def report(self):
-        print(self.buy_id)
-        print(self.sell_id)
         orders = [
             self.trade_client.get_order(order_id)
             for order_id in set(self.buy_id + self.sell_id)
@@ -314,8 +285,8 @@ class User:
         order_info = [{
             'symbol': order.symbol,
             'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
-            # 'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-            'price': round(float(order.price), 6),
+            'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
+            # 'price': round(float(order.price), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
             'currency': order.symbol[:-4].upper(),

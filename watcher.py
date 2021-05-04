@@ -20,7 +20,6 @@ CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
 LOW_STOP_PROFIT_TIME = config.getfloat('time', 'LOW_STOP_PROFIT_TIME')
 WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
-TEST = user_config.getboolean('setting', 'Test')
 
 def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now):
     if (
@@ -37,6 +36,8 @@ def check_sell_signal(client: WatcherClient, target: Target, info, price, trade_
     if price > target.stop_profit_price:
         try:
             client.send_stop_profit_signal(target, price, trade_time, now)
+            for target in client.targets.values():
+                target.set_high_stop_profit(False)
         except Exception as e:
             logger.error(e)
 
@@ -133,6 +134,7 @@ def main():
         logger.info('Master watcher')
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
+        TEST = user_config.getboolean('setting', 'Test')
         if TEST:
             now = datetime.datetime.now()
             run_time = now + datetime.timedelta(seconds=5)
