@@ -283,6 +283,8 @@ class User:
             summary.check_after_buy(client)
             summary.add_filled_callback(callback, [summary])
             summary.add_cancel_callback(callback, [summary])
+        else:
+            client.after_buy(target.symbol, 0)
 
     def report(self):
         orders = [
