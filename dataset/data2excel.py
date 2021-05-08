@@ -9,7 +9,7 @@ from utils import ROOT, config
 from dataset.pgsql import get_session, get_Trade, Target
 
 DB_PATH = os.path.join(ROOT, 'test', 'db')
-PGHOST = config.get('setting', 'PGHost')
+PGHOST = config.get('data', 'PGHost')
 
 def find_csv_path(target_time_str, db_path):
     return [each for each in os.listdir(db_path) if target_time_str in each]

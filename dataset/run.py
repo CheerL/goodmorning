@@ -5,7 +5,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import argparse
 from utils import config
 
-PGHOST = config.get('setting', 'PGHost')
+PGHOST = config.get('data', 'PGHost')
 
 def write_trade(redis_conn: Redis, session: Session):
     for keys, values in redis_conn.scan_iter_with_data('trade_*', 500):
