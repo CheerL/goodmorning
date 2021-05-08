@@ -2,7 +2,10 @@ from dataset.redis import Redis
 from dataset.pgsql import get_Trade, get_session, Session, Target, get_trade_from_redis, get_day, MS_IN_DAY
 from sqlalchemy import func, inspect
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-import sys
+import argparse
+from utils import config
+
+PGHOST = config.get('setting', 'PGHost')
 
 def write_trade(redis_conn: Redis, session: Session):
     for keys, values in redis_conn.scan_iter_with_data('trade_*', 500):
@@ -20,28 +23,27 @@ def write_target(redis_conn: Redis, session: Session):
         session.commit()
         redis_conn.delete(*keys)
 
-def trans():
-    redis_conn = Redis()
-    with get_session() as session:
+def trans(host):
+    redis_conn = Redis(host=host)
+    with get_session(host=host) as session:
         write_target(redis_conn, session)
         write_trade(redis_conn, session)
 
-
-def vacuum(session: Session=None, table: str=''):
-    def _vacuum(table: str):
+def vacuum(session: Session=None, table: str='', full=True, host=''):
+    def _vacuum():
         engine = session.bind
         connection = engine.raw_connection() 
         connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) 
         cursor = connection.cursor() 
-        cursor.execute(f"VACUUM FULL {table}")
+        cursor.execute(f"VACUUM {'FULL' if full else ''} {table}")
         cursor.close()
         connection.close()
-    
+
     if session:
-        _vacuum(table)
+        _vacuum()
     else:
-        with get_session() as session:
-            _vacuum(table)
+        with get_session(host=host) as session:
+            _vacuum()
 
 def delete_many(session: Session, table:str, ids: 'list[int]'):
     ids_str = ','.join(ids)
@@ -65,11 +67,11 @@ def move_trade(Trade, session, start_day, end_day):
             session.bulk_save_objects(new_trades)
             delete_many(session, Trade.__tablename__, [str(trade.id) for trade in trades])
             session.commit()
-    
-    vacuum(session, Trade.__tablename__)
 
-def check_trade_tables():
-    with get_session() as session:
+    vacuum(session, Trade.__tablename__, False)
+
+def check_trade_tables(host):
+    with get_session(host=host) as session:
         inspector = inspect(session.bind)
         tables = [name for name in inspector.get_table_names() if name.startswith('trade')]
         print(tables)
@@ -91,16 +93,75 @@ def check_trade_tables():
                 max_day = int(max_ts // MS_IN_DAY)
                 move_trade(Trade, session, day+1, max_day+1)
 
+        vacuum(session)
+
+def reorder(days, symbols, host):
+    with get_session(host=host) as session:
+        for day in days.split(','):
+            day = int(day)
+            Trade = get_Trade(day)
+            print(Trade.__tablename__)
+            if symbols:
+                symbols = symbols.split(',')
+            else:
+                symbols = [each[0] for each in session.execute(f'SELECT DISTINCT symbol FROM trade_{day}')]
+
+            for symbol in symbols:
+                print(symbol)
+                ts = ''
+                count = 0
+                trades = session.execute(f"""
+                SELECT id, ts
+                FROM trade_{day} as tb
+                WHERE tb.symbol='{symbol}'
+                ORDER BY tb.ts ASC,
+                CASE WHEN tb.direction='buy' THEN tb.price END ASC,
+                CASE WHEN tb.direction='sell' THEN tb.price END DESC
+                """).all()
+                update_mappings = []
+                for trade_id, trade_ts in trades:
+                    print(trade_ts)
+                    if '.' in trade_ts:
+                        trade_ts = trade_ts.split('.')[0]
+
+                    if ts == trade_ts:
+                        count += 1
+                        update_mappings.append({
+                            'id': trade_id,
+                            'ts': str(int(trade_ts)+count/1000)
+                        })
+                    else:
+                        ts = trade_ts
+                        count = 0
+                    if len(update_mappings) > 100:
+                        session.bulk_update_mappings(Trade, update_mappings)
+                        session.commit()
+                        update_mappings = []
+
+                if update_mappings:
+                    session.bulk_update_mappings(Trade, update_mappings)
+                    session.commit()
+
+            symbols = ''
+
+
 def main():
-    if len(sys.argv) > 1:
-        arg = sys.argv[1]
-        if arg == 'trans':
-            trans()
-        elif arg == 'vacuum':
-            table = sys.argv[2] if len(sys.argv) > 2 else ''
-            vacuum(table=table)
-        elif arg == 'check':
-            check_trade_tables()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', default='trans')
+    parser.add_argument('-t', '--table', default='')
+    parser.add_argument('-s', '--symbol', default='')
+    parser.add_argument('-d', '--day', default='')
+    parser.add_argument('-H', '--host', default=PGHOST)
+    args = parser.parse_args()
+
+    if args.command == 'trans':
+        trans(host=args.host)
+    elif args.command == 'vacuum':
+        vacuum(table=args.table, host=args.host)
+    elif args.command == 'check':
+        check_trade_tables(host=args.host)
+    elif args.command == 'reorder':
+        reorder(args.day, args.symbol, host=args.host)
 
 if __name__ == '__main__':
     main()

@@ -1,12 +1,15 @@
 import sys
+import argparse
 import os
 import time
+import datetime
 from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
-from utils import ROOT
+from utils import ROOT, config
 from dataset.pgsql import get_session, get_Trade, Target
 
 DB_PATH = os.path.join(ROOT, 'test', 'db')
+PGHOST = config.get('setting', 'PGHost')
 
 def find_csv_path(target_time_str, db_path):
     return [each for each in os.listdir(db_path) if target_time_str in each]
@@ -19,7 +22,7 @@ def add_sheet(wb, session, symbol, start, end):
     open_ = 0
     high = 0
     vol = 0
-    Trade = get_Trade(ts=start * 1000)
+    Trade = get_Trade(int(start))
     data = Trade.get_data(session, symbol, start, end).all()
     for index, trade in enumerate(data):
         time_ = round(float(trade.ts) / 1000 - start, 3)
@@ -50,15 +53,18 @@ def add_sheet(wb, session, symbol, start, end):
     lc.y_axis.numFmt = '0.00%'
     ws.add_chart(lc, 'I3')
 
-def create_excel(target_time_str, db_path):
+def create_excel(target_time_str, db_path, targets, host):
     target_time = time.strptime(target_time_str, '%Y-%m-%d %H:%M:%S')
     target_time_ts = time.mktime(target_time)
     target_tm = time.strftime('%Y-%m-%d-%H', target_time)
     
     wb = Workbook()
     wb.remove(wb['Sheet'])
-    with get_session() as session:
-        targets = session.query(Target).filter(Target.tm == target_tm).first().targets.split(',')
+    with get_session(host=host) as session:
+        if not targets:
+            targets = session.query(Target).filter(Target.tm == target_tm).first().targets
+
+        targets = targets.split(',')
         print(targets)
         for symbol in targets:
             add_sheet(wb, session, symbol, target_time_ts, target_time_ts + 300)
@@ -66,8 +72,14 @@ def create_excel(target_time_str, db_path):
 
 
 def main():
-    target_time_str = sys.argv[1]
-    create_excel(target_time_str, DB_PATH)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--time', default=datetime.date.today().strftime('%Y-%m-%d %H:%M:%S'))
+    parser.add_argument('-s', '--symbol', default='')
+    parser.add_argument('-H', '--host', default=PGHOST)
+    parser.add_argument('-p', '--path', default=DB_PATH)
+    args = parser.parse_args()
+
+    create_excel(args.time, DB_PATH, args.symbol, args.host)
 
 if __name__ == '__main__':
     main()
