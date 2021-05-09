@@ -79,7 +79,7 @@ def main():
     parser.add_argument('-p', '--path', default=DB_PATH)
     args = parser.parse_args()
 
-    create_excel(args.time, DB_PATH, args.symbol, args.host)
+    create_excel(args.time, args.path, args.symbol, args.host)
 
 if __name__ == '__main__':
     main()
