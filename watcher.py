@@ -33,7 +33,7 @@ def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now
             logger.error(e)
 
 def check_sell_signal(client: WatcherClient, target: Target, info, price, trade_time, now):
-    if price > target.stop_profit_price:
+    if client.high_stop_profit and price > target.stop_profit_price:
         try:
             client.send_stop_profit_signal(target, price, trade_time, now)
             for target in client.targets.values():

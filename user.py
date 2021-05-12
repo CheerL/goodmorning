@@ -94,7 +94,7 @@ class User:
             logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
             return order_summary
         except Exception as e:
-            order_summary.error(e)
+            # order_summary.error(e)
             logger.error(e)
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)
@@ -137,7 +137,7 @@ class User:
             logger.debug(f'Buy {amount} {symbol[:-4]}')
             return order_summary
         except Exception as e:
-            order_summary.error(e)
+            # order_summary.error(e)
             logger.error(e)
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)

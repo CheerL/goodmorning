@@ -133,6 +133,7 @@ class WatcherClient(ControlledClient):
     def send_stop_profit_signal(self, target: Target, price, trade_time, now):
         if not self.high_stop_profit:
             return
+
         self.publish(topic=Topic.STOP_PROFIT, status=False, symbol=target.symbol, price=target.stop_profit_price)
         target.own = False
         self.high_stop_profit = False
@@ -148,7 +149,8 @@ class WatcherClient(ControlledClient):
             return
 
         if price == 0:
-            del self.targets[symbol]
+            # del self.targets[symbol]
+            pass
         else:
             self.targets[symbol].set_buy_price(price)
 
@@ -268,7 +270,7 @@ class DealerClient(ControlledClient):
         target.set_info(self.market_client.symbols_info[symbol])
 
         self.user.buy_and_sell(target, self)
-        logger.info(f'Buy. {symbol}, recieved at {receive_time}')
+        logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}')
 
     def after_buy(self, symbol, price):
         if self.targets[symbol].buy_price:
@@ -291,7 +293,7 @@ class DealerClient(ControlledClient):
 
     @subscribe(topic=Topic.STOP_PROFIT)
     def stop_profit_handler(self, symbol, price, *args, **kwargs):
-        if self.state != State.RUNNING:
+        if self.state != State.RUNNING or not self.high_stop_profit:
             return
 
         def high_cancel_and_sell():

@@ -1,4 +1,5 @@
 import time
+import argparse
 
 from wampyapp import DealerClient as Client, State
 from utils.parallel import run_process
@@ -62,19 +63,23 @@ def error_callback(symbol):
     return warpper
 
 @retry(tries=5, delay=1, logger=logger)
-def init_users() -> 'list[User]':
+def init_users(num=-1) -> 'list[User]':
     ACCESSKEY = user_config.get('setting', 'AccessKey')
     SECRETKEY = user_config.get('setting', 'SecretKey')
     BUY_AMOUNT = user_config.get('setting', 'BuyAmount')
     WXUIDS = user_config.get('setting', 'WxUid')
     TEST = user_config.getboolean('setting', 'Test')
 
+    
     access_keys = [key.strip() for key in ACCESSKEY.split(',')]
     secret_keys = [key.strip() for key in SECRETKEY.split(',')]
     buy_amounts = [amount.strip() for amount in BUY_AMOUNT.split(',')]
     wxuids = [uid.strip() for uid in WXUIDS.split(',')]
-
-    users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
+    
+    if num == -1:
+        users = [User(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
+    else:
+        users = [User(access_keys[num], secret_keys[num], buy_amounts[num], wxuids[num])]
                                                    
     if TEST:
         users = users[:1]
@@ -113,6 +118,10 @@ def main(user: User):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--num', default=-1, type=int)
+    args = parser.parse_args()
+
     logger.info('Dealer')
-    users = init_users()
+    users = init_users(num=args.num)
     run_process([(main, (user,), user.username) for user in users], is_lock=True)
