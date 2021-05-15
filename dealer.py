@@ -53,7 +53,6 @@ def trade_update_callback(client: Client):
                             summary.cancel_callback(*summary.cancel_callback_args)
                         break
         except Exception as e:
-
             logger.error(f"{direction} {etype} {type(e)} {e}")
 
     return warpper

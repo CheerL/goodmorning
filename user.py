@@ -229,15 +229,19 @@ class User:
         return open_orders
 
     def check_and_sell(self, targets: 'list[Target]', limit=True):
+        @retry(tries=10, delay=0.05)
+        def _sell(target, amount, limit=True):
+            if limit:
+                self.sell_limit(target, amount)
+            else:
+                self.sell(target, amount)
+
         for target in targets:
             buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
             sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol] if summary.order_id])
             remain_amount = buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
-            if limit:
-                retry_call(self.sell_limit, fargs=[target, remain_amount], tries=5, delay=0.05)
-            else:
-                retry_call(self.sell, fargs=[target, remain_amount], tries=5, delay=0.05)
+            _sell(target, remain_amount, limit)
 
     @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency):
