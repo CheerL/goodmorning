@@ -6,7 +6,7 @@ from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderSide, OrderType, AccountBalanceMode
 from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
-from retry.api import retry
+from retry.api import retry, retry_call
 
 from utils import config, logger, strftime, timeout_handle
 from report import wx_report, add_profit, get_profit, wx_name
@@ -235,9 +235,9 @@ class User:
             remain_amount = buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
             if limit:
-                retry(tries=5, delay=0.05)(self.sell_limit)(target, remain_amount)
+                retry_call(self.sell_limit, fargs=[target, remain_amount], tries=5, delay=0.05)
             else:
-                retry(tries=5, delay=0.05)(self.sell)(target, remain_amount)
+                retry_call(self.sell, fargs=[target, remain_amount], tries=5, delay=0.05)
 
     @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency):
