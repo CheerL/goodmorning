@@ -230,10 +230,10 @@ class User:
 
     def check_and_sell(self, targets: 'list[Target]', limit=True):
         @retry(tries=10, delay=0.05)
-        def _sell(target, amount, limit=True):
-            if limit:
+        def _sell(target: Target, amount, limit=True):
+            if limit and amount > target.limit_order_min_order_amt:
                 self.sell_limit(target, amount)
-            else:
+            elif not limit and amount > target.sell_market_min_order_amt:
                 self.sell(target, amount)
 
         for target in targets:
