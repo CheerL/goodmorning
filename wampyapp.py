@@ -253,7 +253,7 @@ class DealerClient(ControlledClient):
             message_handler_cls=message_handler_cls
         )
         self.market_client : MarketClient = market_client
-        self.targets : list[Target] = {}
+        self.targets : dict[str, Target] = {}
         self.user : User = user
         self.client_type = 'dealer'
         self.high_stop_profit = True
@@ -304,4 +304,4 @@ class DealerClient(ControlledClient):
         logger.info(f'Stop profit. {symbol}: {price}USDT')
 
     def check_and_sell(self, limit=True):
-        self.user.check_and_sell(self.targets, limit)
+        self.user.check_and_sell(self.targets.values(), limit)

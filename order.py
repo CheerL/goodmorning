@@ -19,7 +19,7 @@ class OrderSummaryStatus:
         4: 'CANCELED'
     }
 
-    @classmethod
+    @staticmethod
     def str(num):
         return OrderSummaryStatus.str_dict[num]
 
