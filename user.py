@@ -236,7 +236,7 @@ class User:
             elif not limit and amount > target.sell_market_min_order_amt:
                 self.sell(target, amount)
 
-        for target in targets:
+        for target in list(targets):
             buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
             sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol] if summary.order_id])
             remain_amount = buy_amount - sell_amount
@@ -278,7 +278,7 @@ class User:
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
             self.sell_limit(target, amount, (price + target.stop_profit_price) / 2)
 
-        for target in targets:
+        for target in list(targets):
             if target.symbol == symbol:
                 callback = _callback
             else:
