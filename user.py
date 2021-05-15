@@ -228,12 +228,23 @@ class User:
             open_orders.extend(self.trade_client.get_open_orders(','.join(symbols), self.account_id, side))
         return open_orders
 
+    def check_and_sell(self, targets: 'list[Target]', limit=True):
+        for target in targets:
+            buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol]])
+            sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol]])
+            remain_amount = buy_amount - sell_amount
+            logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
+            if limit:
+                retry(tries=5, delay=0.05)(self.sell_limit)(target, remain_amount)
+            else:
+                retry(tries=5, delay=0.05)(self.sell)(target, remain_amount)
+
     @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency):
         return self.balance[currency]
 
     def cancel_and_sell(self, target: Target, callback=None, market=True):
-        @retry(tries=5, delay=0.05)
+        @retry(tries=10, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
             if market:
@@ -255,7 +266,7 @@ class User:
                 break
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
-        @retry(tries=5, delay=0.05)
+        @retry(tries=10, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
             self.sell_limit(target, amount, (price + target.stop_profit_price) / 2)
@@ -268,11 +279,10 @@ class User:
                 target.set_high_stop_profit(False)
             self.cancel_and_sell(target, callback, market=False)
 
-        logger.info(f'Stop profit {target.symbol}')
+        logger.info(f'Stop profit {symbol}')
 
-    # @retry(tries=5, delay=0.01)
     def buy_and_sell(self, target: Target, client):
-        @retry(tries=5, delay=0.05)
+        @retry(tries=10, delay=0.05)
         def callback(summary):
             client.after_buy(target.symbol, summary.aver_price)
             amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)

@@ -302,3 +302,6 @@ class DealerClient(ControlledClient):
         self.high_stop_profit = False
         threading.Timer(STOP_PROFIT_SLEEP, high_cancel_and_sell).start()
         logger.info(f'Stop profit. {symbol}: {price}USDT')
+
+    def check_and_sell(self, limit=True):
+        self.user.check_and_sell(self.targets, limit)

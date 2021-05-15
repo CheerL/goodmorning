@@ -12,6 +12,7 @@ from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 
 LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
 STOP_PROFIT_SLEEP = int(config.getint('time', 'STOP_PROFIT_SLEEP'))
+CHECK_SELL_TIME = int(config.getint('time', 'CHECK_SELL_TIME'))
 
 
 
@@ -52,7 +53,7 @@ def trade_update_callback(client: Client):
                             summary.cancel_callback(*summary.cancel_callback_args)
                         break
         except Exception as e:
-            logger.error(e)
+            logger.errora(f'{direction} {etype} {type(e)} {e}')
 
     return warpper
 
@@ -100,6 +101,7 @@ def main(user: User):
         scheduler = Scheduler()
         scheduler_time = LOW_STOP_PROFIT_TIME - STOP_PROFIT_SLEEP
         scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=scheduler_time)
+        scheduler.add_job(client.check_and_sell, args=[True], trigger='cron', hour=0, minute=0, second=CHECK_SELL_TIME)
         scheduler.start()
         client.user.start(trade_update_callback(client), error_callback('order'))
 
@@ -112,6 +114,8 @@ def main(user: User):
         logger.info('Time to cancel')
         for target in client.targets.values():
             user.cancel_and_sell(target)
+        time.sleep(1)
+        client.check_and_sell(limit=False)
         time.sleep(2)
         user.report()
         kill_all_threads()

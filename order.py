@@ -1,5 +1,6 @@
 from huobi.model.trade.order_update import OrderUpdate
 from threading import Timer
+from utils import logger
 
 class OrderSummaryStatus:
     FAILED = -1
@@ -8,6 +9,19 @@ class OrderSummaryStatus:
     PARTIAL_FILLED = 2
     FILLED = 3
     CANCELED = 4
+
+    str_dict = {
+        -1: 'FAILED',
+        0: 'EMPTY',
+        1: 'CREATED',
+        2: 'PARTIAL_FILLED',
+        3: 'FILLED',
+        4: 'CANCELED'
+    }
+
+    @classmethod
+    def str(num):
+        return OrderSummaryStatus.str_dict[num]
 
 class OrderSummary:
     def __init__(self, symbol, direction):
@@ -31,12 +45,16 @@ class OrderSummary:
         self.cancel_callback = None
         self.cancel_callback_args = []
 
+    def report(self):
+        logger.info(f'{self.order_id}: {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain_amount} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
+
     def create(self, data: OrderUpdate):
         self.orders.append(data)
         self.order_id = data.orderId
         if 'market' in data.type:
             self.limit = False
         self.status = OrderSummaryStatus.CREATED
+        self.report()
 
     def update(self, data: OrderUpdate):
         new_price = float(data.tradePrice)
@@ -52,10 +70,12 @@ class OrderSummary:
         elif 'filled' == data.orderStatus:
             self.status = OrderSummaryStatus.FILLED
             self.remain_amount = 0
+        self.report()
 
     def cancel_update(self, data: OrderUpdate):
         self.status = OrderSummaryStatus.CANCELED
         self.remain_amount = float(data.remainAmt)
+        self.report()
 
     def finish(self):
         pass
@@ -63,6 +83,7 @@ class OrderSummary:
     def error(self, e):
         self.status = OrderSummaryStatus.FAILED
         self.error_msg = e
+        self.report()
         
     def check_after_buy(self, client):
         def wrapper():
