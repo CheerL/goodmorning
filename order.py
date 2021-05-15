@@ -46,7 +46,7 @@ class OrderSummary:
         self.cancel_callback_args = []
 
     def report(self):
-        logger.info(f'{self.order_id}: {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain_amount} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
+        logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain_amount} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 
     def create(self, data: OrderUpdate):
         self.orders.append(data)
@@ -83,6 +83,7 @@ class OrderSummary:
     def error(self, e):
         self.status = OrderSummaryStatus.FAILED
         self.error_msg = e
+        self.order_id = -1
         self.report()
         
     def check_after_buy(self, client):
