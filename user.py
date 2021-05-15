@@ -230,8 +230,8 @@ class User:
 
     def check_and_sell(self, targets: 'list[Target]', limit=True):
         for target in targets:
-            buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol]])
-            sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol]])
+            buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
+            sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol] if summary.order_id])
             remain_amount = buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
             if limit:
