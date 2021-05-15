@@ -242,7 +242,8 @@ class User:
             remain_amount = buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
             try:
-                _sell(target, remain_amount, limit)
+                if remain_amount / buy_amount > 0.008:
+                    _sell(target, remain_amount, limit)
             except:
                 pass
 
