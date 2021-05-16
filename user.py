@@ -239,10 +239,10 @@ class User:
         for target in list(targets):
             buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
             sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol] if summary.order_id])
-            remain_amount = buy_amount - sell_amount
+            remain_amount = 0.998 * buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
             try:
-                if remain_amount / buy_amount > 0.008:
+                if (remain_amount / buy_amount) > 0.008:
                     _sell(target, remain_amount, limit)
             except:
                 pass
