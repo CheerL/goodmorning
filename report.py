@@ -92,6 +92,7 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
         ))
         session.commit()
 
+@retry(tries=5, delay=0.2)
 def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:
         return

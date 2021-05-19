@@ -304,11 +304,15 @@ class User:
         else:
             client.after_buy(target.symbol, 0)
 
+    @retry(tries=5, delay=0.1)
     def report(self):
-        orders = [
-            self.trade_client.get_order(order_id)
-            for order_id in set(self.buy_id + self.sell_id)
-        ]
+        orders = []
+        for order_id in set(self.buy_id + self.sell_id):
+            try:
+                order = self.trade_client.get_order(order_id)
+                orders.append(order)
+            except Exception as e:
+                logger.error(e)
 
         order_info = [{
             'symbol': order.symbol,
