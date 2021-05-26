@@ -255,6 +255,7 @@ class User:
         @retry(tries=10, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
+            assert amount / summary.remain_amount > 0.9, "Not yet arrived"
             if market:
                 self.sell(target, amount)
             else:
@@ -277,6 +278,7 @@ class User:
         @retry(tries=10, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
+            assert amount / summary.remain_amount > 0.9, "Not yet arrived"
             self.sell_limit(target, amount, (price + target.stop_profit_price) / 2)
 
         for target in list(targets):
