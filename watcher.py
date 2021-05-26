@@ -15,6 +15,7 @@ from target import Target
 MIN_RATE = config.getfloat('buy', 'MIN_RATE')
 MAX_RATE = config.getfloat('buy', 'MAX_RATE')
 MIN_VOL = config.getfloat('buy', 'MIN_VOL')
+MIN_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'MIN_STOP_PROFIT_HOLD_TIME')
 BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
@@ -33,7 +34,7 @@ def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now
             logger.error(e)
 
 def check_sell_signal(client: WatcherClient, target: Target, info, price, trade_time, now):
-    if client.high_stop_profit and price > target.stop_profit_price:
+    if client.high_stop_profit and price > target.stop_profit_price and trade_time > client.target_time + MIN_STOP_PROFIT_HOLD_TIME:
         try:
             client.send_stop_profit_signal(target, price, trade_time, now)
             for target in client.targets.values():

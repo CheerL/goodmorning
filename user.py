@@ -294,6 +294,7 @@ class User:
         def callback(summary):
             client.after_buy(target.symbol, summary.aver_price)
             amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
+            assert amount / summary.amount > 0.9, "Not yet arrived"
             self.sell_limit(target, amount)
 
         summary = self.buy_limit(target, self.buy_amount)
