@@ -33,16 +33,12 @@ def trade_update_callback(client: Client):
         try:
             if etype == 'creation':
                 for summary in client.user.orders[direction][symbol]:
-                    print('c')
-                    print(client.user.orders[direction])
                     if summary.order_id == None:
                         summary.create(update)
                         break
 
             elif etype == 'trade':
                 for summary in client.user.orders[direction][symbol]:
-                    print('t')
-                    print(client.user.orders[direction])
                     if summary.order_id == order_id:
                         summary.update(update)
                         if update.orderStatus == 'filled' and summary.filled_callback:
@@ -51,15 +47,12 @@ def trade_update_callback(client: Client):
 
             elif etype == 'cancellation':
                 for summary in client.user.orders[direction][symbol]:
-                    print('cl')
-                    print(client.user.orders[direction])
                     if summary.order_id == order_id:
                         summary.cancel_update(update)
                         if summary.cancel_callback:
                             summary.cancel_callback(*summary.cancel_callback_args)
                         break
         except Exception as e:
-            print(client.user.orders[direction])
             logger.error(f"{direction} {etype} {type(e)} {e}")
 
     return warpper

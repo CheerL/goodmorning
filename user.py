@@ -83,12 +83,9 @@ class User:
         order_summary.created_vol = amount
         order_summary.remain_amount = amount
         if symbol not in self.orders['buy']:
-            print('not in')
             self.orders['buy'][symbol] = [order_summary]
         else:
-            print('in')
             self.orders['buy'][symbol].append(order_summary)
-        print(0, self.orders['buy'])
 
         try:
             order_id = self.trade_client.create_order(**order)
@@ -240,11 +237,11 @@ class User:
                 self.sell(target, amount)
 
         for target in list(targets):
-            buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
+            buy_amount = sum([summary.amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
             sell_amount = sum([
                 (summary.created_amount
                 if summary.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]
-                else summary.created_amount - summary.remain_amount)
+                else summary.amount)
                 for summary in self.orders['sell'][target.symbol]
                 if summary.order_id
                 ])
