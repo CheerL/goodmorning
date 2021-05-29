@@ -238,7 +238,13 @@ class User:
 
         for target in list(targets):
             buy_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['buy'][target.symbol] if summary.order_id])
-            sell_amount = sum([summary.created_amount - summary.remain_amount for summary in self.orders['sell'][target.symbol] if summary.order_id])
+            sell_amount = sum([
+                (summary.created_amount
+                if summary.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]
+                else summary.created_amount - summary.remain_amount)
+                for summary in self.orders['sell'][target.symbol]
+                if summary.order_id
+                ])
             remain_amount = 0.998 * buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain_amount}')
             try:
@@ -299,7 +305,7 @@ class User:
             assert amount / summary.amount > 0.9, "Not yet arrived"
             self.sell_limit(target, amount)
 
-        summary = self.buy_limit(target, self.buy_amount)
+        summary = self.buy(target, self.buy_amount)
         if summary != None:
             summary.check_after_buy(client)
             summary.add_filled_callback(callback, [summary])
