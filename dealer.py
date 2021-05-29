@@ -54,6 +54,7 @@ def trade_update_callback(client: Client):
                         break
         except Exception as e:
             logger.error(f"{direction} {etype} {type(e)} {e}")
+            print(client.user.orders[direction])
 
     return warpper
 

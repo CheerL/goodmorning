@@ -83,9 +83,12 @@ class User:
         order_summary.created_vol = amount
         order_summary.remain_amount = amount
         if symbol not in self.orders['buy']:
+            print('not in')
             self.orders['buy'][symbol] = [order_summary]
         else:
+            print('in')
             self.orders['buy'][symbol].append(order_summary)
+        print(0, self.orders['buy'])
 
         try:
             order_id = self.trade_client.create_order(**order)
