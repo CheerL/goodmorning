@@ -22,6 +22,8 @@ STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
 LOW_STOP_PROFIT_TIME = config.getfloat('time', 'LOW_STOP_PROFIT_TIME')
 WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 
+BUY_BACK_RATE = BUY_BACK_RATE / 100
+
 def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now):
     if (
         info['vol'] > MIN_VOL
