@@ -309,8 +309,11 @@ class DealerClient(ControlledClient):
     def check_all_stop_profit(self):
         while self.state == State.RUNNING:
             time.sleep(0.1)
-            asset = self.user.get_asset()
-            if asset > self.user.all_stop_profit_asset:
-                self.state_handler(State.STARTED)
-                logger.info(f'Now asset {asset}U, start asset {self.user.start_asset}U, stop profit')
-                break
+            try:
+                asset = self.user.get_asset()
+                if asset > self.user.all_stop_profit_asset:
+                    self.state_handler(State.STARTED)
+                    logger.info(f'Now asset {asset}U, start asset {self.user.start_asset}U, stop profit')
+                    break
+            except:
+                pass

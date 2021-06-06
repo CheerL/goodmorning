@@ -43,10 +43,12 @@ class User:
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
 
+    
     def get_asset(self):
         asset = float(self.account_client.get_account_asset_valuation('spot', 'USD').balance)
         return asset
 
+    @retry(tries=3, delay=0.01)
     def set_start_asset(self):
         self.start_asset = self.get_asset()
         self.all_stop_profit_asset = self.start_asset + self.usdt_balance * ALL_STOP_PROFIT_RATE / 100
