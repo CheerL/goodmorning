@@ -16,6 +16,7 @@ from order import OrderSummary, OrderSummaryStatus
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 BUY_RATE = config.getfloat('buy', 'BUY_RATE')
+ALL_STOP_PROFIT_RATE = config.getfloat('sell', 'ALL_STOP_PROFIT_RATE')
 AccountBalanceMode.TOTAL = '2'
 
 class User:
@@ -41,6 +42,14 @@ class User:
         self.buy_id = []
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
+
+    def get_asset(self):
+        asset = float(self.account_client.get_account_asset_valuation('spot', 'USD').balance)
+        return asset
+
+    def set_start_asset(self):
+        self.start_asset = self.get_asset()
+        self.all_stop_profit_asset = self.start_asset + self.usdt_balance * ALL_STOP_PROFIT_RATE / 100
 
     def start(self, callback, error_callback):
         self.account_client.sub_account_update(AccountBalanceMode.TOTAL, self.balance_callback)
@@ -142,8 +151,6 @@ class User:
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)
             return None
-        
-
 
     def sell(self, target: Target, amount):
         symbol = target.symbol
@@ -278,7 +285,7 @@ class User:
                 self.trade_client.cancel_order(summary.symbol, summary.order_id)
                 summary.add_cancel_callback(callback, [summary])
                 logger.info(f'Cancel open sell order for {symbol}')
-                break
+                # break
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
         @retry(tries=10, delay=0.05)

@@ -2,7 +2,7 @@ import time
 import argparse
 
 from wampyapp import DealerClient as Client, State
-from utils.parallel import run_process
+from utils.parallel import run_process, run_thread
 from utils import config, kill_all_threads, logger, user_config
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from market import MarketClient
@@ -107,6 +107,8 @@ def main(user: User):
         client.user.start(trade_update_callback(client), error_callback('order'))
 
         client.wait_state(State.RUNNING)
+        client.user.set_start_asset()
+        run_thread([(client.check_all_stop_profit, ())], False)
         client.wait_state(State.STARTED)
     except Exception as e:
         logger.error(e)
