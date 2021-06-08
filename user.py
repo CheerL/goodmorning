@@ -284,9 +284,12 @@ class User:
 
         for summary in self.orders['sell'][symbol]:
             if summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]:
-                self.trade_client.cancel_order(summary.symbol, summary.order_id)
-                summary.add_cancel_callback(callback, [summary])
-                logger.info(f'Cancel open sell order for {symbol}')
+                try:
+                    self.trade_client.cancel_order(summary.symbol, summary.order_id)
+                    summary.add_cancel_callback(callback, [summary])
+                    logger.info(f'Cancel open sell order for {symbol}')
+                except Exception as e:
+                    logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
                 # break
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
