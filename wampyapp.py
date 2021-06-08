@@ -73,7 +73,7 @@ class ControlledClient(Client):
 
     def wait_state(self, state=State.STARTED):
         while self.state != state:
-            time.sleep(1)
+            time.sleep(0.1)
 
     def start(self):
         super().start()

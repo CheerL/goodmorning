@@ -117,7 +117,7 @@ def main(user: User):
         logger.info('Time to cancel')
         for target in client.targets.values():
             user.cancel_and_sell(target)
-        time.sleep(1)
+        time.sleep(0.2)
         client.check_and_sell(limit=False)
         time.sleep(2)
         user.report()
