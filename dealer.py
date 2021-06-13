@@ -108,7 +108,7 @@ def main(user: User):
 
         client.wait_state(State.RUNNING)
         client.user.set_start_asset()
-        run_thread([(client.check_all_stop_profit, ())], False)
+        #run_thread([(client.check_all_stop_profit, ())], False)
         client.wait_state(State.STARTED)
     except Exception as e:
         logger.error(e)
