@@ -297,7 +297,7 @@ class User:
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
             assert amount / summary.remain_amount > 0.9, "Not yet arrived"
-            self.sell_limit(target, amount, (price + target.stop_profit_price) / 2)
+            self.sell_limit(target, amount, price)
 
         for target in list(targets):
             if target.symbol == symbol:
