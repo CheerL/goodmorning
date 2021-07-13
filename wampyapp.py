@@ -264,6 +264,10 @@ class DealerClient(ControlledClient):
         if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= BUY_NUM:
             return
 
+        if not self.high_stop_profit:
+            logger.info(f'Fail to buy {symbol}, already high stop profit')
+            return
+
         receive_time = time.time()
         target = Target(symbol, price, init_price, now, self.high_stop_profit)
         self.targets[symbol] = target
