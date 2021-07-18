@@ -20,42 +20,50 @@ CLEAR_TIME = int(config.getint('time', 'CLEAR_TIME'))
 
 def trade_update_callback(client: Client):
     def warpper(event: OrderUpdateEvent):
-        update: OrderUpdate = event.data
-        symbol = update.symbol
-        direction = 'buy' if 'buy' in update.type else 'sell'
-        etype = update.eventType
-        order_id = update.orderId
-        if direction == 'buy':
-            if order_id not in client.user.buy_id:
-                client.user.buy_id.append(order_id)
-        else:
-            if order_id not in client.user.sell_id:
-                client.user.sell_id.append(order_id)
+        @retry(tries=3, delay=0.01)
+        def _warpper(event: OrderUpdateEvent):
+            update: OrderUpdate = event.data
+            symbol = update.symbol
+            direction = 'buy' if 'buy' in update.type else 'sell'
+            etype = update.eventType
+            order_id = update.orderId
+            if direction == 'buy':
+                if order_id not in client.user.buy_id:
+                    client.user.buy_id.append(order_id)
+            else:
+                if order_id not in client.user.sell_id:
+                    client.user.sell_id.append(order_id)
+
+            try:
+                if etype == 'creation':
+                    for summary in client.user.orders[direction][symbol]:
+                        if summary.order_id == None:
+                            summary.create(update)
+                            break
+
+                elif etype == 'trade':
+                    for summary in client.user.orders[direction][symbol]:
+                        if summary.order_id == order_id:
+                            summary.update(update)
+                            if update.orderStatus == 'filled' and summary.filled_callback:
+                                summary.filled_callback(*summary.filled_callback_args)
+                            break
+
+                elif etype == 'cancellation':
+                    for summary in client.user.orders[direction][symbol]:
+                        if summary.order_id == order_id:
+                            summary.cancel_update(update)
+                            if summary.cancel_callback:
+                                summary.cancel_callback(*summary.cancel_callback_args)
+                            break
+            except Exception as e:
+                logger.error(f"{direction} {etype} | {client.user.orders[direction].keys()} | Error: {type(e)} {e}")
+                raise e
 
         try:
-            if etype == 'creation':
-                for summary in client.user.orders[direction][symbol]:
-                    if summary.order_id == None:
-                        summary.create(update)
-                        break
-
-            elif etype == 'trade':
-                for summary in client.user.orders[direction][symbol]:
-                    if summary.order_id == order_id:
-                        summary.update(update)
-                        if update.orderStatus == 'filled' and summary.filled_callback:
-                            summary.filled_callback(*summary.filled_callback_args)
-                        break
-
-            elif etype == 'cancellation':
-                for summary in client.user.orders[direction][symbol]:
-                    if summary.order_id == order_id:
-                        summary.cancel_update(update)
-                        if summary.cancel_callback:
-                            summary.cancel_callback(*summary.cancel_callback_args)
-                        break
+            _warpper(event)
         except Exception as e:
-            logger.error(f"{direction} {etype} {type(e)} {e}")
+            logger.error(f"max tries | {type(e)} {e}")
 
     return warpper
 
