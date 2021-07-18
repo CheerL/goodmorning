@@ -16,7 +16,7 @@ class MarketClient(_MarketClient):
         'filusdt', 'xrpusdt', 'trxusdt', 'usdt', 'nftusdt',
         'thetausdt', 'dotusdt', 'eosusdt', 'maticusdt',
         'linkusdt', 'adausdt', 'jstusdt', 'vetusdt', 'xmxusdt',
-        'dacusdt'
+        'dacusdt', 'newusdt', 'uipusdt'
     ]
 
     def __init__(self, **kwargs):

@@ -307,6 +307,9 @@ class DealerClient(ControlledClient):
         threading.Timer(STOP_PROFIT_SLEEP, high_cancel_and_sell).start()
         logger.info(f'Stop profit. {symbol}: {price}USDT')
 
+    def sell_in_buy_price(self):
+        self.user.cancel_and_sell_in_buy_price(self.targets.values())
+
     def check_and_sell(self, limit=True):
         self.user.check_and_sell(self.targets.values(), limit)
 

@@ -11,6 +11,7 @@ from user import User
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 
 LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
+FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
 STOP_PROFIT_SLEEP = int(config.getint('time', 'STOP_PROFIT_SLEEP'))
 CHECK_SELL_TIME = int(config.getint('time', 'CHECK_SELL_TIME'))
 CLEAR_TIME = int(config.getint('time', 'CLEAR_TIME'))
@@ -102,6 +103,7 @@ def main(user: User):
         scheduler = Scheduler()
         scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=LOW_STOP_PROFIT_TIME - STOP_PROFIT_SLEEP)
         scheduler.add_job(client.check_and_sell, args=[True], trigger='cron', hour=0, minute=0, second=CHECK_SELL_TIME)
+        scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=0, minute=0, second=FINAL_STOP_PROFIT_TIME)
         scheduler.add_job(client.state_handler, args=[1], trigger='cron', hour=0, minute=0, second=CLEAR_TIME + 2)
         scheduler.start()
         client.user.start(trade_update_callback(client), error_callback('order'))

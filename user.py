@@ -266,6 +266,18 @@ class User:
     def get_amount(self, currency):
         return self.balance[currency]
 
+    def cancel_and_sell_in_buy_price(self, targets: 'list[Target]'):
+        def callback_generator(target):
+            @retry(tries=10, delay=0.05)
+            def callback(summary):
+                amount = min(self.get_amount(target.base_currency), summary.remain_amount)
+                assert amount / summary.remain_amount > 0.9, "Not yet arrived"
+                self.sell_limit(target, amount, price=target.buy_price)
+            return callback
+
+        for target in list(targets):
+            self.cancel_and_sell(target, callback_generator(target), market=False)
+
     def cancel_and_sell(self, target: Target, callback=None, market=True):
         @retry(tries=10, delay=0.05)
         def _callback(summary):
