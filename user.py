@@ -268,10 +268,10 @@ class User:
 
     def cancel_and_sell_in_buy_price(self, targets: 'list[Target]'):
         def callback_generator(target):
-            @retry(tries=10, delay=0.05)
+            @retry(tries=5, delay=0.05)
             def callback(summary):
                 amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-                assert amount / summary.remain_amount > 0.9, "Not yet arrived"
+                assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
                 self.sell_limit(target, amount, price=target.buy_price)
             return callback
 
@@ -279,10 +279,10 @@ class User:
             self.cancel_and_sell(target, callback_generator(target), market=False)
 
     def cancel_and_sell(self, target: Target, callback=None, market=True):
-        @retry(tries=10, delay=0.05)
+        @retry(tries=5, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-            assert amount / summary.remain_amount > 0.9, "Not yet arrived"
+            assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
             if market:
                 self.sell(target, amount)
             else:
@@ -305,10 +305,10 @@ class User:
                 # break
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
-        @retry(tries=10, delay=0.05)
+        @retry(tries=5, delay=0.05)
         def _callback(summary):
             amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-            assert amount / summary.remain_amount > 0.9, "Not yet arrived"
+            assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
             self.sell_limit(target, amount, (price + 3 * target.buy_price) / 4)
 
         for target in list(targets):
@@ -322,11 +322,15 @@ class User:
         logger.info(f'Stop profit {symbol}')
 
     def buy_and_sell(self, target: Target, client):
-        @retry(tries=10, delay=0.05)
+        @retry(tries=5, delay=0.05)
         def callback(summary):
             client.after_buy(target.symbol, summary.aver_price)
+            if summary.aver_price <=0:
+                logger.error(f'Fail to buy {target.symbol}')
+                return
+
             amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
-            assert amount / summary.amount > 0.9, "Not yet arrived"
+            assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
             self.sell_limit(target, amount)
 
         summary = self.buy(target, self.buy_amount)

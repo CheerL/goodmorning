@@ -8,15 +8,15 @@ STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 
 class Target:
-    def __init__(self, symbol, price, init_price, time, high_stop_profit=True):
+    def __init__(self, symbol, price, time, high_stop_profit=True):
         self.symbol = symbol
         self.price = price
-        self.init_price = init_price
+        self.init_price = 0
         self.buy_price = 0
         self.high_price = 0
         self.time = time
+        self.stop_loss_price = 0
         self.min_hold_time = time + MIN_HOLD_TIME
-        self.stop_loss_price = init_price * (1 - STOP_LOSS_RATE / 100)
         self.stop_profit_price = 0
         self.own = False
         self.high_stop_profit = high_stop_profit
@@ -42,12 +42,14 @@ class Target:
         return self.check_price(buy_price)
 
     def set_info(self, info):
+        self.init_price = info.init_price
         self.base_currency = info.base_currency
         self.amount_precision = info.amount_precision
         self.price_precision = info.price_precision
         self.min_order_value = info.min_order_value
         self.sell_market_min_order_amt = info.sell_market_min_order_amt
         self.limit_order_min_order_amt = info.limit_order_min_order_amt
+        self.stop_loss_price = self.init_price * (1 - STOP_LOSS_RATE / 100)
 
     def check_amount(self, amount):
         precision_num = 10 ** self.amount_precision

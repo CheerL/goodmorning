@@ -120,7 +120,9 @@ class WatcherClient(ControlledClient):
             return
 
         self.publish(topic=Topic.BUY_SIGNAL, symbol=symbol, price=price, init_price=init_price, now=trade_time)
-        target = Target(symbol, price, init_price, now, self.high_stop_profit)
+        self.market_client.symbols_info[symbol].init_price = init_price
+        target = Target(symbol, price, now, self.high_stop_profit)
+        target.set_info(self.market_client.symbols_info[symbol])
         self.targets[symbol] = target
         logger.info(f'Buy. {symbol} with price {price}USDT at {trade_time}. recieved at {now}')
         self.redis_conn.write_target(symbol)
@@ -257,6 +259,7 @@ class DealerClient(ControlledClient):
         self.user : User = user
         self.client_type = 'dealer'
         self.high_stop_profit = True
+        self.not_buy = False
 
 
     @subscribe(topic=Topic.BUY_SIGNAL)
@@ -264,14 +267,15 @@ class DealerClient(ControlledClient):
         if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= BUY_NUM:
             return
 
-        if not self.high_stop_profit:
-            logger.info(f'Fail to buy {symbol}, already high stop profit')
+        if self.not_buy:
+            logger.info(f'Fail to buy {symbol}, already stop buy')
             return
 
         receive_time = time.time()
-        target = Target(symbol, price, init_price, now, self.high_stop_profit)
-        self.targets[symbol] = target
+        self.market_client.symbols_info[symbol].init_price = init_price
+        target = Target(symbol, price, now, self.high_stop_profit)
         target.set_info(self.market_client.symbols_info[symbol])
+        self.targets[symbol] = target
 
         self.user.buy_and_sell(target, self)
         logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}')
@@ -304,6 +308,9 @@ class DealerClient(ControlledClient):
             self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
 
         self.high_stop_profit = False
+        if symbol:
+            self.not_buy = True
+
         threading.Timer(STOP_PROFIT_SLEEP, high_cancel_and_sell).start()
         logger.info(f'Stop profit. {symbol}: {price}USDT')
 

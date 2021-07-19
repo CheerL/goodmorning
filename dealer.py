@@ -1,3 +1,4 @@
+from target import Target
 import time
 import argparse
 
@@ -47,6 +48,13 @@ def trade_update_callback(client: Client):
                             summary.update(update)
                             if update.orderStatus == 'filled' and summary.filled_callback:
                                 summary.filled_callback(*summary.filled_callback_args)
+                                if symbol not in client.targets:
+                                    target = Target(
+                                        symbol, summary.aver_price, time.time(), client.high_stop_profit
+                                    )
+                                    target.set_info(client.market_client.symbols_info[symbol])
+                                    target.set_buy_price(summary.aver_price)
+                                    client.targets[symbol] = target
                             break
 
                 elif etype == 'cancellation':
