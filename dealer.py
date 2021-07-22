@@ -1,4 +1,3 @@
-from target import Target
 import time
 import argparse
 
@@ -10,6 +9,7 @@ from market import MarketClient
 from retry import retry
 from user import User
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
+from target import Target
 
 LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
 FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
