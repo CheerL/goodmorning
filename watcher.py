@@ -15,6 +15,7 @@ from target import Target
 MIN_RATE = config.getfloat('buy', 'MIN_RATE')
 MAX_RATE = config.getfloat('buy', 'MAX_RATE')
 MIN_VOL = config.getfloat('buy', 'MIN_VOL')
+BIG_VOL = config.getfloat('buy', 'BIG_VOL')
 MIN_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'MIN_STOP_PROFIT_HOLD_TIME')
 BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
@@ -76,6 +77,10 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 info['high'] = max(info['high'], price)
                 info['max_back'] = max(info['max_back'], 1 - price / info['high'])
                 
+            if vol > BIG_VOL and not info['big']:
+                info['big'] = True
+                logger.info(f'Big buy: {symbol} {vol}USDT at {trade_time}')
+
             if symbol in client.targets:
                 target = client.targets[symbol]
                 
@@ -99,6 +104,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
         'min_buy_price': 0,
         'max_buy_price': 0,
         'max_back': 0,
+        'big': False
     }
     return warpper
 
