@@ -28,6 +28,7 @@ BUY_BACK_RATE = BUY_BACK_RATE / 100
 def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now):
     if (
         info['vol'] > MIN_VOL
+        and info['big']
         and info['max_back'] < BUY_BACK_RATE
         and info['min_buy_price'] < price < info['max_buy_price']
     ):
