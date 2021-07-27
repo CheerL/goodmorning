@@ -26,12 +26,17 @@ WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 BUY_BACK_RATE = BUY_BACK_RATE / 100
 
 def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now):
+
     if (
         info['vol'] > MIN_VOL
-        and info['big']
         and info['max_back'] < BUY_BACK_RATE
         and info['min_buy_price'] < price < info['max_buy_price']
     ):
+
+        if not info['big']:
+            logger.info(f'No big buy for {symbol}')
+            return
+
         try:
             client.send_buy_signal(symbol, price, info['open'], trade_time, now)
         except Exception as e:
