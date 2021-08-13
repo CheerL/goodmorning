@@ -51,7 +51,7 @@ def check_sell_signal(client: WatcherClient, target: Target, info, price, trade_
         except Exception as e:
             logger.error(e)
 
-    elif price < target.stop_loss_price and trade_time > target.min_hold_time:
+    elif price < target.stop_loss_price and trade_time > target.min_stop_loss_hold_time:
         try:
             client.send_stop_loss_signal(target, price, trade_time, now)
         except Exception as e:

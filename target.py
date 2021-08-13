@@ -1,7 +1,7 @@
 from utils import config
 import math
 
-MIN_HOLD_TIME = config.getfloat('time', 'MIN_HOLD_TIME')
+MIN_STOP_LOSS_HOLD_TIME = config.getfloat('time', 'MIN_STOP_LOSS_HOLD_TIME')
 STOP_LOSS_RATE = config.getfloat('sell', 'STOP_LOSS_RATE')
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
@@ -16,7 +16,7 @@ class Target:
         self.high_price = 0
         self.time = time
         self.stop_loss_price = 0
-        self.min_hold_time = time + MIN_HOLD_TIME
+        self.min_stop_loss_hold_time = time + MIN_STOP_LOSS_HOLD_TIME
         self.stop_profit_price = 0
         self.own = False
         self.high_stop_profit = high_stop_profit
