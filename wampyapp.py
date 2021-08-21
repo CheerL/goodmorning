@@ -17,7 +17,7 @@ from utils import config, get_target_time, logger
 BUY_NUM = config.getint('buy', 'BUY_NUM')
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
-STOP_PROFIT_SLEEP = config.getint('time', 'STOP_PROFIT_SLEEP')
+STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
