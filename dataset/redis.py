@@ -50,12 +50,35 @@ class Redis(redis.StrictRedis):
         })
 
     def write_target(self, symbol):
-        now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
-        name = f'target_{now_str}'
-        targets = self.get(name)
-        targets = targets.decode('utf-8') if targets else ''
+        name, targets = self.get_target()
         
         if not targets:
             self.set(name, symbol)
         elif symbol not in targets:
             self.set(name, ','.join([targets, symbol]))
+
+    def get_target(self):
+        now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
+        name = f'target_{now_str}'
+        targets = self.get(name)
+        targets = targets.decode('utf-8') if targets else ''
+        return name, targets
+
+    def del_target(self, symbol):
+        name, targets = self.get_target()
+
+        if not targets:
+            pass
+        else:
+            targets.replace(symbol, '')
+            targets.replace(',,', ',')
+            self.set(name, targets)
+
+    def get_new_price(self, symbol):
+        keys = self.keys(f'trade_{symbol}_*')
+        if keys:
+            key = max(keys)
+            record = self.get(key).decode('utf-8')
+            return float(record.split(',')[1])
+        else:
+            return None

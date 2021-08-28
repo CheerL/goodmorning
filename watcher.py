@@ -94,6 +94,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                     check_sell_signal(client, target, info, price, trade_time, now)
                 elif now > target.time + 2:
                     del client.targets[symbol]
+                    client.redis_conn.del_target(symbol)
 
             if symbol not in client.targets and trade_time < client.target_time + STOP_BUY_TIME:
                 check_buy_signal(client, symbol, info, price, trade_time, now)
