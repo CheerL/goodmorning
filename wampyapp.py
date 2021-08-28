@@ -18,6 +18,7 @@ BUY_NUM = config.getint('buy', 'BUY_NUM')
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
+IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
@@ -34,6 +35,7 @@ class Topic:
     HIGH = 'HIGH'
     STOP_PROFIT = 'STOP_PROFIT'
     STOP_LOSS = 'STOP_LOSS'
+    CLEAR = 'CLEAR'
 
 class State:
     STOPPED = 0
@@ -241,6 +243,22 @@ class WatcherMasterClient(WatcherClient):
             self.set_state(State.STARTED)
             logger.info(f"Change state to not running")
 
+    def clear(self, num=IOC_BATCH_NUM):
+        targets = self.redis_conn.get_target()
+        if targets:
+            targets = targets.split(',')
+            for i in range(num):
+                threading.Timer(
+                    2*i+2,
+                    self.clear_handler,
+                    [targets, i]
+                ).start()
+
+    def clear_handler(self, targets, count):
+        data = [(symbol, self.redis_conn.get_new_price(symbol)) for symbol in targets]
+        self.publish(topic=Topic.CLEAR, data=data, count=count)
+
+
 class DealerClient(ControlledClient):
     def __init__(
         self, market_client: MarketClient,
@@ -331,3 +349,15 @@ class DealerClient(ControlledClient):
                     break
             except:
                 pass
+    
+    @subscribe(topic=Topic.CLEAR)
+    def clear_handler(self, data, count, *arg, **kwargs):
+        if self.state != State.RUNNING:
+            return
+
+        for symbol, price in data:
+            if symbol not in self.targets:
+                continue
+            
+            target = self.targets[symbol]
+            self.user.cancel_and_sell_ioc(target, price, count)
