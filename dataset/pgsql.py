@@ -1,4 +1,6 @@
-from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func
+import time as _time
+import re
+from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func, Table
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -173,3 +175,224 @@ def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPAS
     Base.metadata.bind=engine
     Base.metadata.create_all()
     return Session()
+
+def get_time_from_str(time):
+    if isinstance(time, str):
+        time = _time.strptime(time, '%Y-%m-%d %H:%M:%S')
+        time = _time.mktime(time)
+
+    return time
+
+def get_ms_from_str(time):
+    return get_time_from_str(time) * 1000
+
+def get_trade_list(symbol, start, end):
+    with get_session() as session:
+        start_time = get_ms_from_str(start)
+        end_time = get_ms_from_str(end)
+        Trade = get_Trade(int(start_time))
+        data = Trade.get_data(session, symbol, start_time, end_time).all()
+        if not data:
+            return []
+
+        trade_list = [
+            # {
+            #     'ts': int(start_time),
+            #     'price': data[0].price,
+            #     'vol': 0,
+            #     'acc_vol': 0
+            # }
+        ]
+
+        last_ts = int(start_time)
+        last_price = data[0].price
+        sum_vol = 0
+        acc_vol = 0
+        for trade in data:
+            ts = int(float(trade.ts))
+            price = trade.price
+            vol = round(price * trade.amount, 4)
+
+            if last_ts != ts:
+                trade_list.append({
+                    'ts': last_ts,
+                    'price': last_price,
+                    'vol': round(sum_vol, 4),
+                    'acc_vol': round(acc_vol, 4)
+                })
+
+                last_ts = ts
+                last_price = price
+                sum_vol = vol
+                acc_vol += vol
+            else:
+                sum_vol += vol
+                acc_vol += vol
+                last_price = price
+
+        else:
+            trade_list.append({
+                'ts': last_ts,
+                'price': last_price,
+                'vol': round(sum_vol, 4),
+                'acc_vol': round(acc_vol, 4)
+            })
+
+        return trade_list if len(trade_list) > 1 else []
+
+
+def get_open_price(symbol, start):
+    with get_session() as session:
+        start_time = get_ms_from_str(start)
+        open_time = int(((start_time + MS_IN_DAY / 3) //
+                        MS_IN_DAY - 1/3) * MS_IN_DAY)
+        Trade = get_Trade(open_time)
+        data = session.query(Trade).filter(
+            Trade.symbol == symbol,
+            Trade.ts >= str(open_time),
+            Trade.ts < str(open_time + 300000)
+        ).order_by(Trade.ts).first()
+        return {'open': data.price}
+
+
+def get_profit(name='', month=''):
+    with get_session() as session:
+        profit_human = Table('profit_human', Base.metadata,
+                             autoload=True, autoload_with=session.bind)
+        data = session.query(profit_human)
+        if name:
+            data = data.filter(profit_human.c.name == name)
+        if month:
+            data = data.filter(profit_human.c.month == month)
+        data = data.all()
+        res = [{
+            'key': index,
+            'profit_id': item.id,
+            'name': item.name,
+            'date': item.date_str.strftime('%Y-%m-%d'),
+            'profit': item.profit,
+            'percent': item.percent
+        } for index, item in enumerate(data)]
+        return res
+
+
+def get_month_profit(name='', month=''):
+    with get_session() as session:
+        month_profit = Table('month_profit', Base.metadata,
+                             autoload=True, autoload_with=session.bind)
+        data = session.query(month_profit)
+        if name:
+            data = data.filter(month_profit.c.name == name)
+        if month:
+            data = data.filter(month_profit.c.month == month)
+        data = data.all()
+        res = [{
+            'key': index,
+            'name': item.name,
+            'month': item.month,
+            'profit': item.profit,
+            'percent': item.percent,
+            'fee': item.fee
+        } for index, item in enumerate(data)]
+        return res
+
+
+def get_message(date, name, profit=0):
+    with get_session() as session:
+        data = session.query(Message).filter(
+            Message.summary.like(f'{date}%{name[:3]}%'))
+        if len(data.all()) > 1:
+            data = data.filter(Message.summary.like(f'%{profit}%'))
+
+        if len(data.all()) == 0:
+            return '未找到记录'
+
+        data = data[0]
+        res = re.findall(r'(### 买入记录\n\n.*)\n### 总结', data.msg, re.DOTALL)
+        if res:
+            res = res[0]+'\n'
+            res = re.sub(date + r' (.+?)000', r'\1', res)
+            res = re.sub(r'\|[^~\|]+?\|\n', r'|\n', res)
+            res = re.sub(r'\| (\d*?\.\d{0,3})\d*? \|\n', r'| \1 |\n', res)
+            res = re.sub(r'----', r':----:', res)
+            return res
+        else:
+            return '未找到记录'
+
+
+def get_currency_day_profit(currency='', date='', end_date=''):
+    with get_session() as session:
+        currency_day_profit = Table(
+            'currency_day', Base.metadata, autoload=True, autoload_with=session.bind)
+        data = session.query(currency_day_profit)
+        if currency:
+            data = data.filter(currency_day_profit.c.currency == currency)
+        if end_date and date:
+            data = data.filter(currency_day_profit.c.date <= end_date)
+            data = data.filter(currency_day_profit.c.date >= date)
+        elif date:
+            data = data.filter(currency_day_profit.c.date == date)
+        data = data.all()
+        res = [{
+            'key': index,
+            'currency': item.currency,
+            'date': item.date,
+            'buy_tm': item.buy_tm,
+            'sell_tm': item.sell_tm,
+            'hold_tm': item.sell_tm - item.buy_tm,
+            'buy': item.buy,
+            'sell': item.sell,
+            'profit': item.sell-item.buy,
+            'percent': item.percent,
+            'type': 1 if item.high_profit else (2 if item.high_loss else 0)
+            # 0 for normal, 1 for high profit, 2 for high loss.
+        } for index, item in enumerate(data)]
+        return res
+
+
+def get_record(profit_id='', currency='', date=''):
+    with get_session() as session:
+        record_human = Table('record_human', Base.metadata,
+                             autoload=True, autoload_with=session.bind)
+        data = session.query(record_human)
+        if profit_id:
+            data = data.filter(record_human.c.profit_id == profit_id)
+        if currency:
+            data = data.filter(record_human.c.currency == currency)
+        if date:
+            data = data.filter(record_human.c.date == date)
+        data = data.all()
+        res = [{
+            'key': index,
+            'name': item.name,
+            'currency': item.currency,
+            'date': item.date,
+            'time': item.tm,
+            'price': item.price,
+            'amount': item.amount,
+            'vol': round(item.vol, 2),
+            'direction': item.direction,
+        } for index, item in enumerate(data)]
+        return res
+
+
+def get_stat():
+    with get_session() as session:
+        stat = Table('currency_stat', Base.metadata,
+                     autoload=True, autoload_with=session.bind)
+        data = session.query(stat)
+        data = data.all()
+        res = [{
+            'key': index,
+            'currency': item.currency,
+            'buy_times': item.buy_times,
+            'profit_times': item.profit_times,
+            'high_profit_times': item.high_profit_times,
+            'high_loss_times': item.high_loss_times,
+            'total_profit': item.total_profit,
+            'total_percent': item.total_percent,
+            'profit_percent': item.profit_percent,
+            'high_profit_percent': item.high_profit_percent,
+            'high_loss_percent': item.high_loss_percent
+        } for index, item in enumerate(data)]
+        return res
