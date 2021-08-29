@@ -55,7 +55,7 @@ class User:
         self.all_stop_profit_asset = self.start_asset + self.usdt_balance * ALL_STOP_PROFIT_RATE / 100
 
     def start(self, callback, error_callback):
-        self.account_client.sub_account_update(AccountBalanceMode.TOTAL, self.balance_callback)
+        self.account_client.sub_account_update(AccountBalanceMode.TOTAL, self.balance_callback, error_callback)
         self.trade_client.sub_order_update('*', callback, error_callback)
 
         while 'usdt' not in self.balance:
@@ -71,11 +71,15 @@ class User:
         update: AccountUpdate = event.data
         if float(update.balance) - float(update.available) > 1e-8:
             return
+
+        if not update.changeTime:
+            update.changeTime = 0
+
         if (update.currency not in self.balance_update_time
             or update.changeTime > self.balance_update_time[update.currency]
         ):
             self.balance[update.currency] = float(update.balance)
-            self.balance_update_time[update.currency] = int(update.changeTime) / 1000 if update.changeTime else 0
+            self.balance_update_time[update.currency] = int(update.changeTime) / 1000
 
     def buy(self, target: Target, amount):
         symbol = target.symbol
@@ -332,7 +336,10 @@ class User:
                     # break
 
         if not is_canceled:
-            callback()
+            try:
+                callback()
+            except Exception as e:
+                logger.error(e)
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
         @retry(tries=5, delay=0.05)
