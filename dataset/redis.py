@@ -70,8 +70,7 @@ class Redis(redis.StrictRedis):
         if not targets:
             pass
         else:
-            targets.replace(symbol, '')
-            targets.replace(',,', ',')
+            targets = targets.replace(symbol, '').replace(',,', ',')
             self.set(name, targets)
 
     def get_new_price(self, symbol):

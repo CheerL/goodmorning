@@ -8,14 +8,16 @@ from huobi.model.market.trade_detail import TradeDetail
 from retry import retry
 
 from market import MarketClient
-from utils import config, kill_all_threads, logger, user_config
+from utils import config, kill_all_threads, logger, user_config, test_config
 from websocket_handler import replace_watch_dog, WatchDog
 from target import Target
 
+TEST = user_config.getboolean('setting', 'Test')
 MIN_RATE = config.getfloat('buy', 'MIN_RATE')
 MAX_RATE = config.getfloat('buy', 'MAX_RATE')
 MIN_VOL = config.getfloat('buy', 'MIN_VOL')
 BIG_VOL = config.getfloat('buy', 'BIG_VOL')
+BUY_NUM = config.getint('buy', 'BUY_NUM')
 MIN_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'MIN_STOP_PROFIT_HOLD_TIME')
 BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
@@ -26,7 +28,6 @@ WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 BUY_BACK_RATE = BUY_BACK_RATE / 100
 
 def check_buy_signal(client: WatcherClient, symbol, info, price, trade_time, now):
-
     if (
         info['vol'] > MIN_VOL
         and info['max_back'] < BUY_BACK_RATE
@@ -96,7 +97,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                     del client.targets[symbol]
                     client.redis_conn.del_target(symbol)
 
-            if symbol not in client.targets and trade_time < client.target_time + STOP_BUY_TIME:
+            if symbol not in client.targets and trade_time < client.target_time + STOP_BUY_TIME and len(client.targets) < BUY_NUM:
                 check_buy_signal(client, symbol, info, price, trade_time, now)
 
         if redis:
@@ -150,13 +151,14 @@ def main():
         logger.info('Master watcher')
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         client.get_task(WATCHER_TASK_NUM)
-        TEST = user_config.getboolean('setting', 'Test')
         if TEST:
             now = datetime.datetime.now()
             run_time = now + datetime.timedelta(seconds=5)
-            stop_time = run_time + datetime.timedelta(seconds=CLEAR_TIME)
+            clear_time = run_time + datetime.timedelta(seconds=CLEAR_TIME)
+            stop_time = clear_time + datetime.timedelta(seconds=10)
             end_time = stop_time + datetime.timedelta(seconds=5)
             watch_dog.scheduler.add_job(client.running, trigger='cron', hour=run_time.hour, minute=run_time.minute, second=run_time.second)
+            watch_dog.scheduler.add_job(client.clear, trigger='cron', hour=clear_time.hour, minute=clear_time.minute, second=clear_time.second)
             watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=stop_time.hour, minute=stop_time.minute, second=stop_time.second)
             watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=end_time.hour, minute=end_time.minute, second=end_time.second)
         else:

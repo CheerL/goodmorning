@@ -298,7 +298,8 @@ class User:
 
             sell_price = price * (1 - IOC_RATE / 100)
             sell_amount = amount * 1 / (4 - count)
-            self.sell_limit(target, sell_amount, sell_price, True)
+            logger.info(f'Try to ioc sell {sell_amount} {target.symbol} with price {sell_price}')
+            self.sell_limit(target, sell_amount, sell_price, ioc=True)
 
         if count < 3:
             self.cancel_and_sell(target, callback, False)
