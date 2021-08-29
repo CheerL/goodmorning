@@ -351,15 +351,15 @@ class DealerClient(ControlledClient):
             except:
                 pass
     
-    @subscribe(topic=Topic.CLEAR)
-    def clear_handler(self, data, count, *arg, **kwargs):
-        if self.state != State.RUNNING:
-            return
+    # @subscribe(topic=Topic.CLEAR)
+    # def clear_handler(self, data, count, *arg, **kwargs):
+    #     if self.state != State.RUNNING:
+    #         return
 
-        logger.info(f'Start ioc clear for round {count+1}')
-        for symbol, price in data:
-            if symbol not in self.targets:
-                continue
+    #     logger.info(f'Start ioc clear for round {count+1}')
+    #     for symbol, price in data:
+    #         if symbol not in self.targets:
+    #             continue
             
-            target = self.targets[symbol]
-            self.user.cancel_and_sell_ioc(target, price, count)
+    #         target = self.targets[symbol]
+    #         self.user.cancel_and_sell_ioc(target, price, count)
