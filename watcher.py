@@ -161,6 +161,7 @@ def main():
             watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=end_time.hour, minute=end_time.minute, second=end_time.second)
         else:
             watch_dog.scheduler.add_job(client.running, trigger='cron', hour=23, minute=59, second=30)
+            watch_dog.scheduler.add_job(client.clear, trigger='cron', hour=0, minute=0, second=CLEAR_TIME)
             watch_dog.scheduler.add_job(client.stop_running, trigger='cron', hour=0, minute=0, second=CLEAR_TIME+10)
             watch_dog.scheduler.add_job(client.stopping, trigger='cron', hour=23, minute=56, second=0)
             watch_dog.scheduler.add_job(update_symbols, trigger='cron', minute='*/5', kwargs={'client': client, 'watch_dog': watch_dog})
