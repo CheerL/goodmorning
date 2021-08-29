@@ -17,6 +17,7 @@ from utils.parallel import kill_thread
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, 'config', 'config.ini')
 USER_CONFIG_PATH = os.path.join(ROOT, 'config', 'user.ini')
+TEST_CONFIG_PATH = os.path.join(ROOT, 'config', 'config.test.ini')
 LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 
 URL = 'https://api-aws.huobi.pro'
@@ -27,9 +28,15 @@ config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 user_config = configparser.ConfigParser()
 
+test_config = configparser.ConfigParser()
+if os.path.exists(TEST_CONFIG_PATH):
+    test_config.read(TEST_CONFIG_PATH)
+
 if os.path.exists(USER_CONFIG_PATH):
     user_config.read(USER_CONFIG_PATH)
-
+    TEST = user_config.getboolean('setting', 'Test')
+    if TEST:
+        config = test_config
 
 
 session._request = session.request

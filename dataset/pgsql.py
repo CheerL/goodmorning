@@ -250,9 +250,9 @@ def get_open_price(symbol, start):
         data = session.query(Trade).filter(
             Trade.symbol == symbol,
             Trade.ts >= str(open_time),
-            Trade.ts < str(open_time + 300000)
+            Trade.ts < str(open_time + 30000)
         ).order_by(Trade.ts).first()
-        return {'open': data.price}
+        return {'open': data.price if data else 1}
 
 
 def get_profit(name='', month=''):
@@ -344,7 +344,9 @@ def get_currency_day_profit(currency='', date='', end_date=''):
             'sell': item.sell,
             'profit': item.sell-item.buy,
             'percent': item.percent,
-            'type': 1 if item.high_profit else (2 if item.high_loss else 0)
+            'type': 1 if item.high_profit else (2 if item.high_loss else 0),
+            'buy_price': item.buy_price,
+            'sell_price': item.sell_price
             # 0 for normal, 1 for high profit, 2 for high loss.
         } for index, item in enumerate(data)]
         return res

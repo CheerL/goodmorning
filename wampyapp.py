@@ -14,7 +14,6 @@ from target import Target
 from user import User
 from utils import config, get_target_time, logger
 
-BUY_NUM = config.getint('buy', 'BUY_NUM')
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
@@ -244,7 +243,8 @@ class WatcherMasterClient(WatcherClient):
             logger.info(f"Change state to not running")
 
     def clear(self, num=IOC_BATCH_NUM):
-        targets = self.redis_conn.get_target()
+        [_, targets] = self.redis_conn.get_target()
+        logger.info(f'Start clear, targets are {targets}')
         if targets:
             targets = targets.split(',')
             for i in range(num):
@@ -257,6 +257,7 @@ class WatcherMasterClient(WatcherClient):
     def clear_handler(self, targets, count):
         data = [(symbol, self.redis_conn.get_new_price(symbol)) for symbol in targets]
         self.publish(topic=Topic.CLEAR, data=data, count=count)
+        logger.info(f'Start ioc clear for round {count+1}, data={data}')
 
 
 class DealerClient(ControlledClient):
@@ -282,7 +283,7 @@ class DealerClient(ControlledClient):
 
     @subscribe(topic=Topic.BUY_SIGNAL)
     def buy_signal_handler(self, symbol, price, init_price, now, *args, **kwargs):
-        if self.state != State.RUNNING or symbol in self.targets or len(self.targets) >= BUY_NUM:
+        if self.state != State.RUNNING or symbol in self.targets:
             return
 
         if self.not_buy:
@@ -355,6 +356,7 @@ class DealerClient(ControlledClient):
         if self.state != State.RUNNING:
             return
 
+        logger.info(f'Start ioc clear for round {count+1}')
         for symbol, price in data:
             if symbol not in self.targets:
                 continue
