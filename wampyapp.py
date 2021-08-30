@@ -18,6 +18,7 @@ STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
+IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
@@ -249,7 +250,7 @@ class WatcherMasterClient(WatcherClient):
             targets = targets.split(',')
             for i in range(num):
                 threading.Timer(
-                    2*i+2,
+                    IOC_INTERVAL * i,
                     self.clear_handler,
                     [targets, i]
                 ).start()
@@ -351,15 +352,15 @@ class DealerClient(ControlledClient):
             except:
                 pass
     
-    # @subscribe(topic=Topic.CLEAR)
-    # def clear_handler(self, data, count, *arg, **kwargs):
-    #     if self.state != State.RUNNING:
-    #         return
+    @subscribe(topic=Topic.CLEAR)
+    def clear_handler(self, data, count, *arg, **kwargs):
+        if self.state != State.RUNNING:
+            return
 
-    #     logger.info(f'Start ioc clear for round {count+1}')
-    #     for symbol, price in data:
-    #         if symbol not in self.targets:
-    #             continue
+        logger.info(f'Start ioc clear for round {count+1}')
+        for symbol, price in data:
+            if symbol not in self.targets:
+                continue
             
-    #         target = self.targets[symbol]
-    #         self.user.cancel_and_sell_ioc(target, price, count)
+            target = self.targets[symbol]
+            self.user.cancel_and_sell_ioc(target, price, count)
