@@ -20,7 +20,7 @@ def create_Trade(day):
     class Trade(Base):
         __tablename__ = f'trade_{day}' if day else 'trade'
         id = Column(INTEGER, primary_key=True)
-        symbol = Column(VARCHAR(10))
+        symbol = Column(VARCHAR(20))
         ts = Column(VARCHAR(20))
         price = Column(REAL)
         amount = Column(REAL)
