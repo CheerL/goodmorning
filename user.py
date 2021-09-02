@@ -18,6 +18,7 @@ STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 ALL_STOP_PROFIT_RATE = config.getfloat('sell', 'ALL_STOP_PROFIT_RATE')
 IOC_RATE = config.getfloat('sell', 'IOC_RATE')
+IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 AccountBalanceMode.TOTAL = '2'
 
 class User:
@@ -297,7 +298,8 @@ class User:
                 amount = self.get_amount(target.base_currency)
 
             sell_price = price * (1 - IOC_RATE / 100)
-            sell_amount = amount * 1 / (4 - count)
+            sell_rate = 1 / (IOC_BATCH_NUM - count) if count > 0 else 1 / (IOC_BATCH_NUM - 1)
+            sell_amount = amount * sell_rate
             logger.info(f'Try to ioc sell {sell_amount} {target.symbol} with price {sell_price}')
             self.sell_limit(target, sell_amount, sell_price, ioc=True)
 
