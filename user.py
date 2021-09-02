@@ -303,7 +303,7 @@ class User:
             logger.info(f'Try to ioc sell {sell_amount} {target.symbol} with price {sell_price}')
             self.sell_limit(target, sell_amount, sell_price, ioc=True)
 
-        if count < 3:
+        if count < IOC_BATCH_NUM - 1:
             self.cancel_and_sell(target, callback, False)
         else:
             self.cancel_and_sell(target, market=True)
