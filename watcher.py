@@ -24,6 +24,7 @@ CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
 LOW_STOP_PROFIT_TIME = config.getfloat('time', 'LOW_STOP_PROFIT_TIME')
 WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
+GOOD_SYMBOL = config.get('buy', 'GOOD_SYMBOL').split(',')
 
 BUY_BACK_RATE = BUY_BACK_RATE / 100
 
@@ -97,7 +98,11 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                     del client.targets[symbol]
                     client.redis_conn.del_target(symbol)
 
-            if symbol not in client.targets and trade_time < client.target_time + STOP_BUY_TIME and len(client.targets) < BUY_NUM:
+            if (
+                symbol not in client.targets 
+                and (trade_time < client.target_time + STOP_BUY_TIME or symbol in GOOD_SYMBOL)
+                and len(client.targets) < BUY_NUM
+            ):
                 check_buy_signal(client, symbol, info, price, trade_time, now)
 
         if redis:
@@ -142,6 +147,7 @@ def init_watcher(Client=WatcherClient) -> WatcherClient:
     return client
 
 def main():
+    print(GOOD_SYMBOL)
     is_master = len(sys.argv) > 1 and sys.argv[1] == 'master'
     is_wait_stop = len(sys.argv) <= 1 or sys.argv[1] != 'nowait'
     is_redis = is_wait_stop
