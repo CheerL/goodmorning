@@ -147,7 +147,6 @@ def init_watcher(Client=WatcherClient) -> WatcherClient:
     return client
 
 def main():
-    print(GOOD_SYMBOL)
     is_master = len(sys.argv) > 1 and sys.argv[1] == 'master'
     is_wait_stop = len(sys.argv) <= 1 or sys.argv[1] != 'nowait'
     is_redis = is_wait_stop

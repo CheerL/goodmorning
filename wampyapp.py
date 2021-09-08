@@ -12,13 +12,14 @@ from market import MarketClient
 from dataset.redis import Redis
 from target import Target
 from user import User
-from utils import config, get_target_time, logger
+from utils import config, get_target_time, logger, user_config
 
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
+REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
@@ -304,7 +305,9 @@ class DealerClient(ControlledClient):
         if self.targets[symbol].buy_price:
             return
 
-        self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=price)
+        if REPORT_PRICE:
+            self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=price)
+
         if price == 0:
             del self.targets[symbol]
         else:
