@@ -7,6 +7,7 @@ from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderSide, OrderType, AccountBalanceMode
 from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 from retry.api import retry
+from threading import Timer
 
 from utils import config, logger, strftime, timeout_handle
 from report import wx_report, add_profit, get_profit, wx_name
@@ -377,13 +378,16 @@ class User:
             assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
             self.sell_limit(target, amount)
 
-        summary = self.buy(target, self.buy_amount)
-        if summary != None:
-            summary.check_after_buy(client)
-            summary.add_filled_callback(callback, [summary])
-            summary.add_cancel_callback(callback, [summary])
-        else:
-            client.after_buy(target.symbol, 0)
+        def buy_callback():
+            summary = self.buy(target, self.buy_amount)
+            if summary != None:
+                summary.check_after_buy(client)
+                summary.add_filled_callback(callback, [summary])
+                summary.add_cancel_callback(callback, [summary])
+            else:
+                client.after_buy(target.symbol, 0)
+
+        Timer(0, buy_callback).start()
 
     @retry(tries=5, delay=0.1)
     def report(self):
