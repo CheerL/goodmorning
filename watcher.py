@@ -155,8 +155,9 @@ def main():
     if is_master:
         logger.info('Master watcher')
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
-        client.get_task(WATCHER_TASK_NUM)
+        logger.info(f'Total task num is {len(client.symbols)}')
         if TEST:
+            # client.get_task(WATCHER_TASK_NUM)
             now = datetime.datetime.now()
             run_time = now + datetime.timedelta(seconds=5)
             clear_time = run_time + datetime.timedelta(seconds=CLEAR_TIME)
@@ -179,17 +180,19 @@ def main():
         client.wait_state(State.STARTED)
         client.get_task(WATCHER_TASK_NUM)
 
-    if not client.task:
-        return
+        if not client.task:
+            return
+    
+    if client.task:
+        logger.info(f'Watcher task are: {", ".join(client.task)}')
 
-    logger.info(f'Watcher task are: {", ".join(client.task)}')
-    for i, symbol in enumerate(client.task):
-        client.market_client.sub_trade_detail(
-            symbol, trade_detail_callback(symbol, client, redis=is_redis), error_callback
-        )
-        watch_dog.after_connection_created(symbol)
-        if not i % 10:
-            time.sleep(0.5)
+        for i, symbol in enumerate(client.task):
+            client.market_client.sub_trade_detail(
+                symbol, trade_detail_callback(symbol, client, redis=is_redis), error_callback
+            )
+            watch_dog.after_connection_created(symbol)
+            if not i % 10:
+                time.sleep(0.5)
 
     client.wait_state(State.RUNNING)
     client.wait_state(State.STARTED)
