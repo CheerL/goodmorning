@@ -1,5 +1,6 @@
 import time
 import threading
+import math
 from huobi.model.generic.symbol import Symbol
 
 from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT
@@ -20,6 +21,7 @@ STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
+WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
@@ -175,10 +177,20 @@ class WatcherMasterClient(WatcherClient):
             'watcher': 0,
             'dealer': 0
         }
+        vols = self.market_client.get_vol()
         self.symbols : list[str] = sorted(
             self.market_client.symbols_info.keys(),
-            reverse=False
+            key=lambda symbol: vols[symbol],
+            reverse=True
         )
+        k = math.ceil(len(self.symbols) / WATCHER_TASK_NUM)
+
+        self.tasks = [[] for _ in range(k)]
+        tasks_vol = [0] * k
+        for symbol in self.symbols:
+            i = tasks_vol.index(min(tasks_vol))
+            self.tasks[i].append(symbol)
+            tasks_vol[i] += vols[symbol]
 
     def set_state(self, state):
         self.state = state
@@ -194,20 +206,13 @@ class WatcherMasterClient(WatcherClient):
     def before_stop(self):
         self.info_handler(self.client_type, True)
 
-    def get_task(self, num):
+    def get_task(self, num=0):
         self.task = self.req_task(num)
 
     @callee
-    def req_task(self, num) -> 'list[str]':
-        task = self.symbols[:num]
-        self.symbols = self.symbols[num:]
-
-        if not self.symbols:
-            self.symbols = sorted(
-                self.market_client.symbols_info.keys(),
-                # key=lambda symbol: symbol,
-                reverse=True
-            )
+    def req_task(self, num=0) -> 'list[str]':
+        task = self.tasks[0]
+        self.tasks = self.tasks[1:]
         return task
 
     @subscribe(topic=Topic.CLIENT_INFO)

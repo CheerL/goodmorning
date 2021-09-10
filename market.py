@@ -56,3 +56,10 @@ class MarketClient(_MarketClient):
             pair.symbol: pair.close
             for pair in self.get_market_tickers()
         }
+
+    @timeout_handle({})
+    def get_vol(self) -> 'dict[str, float]':
+        return {
+            pair.symbol: pair.vol
+            for pair in self.get_market_tickers()
+        }
