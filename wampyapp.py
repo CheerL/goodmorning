@@ -302,8 +302,8 @@ class DealerClient(ControlledClient):
         target.set_info(self.market_client.symbols_info[symbol])
         self.targets[symbol] = target
 
-        self.user.buy_and_sell(target, self)
-        logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}')
+        self.user.buy_limit_and_sell(target, self)
+        logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}, price {price}')
 
     def after_buy(self, symbol, price):
         if self.targets[symbol].buy_price:
@@ -332,7 +332,7 @@ class DealerClient(ControlledClient):
             return
 
         def high_cancel_and_sell():
-            self.user.high_cancel_and_sell(self.targets.values(), symbol, price)
+            self.user.high_cancel_and_sell(list(self.targets.values()), symbol, price)
 
         self.high_stop_profit = False
         if symbol:

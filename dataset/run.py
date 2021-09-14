@@ -52,14 +52,12 @@ def delete_many(session: Session, table:str, ids: 'list[int]'):
 
 def move_trade(Trade, session, start_day, end_day):
     for day in range(start_day, end_day):
-        print(day)
         DayTrade = get_Trade(day)
         start = str(day * MS_IN_DAY)
         end = str((day + 1) * MS_IN_DAY)
 
         while True:
             trades = session.query(Trade).filter(Trade.ts >= start, Trade.ts < end).limit(1000).all()
-            print(len(trades))
             if not trades:
                 break
 
@@ -74,22 +72,16 @@ def check_trade_tables(host):
     with get_session(host=host) as session:
         inspector = inspect(session.bind)
         tables = [name for name in inspector.get_table_names() if name.startswith('trade')]
-        print(tables)
         for table in tables:
             day = int(table.split('_')[1])
             Trade = get_Trade(day)
-            print(day, Trade.__tablename__)
             min_ts = float(session.query(func.min(Trade.ts)).scalar())
-            print(min_ts)
             if min_ts < day * MS_IN_DAY:
-                print('move small')
                 min_day = int(min_ts // MS_IN_DAY)
                 move_trade(Trade, session, min_day, day)
 
             max_ts = float(session.query(func.max(Trade.ts)).scalar())
-            print(max_ts)
             if max_ts > (day + 1) * MS_IN_DAY:
-                print('move big')
                 max_day = int(max_ts // MS_IN_DAY)
                 move_trade(Trade, session, day+1, max_day+1)
 
@@ -100,14 +92,12 @@ def reorder(days, symbols, host):
         for day in days.split(','):
             day = int(day)
             Trade = get_Trade(day)
-            print(Trade.__tablename__)
             if symbols:
                 symbols = symbols.split(',')
             else:
                 symbols = [each[0] for each in session.execute(f'SELECT DISTINCT symbol FROM trade_{day}')]
 
             for symbol in symbols:
-                print(symbol)
                 ts = ''
                 count = 0
                 trades = session.execute(f"""
@@ -120,7 +110,6 @@ def reorder(days, symbols, host):
                 """).all()
                 update_mappings = []
                 for trade_id, trade_ts in trades:
-                    print(trade_ts)
                     if '.' in trade_ts:
                         trade_ts = trade_ts.split('.')[0]
 

@@ -38,8 +38,9 @@ class Target:
         self.stop_profit_price = self.buy_price * (1 + rate / 100)
 
     def get_buy_price(self):
-        buy_price = min((1 + BUY_RATE / 100) * self.init_price, (1 + 9 / 100) * self.price)
-        return self.check_price(buy_price)
+        buy_price = (1 + BUY_RATE / 100) * self.price
+        # return self.check_price(buy_price)
+        return buy_price
 
     def set_info(self, info):
         self.init_price = info.init_price

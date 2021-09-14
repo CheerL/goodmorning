@@ -16,10 +16,10 @@ from order import OrderSummary, OrderSummaryStatus
 
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
-BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 ALL_STOP_PROFIT_RATE = config.getfloat('sell', 'ALL_STOP_PROFIT_RATE')
 IOC_RATE = config.getfloat('sell', 'IOC_RATE')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
+HIGH_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'HIGH_STOP_PROFIT_HOLD_TIME')
 AccountBalanceMode.TOTAL = '2'
 
 class User:
@@ -68,6 +68,7 @@ class User:
             self.buy_amount = max(math.floor(self.usdt_balance / float(self.buy_amount[1:])), 5)
         else:
             self.buy_amount = float(self.buy_amount)
+        
 
     def balance_callback(self, event: AccountUpdateEvent):
         update: AccountUpdate = event.data
@@ -124,7 +125,6 @@ class User:
             price = target.get_buy_price()
         else:
             price = target.check_price(price)
-
         symbol = target.symbol
         amount = target.check_amount(max(
             amount / price,
@@ -356,15 +356,19 @@ class User:
 
             self.sell_limit(target, amount, (price + 2 * target.buy_price) / 3)
 
-        for target in list(targets):
+        for target in targets:
             if target.symbol == symbol:
-                callback = _callback
+                self.cancel_and_sell(target, _callback, market=False)
             else:
-                callback = None
-                target.set_high_stop_profit(False)
-            self.cancel_and_sell(target, callback, market=False)
+                self.turn_low_cancel_and_sell(target, None)
 
         logger.info(f'Stop profit {symbol}')
+
+    def turn_low_cancel_and_sell(self, target: 'Target', callback=None):
+        if target.high_stop_profit:
+            target.set_high_stop_profit(False)
+            self.cancel_and_sell(target, callback, False)
+            logger.info(f'Turn {target.symbol} to low profit')
 
     def buy_and_sell(self, target: Target, client):
         @retry(tries=5, delay=0.05)
@@ -377,9 +381,35 @@ class User:
             amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
             assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
             self.sell_limit(target, amount)
+            Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
 
         def buy_callback():
             summary = self.buy(target, self.buy_amount)
+            if summary != None:
+                summary.check_after_buy(client)
+                summary.add_filled_callback(callback, [summary])
+                summary.add_cancel_callback(callback, [summary])
+            else:
+                client.after_buy(target.symbol, 0)
+
+        Timer(0, buy_callback).start()
+
+    def buy_limit_and_sell(self, target: Target, client):
+        @retry(tries=5, delay=0.05)
+        def callback(summary):
+            client.after_buy(target.symbol, summary.aver_price)
+            if summary.aver_price <=0:
+                logger.error(f'Fail to buy {target.symbol}')
+                return
+
+            amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
+            assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
+            self.sell_limit(target, amount)
+            Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
+
+        def buy_callback():
+            buy_price = target.get_buy_price()
+            summary = self.buy_limit(target, float(self.buy_amount), buy_price)
             if summary != None:
                 summary.check_after_buy(client)
                 summary.add_filled_callback(callback, [summary])

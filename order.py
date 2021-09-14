@@ -93,7 +93,7 @@ class OrderSummary:
             elif self.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
                 client.user.trade_client.cancel_order(self.symbol, self.order_id)
         
-        Timer(1, wrapper).start()
+        Timer(1.5, wrapper).start()
 
     def add_filled_callback(self, callback, args=[]):
         self.filled_callback = callback

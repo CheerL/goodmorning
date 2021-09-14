@@ -87,14 +87,14 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 
             if vol > BIG_VOL and not info['big']:
                 info['big'] = True
-                logger.info(f'Big buy: {symbol} {vol}USDT at {trade_time}')
+                # logger.info(f'Big buy: {symbol} {vol}USDT at {trade_time}')
 
             if symbol in client.targets:
                 target = client.targets[symbol]
                 
                 if target.own:
                     check_sell_signal(client, target, info, price, trade_time, now)
-                elif now > target.time + 2:
+                elif now > target.time + 2.5:
                     del client.targets[symbol]
                     client.redis_conn.del_target(symbol)
 
@@ -157,7 +157,7 @@ def main():
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         logger.info(f'Total task num is {len(client.symbols)}')
         if TEST:
-            # client.get_task(WATCHER_TASK_NUM)
+            client.get_task(WATCHER_TASK_NUM)
             now = datetime.datetime.now()
             run_time = now + datetime.timedelta(seconds=5)
             clear_time = run_time + datetime.timedelta(seconds=CLEAR_TIME)

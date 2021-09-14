@@ -66,13 +66,15 @@ def trade_update_callback(client: Client):
                                 summary.cancel_callback(*summary.cancel_callback_args)
                             break
             except Exception as e:
-                logger.error(f"{direction} {etype} | {client.user.orders[direction].keys()} | Error: {type(e)} {e}")
+                if not isinstance(e, KeyError):
+                    logger.error(f"{direction} {etype} | {client.user.orders[direction].keys()} | Error: {type(e)} {e}")
                 raise e
 
         try:
             _warpper(event)
         except Exception as e:
-            logger.error(f"max tries | {type(e)} {e}")
+            if not isinstance(e, KeyError):
+                logger.error(f"max tries | {type(e)} {e}")
 
     return warpper
 
@@ -116,10 +118,8 @@ def main(user: User):
     try:
         logger.info('Start run sub process')
         client = init_dealer(user)
-
         scheduler = Scheduler()
         client.user.start(trade_update_callback(client), error_callback('order'))
-
         client.wait_state(State.RUNNING)
         client.user.set_start_asset()
         if TEST:
@@ -130,7 +130,7 @@ def main(user: User):
             end_time = now + datetime.timedelta(seconds=CLEAR_TIME + 12)
             scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=low_stop_profit_time.hour, minute=low_stop_profit_time.minute, second=low_stop_profit_time.second)
             scheduler.add_job(client.check_and_sell, args=[True], trigger='cron', hour=check_sell_time.hour, minute=check_sell_time.minute, second=check_sell_time.second)
-            # scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=buy_price_sell_time.hour, minute=buy_price_sell_time.minute, second=buy_price_sell_time.second)
+            scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=buy_price_sell_time.hour, minute=buy_price_sell_time.minute, second=buy_price_sell_time.second)
             scheduler.add_job(client.state_handler, args=[1], trigger='cron', hour=end_time.hour, minute=end_time.minute, second=end_time.second)
         else:
             scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=LOW_STOP_PROFIT_TIME)
