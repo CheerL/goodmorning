@@ -81,7 +81,7 @@ def run_process(req_list, is_lock=True, limit_num=8):
     queue = deque(req_list)
     processes = []
     while len(queue):
-        if threading.active_count() <= limit_num:
+        if len(multiprocessing.active_children()) <= limit_num:
             para = queue.popleft()
             process_name = para[2] if len(para) > 2 else None
             now_process = multiprocessing.Process(target=para[0], args=para[1], name=process_name)
