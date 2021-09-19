@@ -4,7 +4,7 @@ import argparse
 
 from wampyapp import DealerClient as Client, State
 from utils.parallel import run_process
-from utils import config, kill_all_threads, logger, user_config, test_config
+from utils import config, kill_all_threads, logger, user_config
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from market import MarketClient
 from retry import retry

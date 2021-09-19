@@ -47,6 +47,12 @@ PrintBasic.print_basic = lambda data, name=None: None
 input_checker.reg_ex = "[ _`~!@#$%^&()+=|{}':;',\\[\\].<>/?~！@#￥%……&（）——+|{}【】‘；：”“’。，、？]|\n|\t"
 
 
+def get_rate(a, b, k=5):
+    if b:
+        return round((a/b)-1, k)
+    else:
+        return 0
+
 def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
     tz = pytz.timezone(tz_name)
     utc_time = pytz.utc.localize(

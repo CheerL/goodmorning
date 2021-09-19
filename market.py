@@ -22,6 +22,7 @@ class MarketClient(_MarketClient):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.generic_client = GenericClient()
+        self.all_symbol_info: 'dict[str, Symbol]' = {}
         self.symbols_info: 'dict[str, Symbol]' = {}
         self.mark_price: 'dict[str, float]' = {}
         self.update_symbols_info()
@@ -31,17 +32,24 @@ class MarketClient(_MarketClient):
             symbol: info
             for symbol, info in infos.items()
             if symbol not in self.exclude_list
-            and not re.search('\d', symbol)
             and symbol in base_price
             and base_price[symbol] < 10
         }
 
-    def update_symbols_info(self) -> 'tuple[list[str], list[str]]':
-        new_symbols_info = {
+    def get_all_symbols_info(self):
+        return {
             info.symbol: info
             for info in self.generic_client.get_exchange_symbols()
             if info.symbol.endswith('usdt')
+            and not re.search('\d', info.symbol)
+            and info.symbol not in [
+                'bchausdt', 'mcousdt', 'borusdt',
+                'venusdt', 'botusdt', 'lendusdt'
+            ]
         }
+
+    def update_symbols_info(self) -> 'tuple[list[str], list[str]]':
+        new_symbols_info = self.get_all_symbols_info()
         price = self.get_price()
         symbols_info = self.exclude(new_symbols_info, price)
         new_symbols = [symbol for symbol in symbols_info.keys() if symbol not in self.symbols_info]

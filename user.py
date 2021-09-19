@@ -34,6 +34,7 @@ class User:
         )).id
 
         self.balance: dict[str, float] = {}
+        self.available_balance: dict[str, float] = {}
         self.balance_update_time: dict[str, float] = {}
         self.buy_amount = buy_amount
         self.orders: dict[str, dict[str, list[OrderSummary]]] = {'buy': {}, 'sell': {}}
@@ -68,12 +69,11 @@ class User:
             self.buy_amount = max(math.floor(self.usdt_balance / float(self.buy_amount[1:])), 5)
         else:
             self.buy_amount = float(self.buy_amount)
-        
 
     def balance_callback(self, event: AccountUpdateEvent):
         update: AccountUpdate = event.data
-        if float(update.balance) - float(update.available) > 1e-8:
-            return
+        # if float(update.balance) - float(update.available) > 1e-8:
+        #     return
 
         if not update.changeTime:
             update.changeTime = 0
@@ -82,6 +82,7 @@ class User:
             or update.changeTime > self.balance_update_time[update.currency]
         ):
             self.balance[update.currency] = float(update.balance)
+            self.available_balance[update.currency] = float(update.available)
             self.balance_update_time[update.currency] = int(update.changeTime) / 1000
 
     def buy(self, target: Target, amount):
@@ -118,7 +119,6 @@ class User:
             self.orders['buy'][symbol].remove(order_summary)
             # raise Exception(e)
             return None
-        
 
     def buy_limit(self, target: Target, amount, price=None):
         if not price:
@@ -194,7 +194,6 @@ class User:
             order_summary.error(e)
             logger.error(e)
             raise Exception(e)
-        
 
     def sell_limit(self, target: Target, amount, price=None, ioc=False):
         if not price:
@@ -234,7 +233,6 @@ class User:
             order_summary.error(e)
             logger.error(e)
             raise Exception(e)
-        
 
     @timeout_handle([])
     def get_open_orders(self, targets, side=OrderSide.SELL) -> 'list[huobi.model.trade.order.Order]':
@@ -270,7 +268,9 @@ class User:
                 pass
 
     @retry(tries=5, delay=0.05, logger=logger)
-    def get_amount(self, currency):
+    def get_amount(self, currency, available=True):
+        if available:
+            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'Some unavailable'
         return self.balance[currency]
 
     def cancel_and_sell_in_buy_price(self, targets: 'list[Target]'):
