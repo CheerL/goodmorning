@@ -1,5 +1,6 @@
 
 import argparse
+from re import I
 import time
 
 from retry.api import retry
@@ -12,12 +13,19 @@ from client.dealer import LossDealerClient as Client
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 
 def main(user: User):
-    @retry(tries=30, delay=1)
+    @retry(tries=30, delay=1, logger=logger)
     def buy_targets():
         assert client.targets, 'No targets'
 
         for target in client.targets.values():
             client.buy_limit_target(target)
+
+    @retry(tries=10, delay=1, logger=logger)
+    def sell_targets():
+        assert client.targets, 'No targets'
+
+        for target in client.targets.values():
+            client.sell_limit_target(target, selling_level=3)
 
     user.start()
     client = Client.init_dealer(user)
@@ -25,6 +33,8 @@ def main(user: User):
     scheduler.add_job(client.find_targets, kwargs={'end': 0}, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(client.watch_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(buy_targets, trigger='cron', hour=23, minute=59, second=0)
+    scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=55, second=0)
+    scheduler.start()
 
     client.wait_state(10)
     kill_all_threads()

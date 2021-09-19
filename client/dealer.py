@@ -281,6 +281,7 @@ class LossDealerClient(BaseDealerClient):
             return
         elif target.selling == 0:
             target.selling = selling_level
+
             if not sell_amount:
                 sell_amount = self.user.get_amount(target.base_currency)
 
