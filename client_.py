@@ -1,7 +1,6 @@
 import time
 import threading
 import math
-from huobi.model.generic.symbol import Symbol
 
 from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT
 from wampy.peers.clients import Client
@@ -371,3 +370,107 @@ class DealerClient(ControlledClient):
             
             target = self.targets[symbol]
             self.user.cancel_and_sell_ioc(target, price, count)
+
+
+class LossDealerClient(ControlledClient):
+    def __init__(
+        self, market_client: MarketClient, user: User,
+        url=WS_URL, cert_path=None, ipv=4, name=None,
+        realm=DEFAULT_REALM, roles=DEFAULT_ROLES, call_timeout=DEFAULT_TIMEOUT,
+        message_handler_cls=None
+    ):
+        super().__init__(
+            url=url, cert_path=cert_path, ipv=ipv, name=name,
+            realm=realm, roles=roles, call_timeout=call_timeout,
+            message_handler_cls=message_handler_cls
+        )
+        self.market_client : MarketClient = market_client
+        self.targets : dict[str, Target] = {}
+        self.record_list = []
+        self.user : User = user
+        self.client_type = 'loss_dealer'
+
+
+    @subscribe(topic=Topic.BUY_SIGNAL)
+    def buy_signal_handler(self, symbol, price, init_price, now, *args, **kwargs):
+        pass
+        # if self.state != State.RUNNING or symbol in self.targets:
+        #     return
+
+        # if self.not_buy:
+        #     logger.info(f'Fail to buy {symbol}, already stop buy')
+        #     return
+
+        # receive_time = time.time()
+        # self.market_client.symbols_info[symbol].init_price = init_price
+        # target = Target(symbol, price, now, self.high_stop_profit)
+        # target.set_info(self.market_client.symbols_info[symbol])
+        # self.targets[symbol] = target
+
+        # self.user.buy_limit_and_sell(target, self)
+        # logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}, price {price}')
+
+    def after_buy(self, symbol, price):
+        if self.targets[symbol].buy_price:
+            return
+
+        # if REPORT_PRICE:
+        #     self.publish(topic=Topic.AFTER_BUY, symbol=symbol, price=price)
+
+        if price != 0:
+            self.targets[symbol].set_buy_price(price)
+
+    # @subscribe(topic=Topic.STOP_LOSS)
+    # def stop_loss_handler(self, symbol, price, *args, **kwargs):
+    #     if self.state != State.RUNNING or symbol not in self.targets:
+    #         return
+
+    #     target = self.targets[symbol]
+    #     self.user.cancel_and_sell(target)
+    #     logger.info(f'Stop loss. {symbol}: {price}USDT')
+
+    # @subscribe(topic=Topic.STOP_PROFIT)
+    # def stop_profit_handler(self, symbol, price, *args, **kwargs):
+    #     if self.state != State.RUNNING or not self.high_stop_profit:
+    #         return
+
+    #     def high_cancel_and_sell():
+    #         self.user.high_cancel_and_sell(list(self.targets.values()), symbol, price)
+
+    #     self.high_stop_profit = False
+    #     if symbol:
+    #         self.not_buy = True
+
+    #     threading.Timer(STOP_PROFIT_SLEEP, high_cancel_and_sell).start()
+    #     logger.info(f'Stop profit. {symbol}: {price}USDT')
+
+    # def sell_in_buy_price(self):
+    #     self.user.cancel_and_sell_in_buy_price(self.targets.values())
+
+    # def check_and_sell(self, limit=True):
+    #     self.user.check_and_sell(self.targets.values(), limit)
+
+    # def check_all_stop_profit(self):
+    #     while self.state == State.RUNNING:
+    #         time.sleep(0.1)
+    #         try:
+    #             asset = self.user.get_asset()
+    #             if asset > self.user.all_stop_profit_asset:
+    #                 self.state_handler(State.STARTED)
+    #                 logger.info(f'Now asset {asset}U, start asset {self.user.start_asset}U, stop profit')
+    #                 break
+    #         except:
+    #             pass
+    
+    # @subscribe(topic=Topic.CLEAR)
+    # def clear_handler(self, data, count, *arg, **kwargs):
+    #     if self.state != State.RUNNING:
+    #         return
+
+    #     logger.info(f'Start ioc clear for round {count+1}')
+    #     for symbol, price in data:
+    #         if symbol not in self.targets:
+    #             continue
+            
+    #         target = self.targets[symbol]
+    #         self.user.cancel_and_sell_ioc(target, price, count)

@@ -3,6 +3,8 @@ import os
 import sqlite3
 import time
 
+# from gevent import monkey
+# monkey.patch_all(select=False)
 import requests
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
 from dataset.pgsql import Record, get_session, Profit, Message

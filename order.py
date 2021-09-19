@@ -86,14 +86,14 @@ class OrderSummary:
         self.order_id = -1
         self.report()
         
-    def check_after_buy(self, client):
+    def check_after_buy(self, client, wait=1.5):
         def wrapper():
             if self.status in [OrderSummaryStatus.FAILED, OrderSummaryStatus.EMPTY]:
                 client.after_buy(self.symbol, 0)
             elif self.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
                 client.user.trade_client.cancel_order(self.symbol, self.order_id)
         
-        Timer(1.5, wrapper).start()
+        Timer(wait, wrapper).start()
 
     def add_filled_callback(self, callback, args=[]):
         self.filled_callback = callback
