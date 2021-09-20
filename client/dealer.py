@@ -210,18 +210,21 @@ class LossDealerClient(BaseDealerClient):
             time_list = []
             
             while True:
-                tickers = self.market_client.get_market_tickers()
-                now = time.time()
-                time_list.append(now)
-                for start, each in enumerate(time_list.copy()):
-                    if each < now - aver_length:
-                        time_list.pop(0)
-                    else:
-                        break
+                try:
+                    tickers = self.market_client.get_market_tickers()
+                    now = time.time()
+                    time_list.append(now)
+                    for start, each in enumerate(time_list.copy()):
+                        if each < now - aver_length:
+                            time_list.pop(0)
+                        else:
+                            break
 
-                for target in self.targets.values():
-                    target.update_price(tickers, start)
-                    self.check_target(target)
+                    for target in self.targets.values():
+                        target.update_price(tickers, start)
+                        self.check_target(target)
+                except Exception as e:
+                    logger.error(e)
 
                 time.sleep(0.5)
 
