@@ -32,7 +32,6 @@ class BaseTarget:
 
     def get_target_buy_price(self, rate=BUY_RATE):
         buy_price = (1 + rate / 100) * self.price
-        print(self.init_price, self.price, buy_price)
         # return self.check_price(buy_price)
         return buy_price
 
@@ -74,10 +73,11 @@ class Target(BaseTarget):
 class LossTarget(BaseTarget):
     def __init__(self, symbol, price, time, open_price, vol):
         super().__init__(symbol, price, time)
+        self.own_amount = 0
         self.open = open_price
         self.vol = vol
         self.buy_vol = 0
-        self.keep_buy = True
+        # self.keep_buy = True
         self.selling = 0
         self.ticker_id = -1
         self.recent_price = []
@@ -101,8 +101,8 @@ class LossTarget(BaseTarget):
         self.low_mark_price = max(init_price * (1+low_rate), (self.open+init_price)/2)
         self.sell_price = init_price * (1+sell_rate)
 
-    def set_buy_price(self, price, vol):
-        if price <= 0 or vol <= 0:
+    def set_buy(self, price, vol, amount):
+        if price <= 0 or vol <= 0 or amount <= 0:
             return
 
         if not self.buy_price:
@@ -112,6 +112,15 @@ class LossTarget(BaseTarget):
             self.buy_price = (self.buy_price * self.buy_vol + price * vol) / (self.buy_vol + vol)
             self.buy_vol += vol
         self.own = True
+        self.own_amount += amount
+
+    def set_sell(self, amount):
+        if amount <= 0:
+            return
+
+        self.own_amount -= amount
+        if self.own_amount * self.buy_price <= 5:
+            self.own = False
 
     def update_price(self, tickers, start):
         if self.ticker_id != -1 and tickers[self.ticker_id].symbol != self.symbol:

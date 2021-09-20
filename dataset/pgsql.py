@@ -169,6 +169,49 @@ class Message(Base):
     msg_type = Column(INTEGER)
     uids = Column(VARCHAR(200))
 
+
+class Order(Base):
+    __tablename__ = 'order'
+    id = Column(INTEGER, primary_key=True)
+    order_id = Column(VARCHAR(50))
+    status = Column(INTEGER)
+    symbol = Column(VARCHAR(100))
+    ts = Column(VARCHAR(100))
+    account = Column(VARCHAR(200))
+    direction = Column(VARCHAR(10))
+
+    @classmethod
+    def create_order(cls, summary, account_id, status):
+        with get_session() as session:
+            order = cls(
+                order_id=str(summary.order_id),
+                status=status,
+                symbol=summary.symbol,
+                ts=str(_time.time()),
+                account=str(account_id),
+                direction=summary.direction
+            )
+            session.add(order)
+            session.commit()
+
+    @classmethod
+    def add_order(cls, summary, account_id):
+        cls.create_order(summary, account_id, 0)
+
+    @classmethod
+    def filled_order(cls, summary, account_id):
+        cls.create_order(summary, account_id, 1)
+
+    @classmethod
+    def cancel_order(cls, summary, account_id):
+        cls.create_order(summary, account_id, 2)
+
+    @classmethod
+    def get_orders(cls, conditions=[]):
+        with get_session() as session:
+            return session.query(cls).filter(*conditions)
+
+
 def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
     Session = sessionmaker(bind=engine)

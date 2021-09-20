@@ -24,8 +24,8 @@ class OrderSummaryStatus:
         return OrderSummaryStatus.str_dict[num]
 
 class OrderSummary:
-    def __init__(self, symbol, direction):
-        self.order_id = None
+    def __init__(self, order_id, symbol, direction):
+        self.order_id = order_id
         self.symbol = symbol
         self.direction = direction
         self.limit = True
@@ -50,7 +50,6 @@ class OrderSummary:
 
     def create(self, data: OrderUpdate):
         self.orders.append(data)
-        self.order_id = data.orderId
         if 'market' in data.type:
             self.limit = False
         self.status = OrderSummaryStatus.CREATED

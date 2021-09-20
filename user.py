@@ -41,11 +41,9 @@ class BaseUser:
         self.balance: dict[str, float] = {}
         self.available_balance: dict[str, float] = {}
         self.balance_update_time: dict[str, float] = {}
-        self.orders: dict[str, dict[str, list[OrderSummary]]] = {'buy': {}, 'sell': {}}
+        self.orders: dict[int, OrderSummary] = {}
         self.wxuid = wxuid.split(';')
 
-        self.buy_order_list = []
-        self.sell_order_list = []
         self.buy_id = []
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
@@ -124,38 +122,30 @@ class BaseUser:
                 direction = 'buy' if 'buy' in update.type else 'sell'
                 etype = update.eventType
                 order_id = update.orderId
-                if direction == 'buy':
-                    if order_id not in self.buy_id:
-                        self.buy_id.append(order_id)
+
+                if order_id in self.orders:
+                    summary = self.orders[order_id]
                 else:
-                    if order_id not in self.sell_id:
-                        self.sell_id.append(order_id)
+                    summary = OrderSummary(order_id, symbol, direction)
+                    self.orders[order_id] = summary
 
                 try:
                     if etype == 'creation':
-                        for summary in self.orders[direction][symbol]:
-                            if summary.order_id == None:
-                                summary.create(update)
-                                break
+                        summary.create(update)
 
                     elif etype == 'trade':
-                        for summary in self.orders[direction][symbol]:
-                            if summary.order_id == order_id:
-                                summary.update(update)
-                                if update.orderStatus == 'filled' and summary.filled_callback:
-                                    summary.filled_callback(*summary.filled_callback_args)
-                                break
+                        summary.update(update)
+                        if update.orderStatus == 'filled' and summary.filled_callback:
+                            summary.filled_callback(*summary.filled_callback_args)
 
                     elif etype == 'cancellation':
-                        for summary in self.orders[direction][symbol]:
-                            if summary.order_id == order_id:
-                                summary.cancel_update(update)
-                                if summary.cancel_callback:
-                                    summary.cancel_callback(*summary.cancel_callback_args)
-                                break
+                        summary.cancel_update(update)
+                        if summary.cancel_callback:
+                            summary.cancel_callback(*summary.cancel_callback_args)
+
                 except Exception as e:
                     if not isinstance(e, KeyError):
-                        logger.error(f"{direction} {etype} | {self.orders[direction].keys()} | Error: {type(e)} {e}")
+                        logger.error(f"{direction} {etype} | Error: {type(e)} {e}")
                     raise e
 
             try:
@@ -171,48 +161,48 @@ class BaseUser:
             logger.error(f'[{prefix}] {error}')
         return warpper
 
-    def buy(self, target: Target, amount):
+    def buy(self, target: Target, vol):
         symbol = target.symbol
-        amount = target.check_amount(max(
-            amount,
+        vol = target.check_amount(max(
+            vol,
             target.min_order_value
         ))
         order = dict(
             symbol=symbol,
             account_id=self.account_id,
             order_type=OrderType.BUY_MARKET,
-            amount=amount,
+            amount=vol,
             price=1,
             source=OrderSource.SPOT_API
         )
-        order_summary = OrderSummary(symbol, 'buy')
-        order_summary.created_vol = amount
-        order_summary.remain_amount = amount
-        if symbol not in self.orders['buy']:
-            self.orders['buy'][symbol] = [order_summary]
-        else:
-            self.orders['buy'][symbol].append(order_summary)
+        # order_id = -1
 
         try:
             order_id = self.trade_client.create_order(**order)
+            if order_id in self.orders:
+                order_summary = self.orders[order_id]
+            else:
+                order_summary = OrderSummary(order_id, symbol, 'buy')
+                self.orders[order_id] = order_summary
+
+            order_summary.created_vol = vol
+            order_summary.remain_amount = vol
             self.buy_id.append(order_id)
-            self.buy_order_list.append(order)
-            logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
+            
+            logger.debug(f'Speed {vol} USDT to buy {target.symbol[:-4]}')
             return order_summary
         except Exception as e:
-            # order_summary.error(e)
             logger.error(e)
-            self.orders['buy'][symbol].remove(order_summary)
-            # raise Exception(e)
+            # if order_id in self.orders:
+            #     del self.orders[order_id]
             return None
 
-    def buy_limit(self, target: Target, amount, price=None):
+    def buy_limit(self, target: Target, vol, price=None):
         if not price:
             price = target.get_target_buy_price()
         else:
             price = target.check_price(price)
         symbol = target.symbol
-        vol = amount
         amount = target.check_amount(max(
             vol / price,
             target.limit_order_min_order_amt
@@ -225,28 +215,28 @@ class BaseUser:
             price=price,
             source=OrderSource.API
         )
-        order_summary = OrderSummary(symbol, 'buy')
-        order_summary.created_amount = amount
-        order_summary.created_vol = vol
-        order_summary.created_price = price
-        order_summary.remain_amount = amount
-        if symbol not in self.orders['buy']:
-            self.orders['buy'][symbol] = [order_summary]
-        else:
-            self.orders['buy'][symbol].append(order_summary)
-
+        # order_id = -1
 
         try:
             order_id = self.trade_client.create_order(**order)
+            if order_id in self.orders:
+                order_summary = self.orders[order_id]
+            else:
+                order_summary = OrderSummary(order_id, symbol, 'buy')
+                self.orders[order_id] = order_summary
+
+            order_summary.created_amount = amount
+            order_summary.created_vol = vol
+            order_summary.created_price = price
+            order_summary.remain_amount = amount
             self.buy_id.append(order_id)
-            self.buy_order_list.append(order)
-            logger.debug(f'Buy {amount} {symbol[:-4]}')
+            
+            logger.debug(f'Buy {vol} {symbol[:-4]}')
             return order_summary
         except Exception as e:
-            # order_summary.error(e)
             logger.error(e)
-            self.orders['buy'][symbol].remove(order_summary)
-            # raise Exception(e)
+            # if order_id in self.orders:
+            #     del self.orders[order_id]
             return None
 
     def sell(self, target: Target, amount):
@@ -263,23 +253,23 @@ class BaseUser:
             price=1,
             source=OrderSource.SPOT_API
         )
-        order_summary = OrderSummary(symbol, 'sell')
-        order_summary.created_amount = amount
-        order_summary.remain_amount = amount
-        if symbol not in self.orders['sell']:
-            self.orders['sell'][symbol] = [order_summary]
-        else:
-            self.orders['sell'][symbol].append(order_summary)
-
 
         try:
             order_id = self.trade_client.create_order(**order)
+            if order_id in self.orders:
+                order_summary = self.orders[order_id]
+            else:
+                order_summary = OrderSummary(order_id, symbol, 'sell')
+                self.orders[order_id] = order_summary
+
+            order_summary.created_amount = amount
+            order_summary.remain_amount = amount
             self.sell_id.append(order_id)
-            self.sell_order_list.append(order)
+            
             logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
             return order_summary
         except Exception as e:
-            order_summary.error(e)
+            # order_summary.error(e)
             logger.error(e)
             raise Exception(e)
 
@@ -298,23 +288,23 @@ class BaseUser:
             price=price,
             source=OrderSource.SPOT_API
         )
-        order_summary = OrderSummary(symbol, 'sell')
-        order_summary.created_amount = amount
-        order_summary.created_price = price
-        order_summary.remain_amount = amount
-        if symbol not in self.orders['sell']:
-            self.orders['sell'][symbol] = [order_summary]
-        else:
-            self.orders['sell'][symbol].append(order_summary)
-        
+
         try:
             order_id = self.trade_client.create_order(**order)
+            if order_id in self.orders:
+                order_summary = self.orders[order_id]
+            else:
+                order_summary = OrderSummary(order_id, symbol, 'sell')
+                self.orders[order_id] = order_summary
+
+            order_summary.created_amount = amount
+            order_summary.created_price = price
+            order_summary.remain_amount = amount
             self.sell_id.append(order_id)
-            self.sell_order_list.append(order)
             logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
             return order_summary
         except Exception as e:
-            order_summary.error(e)
+            # order_summary.error(e)
             logger.error(e)
             raise Exception(e)
 
@@ -327,9 +317,11 @@ class BaseUser:
         return open_orders
 
     @retry(tries=5, delay=0.05, logger=logger)
-    def get_amount(self, currency, available=True):
+    def get_amount(self, currency, available=False, check=True):
+        if check:
+            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
         if available:
-            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'Some unavailable'
+            return self.available_balance[currency]
         return self.balance[currency]
 
     @retry(tries=5, delay=0.1)
@@ -570,7 +562,7 @@ class User(BaseUser):
 class LossUser(BaseUser):
     def filter_targets(self, targets):
         targets_num = len(targets)
-        usdt_amount = self.get_amount('usdt', False)
+        usdt_amount = self.get_amount('usdt', available=True, check=False)
         buy_num = max(min(targets_num, MAX_NUM), MIN_NUM)
         buy_amount = usdt_amount // buy_num
         if buy_amount < 5:

@@ -11,12 +11,15 @@ from order import OrderSummary, OrderSummaryStatus
 from wampy.roles.subscriber import subscribe
 from client import ControlledClient, Topic, State, WS_URL
 from user import User
+from dataset.pgsql import Order
 
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
 MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 AVER_LENGTH = config.getfloat('loss', 'AVER_LENGTH')
+BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
+SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 
 
 class BaseDealerClient(ControlledClient):
@@ -141,25 +144,17 @@ class LossDealerClient(BaseDealerClient):
     # def buy_signal_handler(self, symbol, price, init_price, now, *args, **kwargs):
     #     pass
 
-    def after_buy(self, symbol, summary: OrderSummary):
-        if self.targets[symbol].buy_price:
-            return
-
-        if summary.aver_price != 0:
-            self.targets[symbol].set_buy_price(summary.aver_price, summary.vol)
-
 
     def check_target(self, target: LossTarget):
-        print(target.price, target.high_mark_price, target.high_mark_back_price, target.high_mark)
         if target.high_mark:
-            if target.own and target.price <= target.high_mark_back_price:
+            if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE):
                 self.sell_limit_target(target, target.high_mark_back_price)
                 return
         elif target.price >= target.high_mark_price:
             target.high_mark = True
         
         if target.low_mark:
-            if target.own and target.price <= target.sell_price:
+            if target.own and target.price <= target.sell_price * (1+SELL_UP_RATE):
                 self.sell_limit_target(target, target.sell_price, selling_level=2)
                 return
         elif target.price >= target.low_mark_price:
@@ -206,8 +201,9 @@ class LossDealerClient(BaseDealerClient):
             return
         
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
-        self.targets = self.user.filter_targets(targets)
+        targets = self.user.filter_targets(targets)
         logger.info(f'Targets of {self.user.username} are {",".join(targets.keys())}')
+        return targets
 
     def watch_targets(self, aver_length=AVER_LENGTH):
         def worker():
@@ -231,84 +227,142 @@ class LossDealerClient(BaseDealerClient):
 
         Timer(0, worker).start()
 
-    def buy_limit_target(self, target: LossTarget, buy_amount=0, limit_rate=0):
+    def buy_limit_target(self, target: LossTarget, price=0, vol=0, limit_rate=BUY_UP_RATE):
         @retry(tries=5, delay=0.05)
         def filled_callback(summary):
-            self.after_buy(target.symbol, summary)
             if summary.aver_price <=0:
                 logger.error(f'Fail to buy {target.symbol}')
                 return
 
+            target.set_buy(summary.aver_price, summary.vol, summary.amount)
+            Order.filled_order(summary, self.user.account_id)
+
         @retry(tries=5, delay=0.05)
         def cancel_callback(summary):
-            self.after_buy(target.symbol, summary)
+            target.set_buy(summary.aver_price, summary.vol, summary.amount)
+            Order.cancel_order(summary, self.user.account_id)
 
-            if target.keep_buy:
-                self.buy_limit_target(target, summary.created_vol - summary.vol)
+            # if target.keep_buy:
+            #     self.buy_limit_target(target, summary.created_vol - summary.vol)
 
-        if not buy_amount:
-            buy_amount = float(self.user.buy_amount)
+        if not vol:
+            vol = float(self.user.buy_amount) -  target.own_amount * target.buy_price
 
-        buy_price = target.get_target_buy_price(rate=limit_rate)
-        summary = self.user.buy_limit(target, buy_amount, buy_price)
+        if not price:
+            price = target.get_target_buy_price(rate=limit_rate)
+
+        summary = self.user.buy_limit(target, vol, price)
         if summary != None:
-            summary.check_after_buy(self, 600)
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
+            Order.add_order(summary, self.user.account_id)
         else:
             logger.error(f'Failed to buy {target.symbol}')
+        return summary
 
-    def sell_limit_target(
-        self, target: LossTarget, price,
-        sell_amount=None, selling_level=1
-    ):
+    @retry(tries=10, delay=0.05)
+    def get_sell_amount(self, target):
+        available_amount = self.user.get_amount(target.base_currency, True, False)
+        assert available_amount > 0.95 * target.own_amount, 'Some unavailable'
+        return min(target.own_amount, available_amount)
+
+    def sell_limit_target(self, target: LossTarget, price, sell_amount=0, selling_level=1):
         @retry(tries=5, delay=0.05)
         def filled_callback(summary):
             target.selling = 0
-            target.own = False
+            target.set_sell(summary.amount)
+            Order.filled_order(summary, self.user.account_id)
 
         @retry(tries=5, delay=0.05)
-        def cancel_callback(summary=None):
+        def cancel_callback(summary):
             target.selling = 0
-            if summary:
-                sell_amount = min(self.user.get_amount(target.base_currency), summary.remain_amount)
-                assert sell_amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
-            else:
-                sell_amount = self.user.get_amount(target.base_currency)
-            self.sell_limit_target(target, price, sell_amount, selling_level)
+            target.set_sell(summary.amount)
+            Order.cancel_order(summary, self.user.account_id)
 
         if target.selling >= selling_level:
             return
-        elif target.selling == 0:
-            target.selling = selling_level
+        elif target.selling != 0:
+            return self.cancel_and_sell_limit_target(target, price, selling_level)
 
-            if not sell_amount:
-                sell_amount = self.user.get_amount(target.base_currency)
+        target.selling = selling_level
+        sell_amount = sell_amount if sell_amount else self.get_sell_amount(target)
 
-            summary = self.user.sell_limit(target, sell_amount, price)
-            if summary != None:
-                # summary.check_after_buy(self, 60)
-                summary.add_filled_callback(filled_callback, [summary])
-                # summary.add_cancel_callback(cancel_callback, [summary])
-            else:
-                logger.error(f'Failed to sell {target.symbol}')
+        summary = self.user.sell_limit(target, sell_amount, price)
+        if summary != None:
+            summary.add_filled_callback(filled_callback, [summary])
+            summary.add_cancel_callback(cancel_callback, [summary])
+            Order.add_order(summary, self.user.account_id)
         else:
-            self.cancel_and_sell(target, cancel_callback)
+            logger.error(f'Failed to sell {target.symbol}')
+        return summary
 
-    def cancel_and_sell(self, target, callback):
+    def cancel_and_sell_limit_target(self, target: LossTarget, price, selling_level=1, direction='sell'):
+        @retry(tries=5, delay=0.05)
+        def cancel_sell_callback(summary=None):
+            if summary:
+                target.set_sell(summary.amount)
+                Order.cancel_order(summary, self.user.account_id)
+
+            sell_amount = self.get_sell_amount(target)
+            self.sell_limit_target(target, price, sell_amount, selling_level)
+
+        @retry(tries=5, delay=0.05)
+        def cancel_buy_callback(summary=None):
+            if summary:
+                target.set_buy(summary.aver_price, summary.vol, summary.amount)
+                Order.cancel_order(summary, self.user.account_id)
+
+            sell_amount = self.get_sell_amount(target)
+            self.sell_limit_target(target, price, sell_amount, selling_level)
+
         symbol = target.symbol
         is_canceled = False
+        callback = cancel_sell_callback if direction == 'sell' else cancel_buy_callback
         
-        if symbol in self.user.orders['sell']:
-            for summary in self.user.sorders['sell'][symbol]:
-                if summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]:
-                    try:
-                        self.trade_client.cancel_order(summary.symbol, summary.order_id)
-                        summary.add_cancel_callback(callback, [summary])
-                        logger.info(f'Cancel open sell order for {symbol}')
-                        is_canceled = True
-                    except Exception as e:
-                        logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
+        for summary in self.user.orders:
+            if (summary.symbol == target.symbol and summary.order_id in (self.user.sell_id if direction == 'sell' else self.user.buy_id)
+                and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
+            ):
+                try:
+                    summary.add_cancel_callback(callback, [summary])
+                    self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                    logger.info(f'Cancel open sell order for {symbol}')
+                    is_canceled = True
+                except Exception as e:
+                    logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
+                    # break
+
+        if not is_canceled:
+            try:
+                callback()
+            except Exception as e:
+                logger.error(e)
+
+    def cancel_and_buy_limit_target(self, target: LossTarget, price=0, limit_rate=BUY_UP_RATE):
+        @retry(tries=5, delay=0.05)
+        def callback(summary=None):
+            if summary:
+                vol = min(float(self.buy_amount), summary.created_vol-summary.vol)
+                target.set_buy(summary.aver_price, summary.vol, summary.amount)
+                Order.cancel_order(summary, self.user.account_id)
+            else:
+                vol = float(self.buy_amount) - target.own_amount * target.buy_price
+            self.buy_limit_target(target, price, vol, limit_rate)
+
+        symbol = target.symbol
+        is_canceled = False
+
+        for summary in self.user.orders:
+            if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id 
+                and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
+            ):
+                try:
+                    summary.add_cancel_callback(callback, [summary])
+                    self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                    logger.info(f'Cancel open buy order for {symbol}')
+                    is_canceled = True
+                except Exception as e:
+                    logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
                     # break
 
         if not is_canceled:
