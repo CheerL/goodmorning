@@ -1,4 +1,5 @@
 from utils import config
+from utils.datetime import ts2date
 import math
 
 MIN_STOP_LOSS_HOLD_TIME = config.getfloat('time', 'MIN_STOP_LOSS_HOLD_TIME')
@@ -71,13 +72,14 @@ class Target(BaseTarget):
 
 
 class LossTarget(BaseTarget):
-    def __init__(self, symbol, price, time, open_price, vol):
-        super().__init__(symbol, price, time)
+    def __init__(self, symbol, date, open_, close, vol):
+        super().__init__(symbol, close, 0)
         self.own_amount = 0
-        self.open = open_price
+        self.open = open_
+        self.close = close
         self.vol = vol
+        self.date = date
         self.buy_vol = 0
-        # self.keep_buy = True
         self.selling = 0
         self.ticker_id = -1
         self.recent_price = []
@@ -90,29 +92,28 @@ class LossTarget(BaseTarget):
         self.low_mark = False
         self.sell_price = 0
 
-        self.set_init_price(price)
+        self.set_init_price(close)
 
-    def set_init_price(self, init_price, high_rate=HIGH_RATE,
-        low_rate=LOW_RATE, sell_rate=SELL_RATE
-    ):
-        self.init_price = init_price
-        self.high_mark_price = init_price * (1+high_rate)
-        self.high_mark_back_price = init_price * (1+high_rate/2)
-        self.low_mark_price = max(init_price * (1+low_rate), (self.open+init_price)/2)
-        self.sell_price = init_price * (1+sell_rate)
+    def set_init_price(self, price, high_rate=HIGH_RATE, low_rate=LOW_RATE):
+        self.init_price = price
+        self.high_mark_price = price * (1+high_rate)
+        self.high_mark_back_price = price * (1+high_rate/2)
+        self.low_mark_price = max(price * (1+low_rate), (self.open+price)/2)
+        
 
-    def set_buy(self, price, vol, amount):
+    def set_buy(self, price, vol, amount, sell_rate=SELL_RATE):
         if price <= 0 or vol <= 0 or amount <= 0:
             return
 
+        self.own_amount += amount * 0.998
         if not self.buy_price:
-            self.buy_price = price
             self.buy_vol = vol
+            self.buy_price = price
         else:
-            self.buy_price = (self.buy_price * self.buy_vol + price * vol) / (self.buy_vol + vol)
             self.buy_vol += vol
+            self.buy_price = self.buy_vol / self.own_amount * 0.998
         self.own = True
-        self.own_amount += amount
+        self.sell_price = self.buy_price * (1+sell_rate)
 
     def set_sell(self, amount):
         if amount <= 0:

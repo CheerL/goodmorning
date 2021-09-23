@@ -7,71 +7,91 @@ from threading import Timer
 from target import LossTarget as Target
 from utils import config, kill_all_threads, logger
 from utils.parallel import run_process
+from utils.datetime import date2ts, ts2date
 from user import LossUser  as User
 from client.dealer import LossDealerClient as Client
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from order import OrderSummaryStatus
-from dataset.pgsql import Order
+from dataset.pgsql import Order as OrderSQL
+
+SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+MAX_DAY = config.getint('loss', 'MAX_DAY')
 
 def main(user: User):
     @retry(tries=10, delay=1, logger=logger)
-    def final_sell_targets():
+    def sell_targets():
         assert client.targets, 'No targets'
 
         @retry(tries=5, delay=0.05)
-        def cancel_callback(summary):
+        def cancel_callback(summary=None):
+            if summary:
+                target.set_sell(summary.amount)
+
             target.selling = 0
-            target.set_sell(summary.amount)
-            client.sell_limit_target(target, target.sell_price, selling_level=3)
-            Order.cancel_order(summary, client.user.account_id)
+            client.sell_limit_target(target, target.sell_price, selling_level=5)
 
         @retry(tries=5, delay=0.05)
         def cancel(summary):
             if summary.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
                 client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
 
-        for target in client.targets.values():
-            summary = client.sell_limit_target(target, max(target.sell_price, target.price), selling_level=3)
-            if summary:
-                summary.add_cancel_callback(cancel_callback, [summary])
-                Timer(60, cancel, [summary]).start()
-
-        # client.targets.clear()
-        # client.buy_id.clear()
-        # client.sell_id.clear()
-
-    def set_targets():
-        targets = client.find_targets(end=0)
-        client.targets = targets
-
-        client.watch_targets()
+        date = client.date
+        clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
+        clear_targets = client.targets.get(clear_date, {})
+        tickers = client.market_client.get_market_tickers()
         
-        for target in client.targets.values():
+        for ticker in tickers:
+            symbol = ticker.symbol
+            if symbol in clear_targets:
+                target = clear_targets[symbol]
+                sell_price = ticker.close*(1-SELL_UP_RATE)
+                if target.own_amount * sell_price > 5:
+                    client.cancel_and_sell_limit_target(target, sell_price, 6)
+
+        for target in client.targets[date].values():
+            sell_price = max(target.sell_price, target.price*(1-SELL_UP_RATE))
+            if target.own_amount * target.price > 5:
+                summary = client.cancel_and_sell_limit_target(target, sell_price, selling_level=4)
+                if summary:
+                    summary.add_cancel_callback(cancel_callback, [summary])
+                    Timer(60, cancel, [summary]).start()
+
+
+
+    def set_targets(end=0):
+        targets, date = client.find_targets(end=end)
+        targets = client.user.filter_targets(targets)
+        client.targets[date] = targets
+        client.date = max(client.targets.keys())
+
+        for target in client.targets[client.date].values():
             client.buy_limit_target(target)
 
-    def update_targets():
-        targets = client.find_targets(end=1)
+    def update_targets(end=1):
+        date = ts2date(time.time()-end*86400)
+        symbols = client.targets[date].keys()
+        targets, _ = client.find_targets(symbols=symbols, end=end)
         for symbol, target in targets.items():
-            if symbol in client.targets:
-                now_target = client.targets[symbol]
-                now_target.set_init_price(target.init_price)
-                client.cancel_and_buy_limit_target(now_target, target.init_price)
-            else:
-                client.targets[symbol] = target
-                client.buy_limit_target(target, target.init_price)
-        
-        for symbol, target in client.targets.items():
-            if symbol not in targets:
-                client.cancel_and_sell_limit_target(target, target.buy_price, 3, direction='sell' if target.selling else 'buy')
+            now_target = client.targets[date][symbol]
+            now_target.set_init_price(target.init_price)
+            client.cancel_and_buy_limit_target(now_target, target.init_price)
 
     user.start()
     client = Client.init_dealer(user)
     scheduler = Scheduler()
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
-    scheduler.add_job(final_sell_targets, trigger='cron', hour=23, minute=57, second=0)
+    scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
     scheduler.start()
-    # client.watch_targets()
+
+    client.resume()
+    # print(client.date, client.targets)
+    # for summary in client.user.orders.values():
+    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price)
+
+    # for target in client.targets[client.date].values():
+    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    client.watch_targets()
 
     client.wait_state(10)
     kill_all_threads()

@@ -2,6 +2,7 @@ import time as _time
 import re
 from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func, Table
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.ext.declarative import declarative_base
 
 from utils import config, user_config
@@ -113,6 +114,44 @@ class Target(Base):
             targets=targets
         )
 
+class LossTarget(Base):
+    __tablename__ = 'loss_target'
+    id = Column(INTEGER, primary_key=True)
+    date = Column(VARCHAR(20))
+    symbol = Column(VARCHAR(30))
+    open = Column(REAL)
+    close = Column(REAL)
+    high = Column(REAL)
+    low = Column(REAL)
+    vol = Column(REAL)
+
+    @classmethod
+    def add_target(cls, **kwargs):
+        with get_session() as session:
+            target = session.query(cls).filter(
+                cls.symbol==kwargs['symbol'],
+                cls.date==kwargs['date']
+            ).first()
+            if not target:
+                session.add(cls(**kwargs))
+                session.commit()
+
+    @classmethod
+    def get_targets(cls, conditions=[]):
+        with get_session() as session:
+            target = session.query(cls).filter(*conditions).order_by(
+                cls.date,
+                cls.symbol
+            )
+            return target
+
+    @classmethod
+    def get_target(cls, conditions=[]):
+        with get_session() as session:
+            target = session.query(cls).filter(*conditions).first()
+            return target
+
+
 class Profit(Base):
     __tablename__ = 'profit'
     id = Column(INTEGER, primary_key=True)
@@ -174,20 +213,18 @@ class Order(Base):
     __tablename__ = 'order'
     id = Column(INTEGER, primary_key=True)
     order_id = Column(VARCHAR(50))
-    status = Column(INTEGER)
     symbol = Column(VARCHAR(100))
-    ts = Column(VARCHAR(100))
+    date = Column(VARCHAR(20))
     account = Column(VARCHAR(200))
     direction = Column(VARCHAR(10))
 
     @classmethod
-    def create_order(cls, summary, account_id, status):
+    def add_order(cls, summary, date, account_id):
         with get_session() as session:
             order = cls(
                 order_id=str(summary.order_id),
-                status=status,
                 symbol=summary.symbol,
-                ts=str(_time.time()),
+                date=date,
                 account=str(account_id),
                 direction=summary.direction
             )
@@ -195,21 +232,9 @@ class Order(Base):
             session.commit()
 
     @classmethod
-    def add_order(cls, summary, account_id):
-        cls.create_order(summary, account_id, 0)
-
-    @classmethod
-    def filled_order(cls, summary, account_id):
-        cls.create_order(summary, account_id, 1)
-
-    @classmethod
-    def cancel_order(cls, summary, account_id):
-        cls.create_order(summary, account_id, 2)
-
-    @classmethod
     def get_orders(cls, conditions=[]):
         with get_session() as session:
-            return session.query(cls).filter(*conditions)
+            return session.query(cls).filter(*conditions).order_by(cls.date, cls.direction)
 
 
 def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:

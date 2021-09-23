@@ -6,12 +6,13 @@ from market import MarketClient
 from target import Target, LossTarget
 from utils import config, logger, user_config, get_rate
 from utils.parallel import run_thread_pool
+from utils.datetime import date2ts, ts2date
 from order import OrderSummary, OrderSummaryStatus
 
 from wampy.roles.subscriber import subscribe
 from client import ControlledClient, Topic, State, WS_URL
-from user import User
-from dataset.pgsql import Order
+from user import User, LossUser
+from dataset.pgsql import Order as OrderSQL, LossTarget as LossTargetSQL
 
 STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
@@ -20,6 +21,7 @@ BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 AVER_LENGTH = config.getfloat('loss', 'AVER_LENGTH')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+MAX_DAY = config.getint('loss', 'MAX_DAY')
 
 
 class BaseDealerClient(ControlledClient):
@@ -134,16 +136,97 @@ class DealerClient(BaseDealerClient):
 
 
 class LossDealerClient(BaseDealerClient):
-    def __init__(self, market_client: MarketClient, user: User, url=WS_URL):
-        super().__init__(market_client=market_client, user=user, url=url)
-        self.targets: dict[str, LossTarget] = {}
+    def __init__(self, market_client: MarketClient, user: LossUser, url=WS_URL):
+        super().__init__(market_client=market_client, user=None, url=url)
+        self.user: LossUser = user
+        self.targets: dict[str, dict[str, LossTarget]] = {}
+        self.date = ts2date()
         self.client_type = 'loss_dealer'
-        self.record_list = []
 
-    # @subscribe(topic=Topic.BUY_SIGNAL)
-    # def buy_signal_handler(self, symbol, price, init_price, now, *args, **kwargs):
-    #     pass
+    def resume(self):
+        now = time.time()
+        start_date = ts2date(now - MAX_DAY * 86400)
+        targets: list[LossTargetSQL] = LossTargetSQL.get_targets([
+            LossTargetSQL.date >= start_date
+        ])
 
+        # target_dict: dict[str, dict[str, LossTarget]] = {}
+        for target in targets:
+            date_target_dict = self.targets.setdefault(target.date, {})
+            date_target_dict[target.symbol] = LossTarget(
+                target.symbol, target.date, target.open, target.close, target.vol
+            )
+        
+
+
+        orders: list[OrderSQL] = OrderSQL.get_orders([
+            OrderSQL.account==str(self.user.account_id),
+            OrderSQL.date>=start_date
+        ])
+
+        for order in orders:
+            order_id = int(order.order_id)
+            symbol = order.symbol
+            try:
+                detail = self.user.trade_client.get_order(order_id)
+            except:
+                continue
+
+            summary = OrderSummary(order_id, symbol, order.direction, order.date)
+            summary.status = {
+                'created': 1,
+                'partial-filled': 2,
+                'filled': 3,
+                'canceled': 4
+            }[detail.state]
+            summary.amount = float(detail.filled_amount)
+            summary.vol = float(detail.filled_cash_amount)
+            summary.aver_price = summary.vol / summary.amount
+            summary.fee = summary.vol * 0.002
+            summary.label = order.date
+
+            if 'market' in detail.type:
+                summary.limit = False
+                summary.create_price = 0
+            else:
+                summary.create_price = float(detail.price)
+
+            if detail.type in ['buy-market']:
+                summary.create_amount = float(detail.amount)
+                summary.remain = summary.created_amount - summary.amount
+                if summary.remain / summary.created_amount < 1e-6:
+                    summary.remain = 0
+                
+            elif detail.type in ['buy-limit', 'sell-limit']:
+                summary.created_vol = float(detail.amount)
+                summary.remain = summary.created_vol - summary.vol
+                if summary.remain / summary.created_vol < 1e-6:
+                    summary.remain = 0
+            
+            targets = self.targets.setdefault(order.date, {})
+            if symbol not in targets:
+                klines = self.market_client.get_candlestick(symbol, '1day', 5)
+                num = int((now - date2ts(order.date)) // 86400)
+                kline = klines[num]
+                self.targets[order.date][symbol] = LossTarget(symbol, order.date, kline.open, kline.close, kline.vol)
+
+            target = self.targets[order.date][symbol]
+
+            if order.direction == 'buy':
+                target.set_buy(summary.aver_price, summary.vol, summary.amount)
+                self.user.buy_id.append(order_id)
+            else:
+                target.set_sell(summary.amount)
+                self.user.sell_id.append(order_id)
+            
+            self.user.orders[order_id] = summary
+
+
+        for date, targets in self.targets.items():
+            date_symbols = list(set([summary.symbol for summary in self.user.orders.values() if summary.label == date]))
+            for symbol in targets.copy():
+                if symbol not in date_symbols:
+                    del self.targets[date][symbol]
 
     def check_target(self, target: LossTarget):
         if target.high_mark:
@@ -160,11 +243,12 @@ class LossDealerClient(BaseDealerClient):
         elif target.price >= target.low_mark_price:
             target.low_mark = True
 
-    def find_targets(self, min_loss_rate=MIN_LOSS_RATE,
+    def find_targets(self, symbols=[], min_loss_rate=MIN_LOSS_RATE,
         break_loss_rate=BREAK_LOSS_RATE, end=0, min_before=180
     ):
         infos = self.market_client.get_all_symbols_info()
-        symbols = infos.keys()
+        if not symbols:
+            symbols = infos.keys()
         targets = {}
         now = time.time()
 
@@ -193,7 +277,17 @@ class LossDealerClient(BaseDealerClient):
             kline = klines[0]
             cont_loss = sum(cont_loss_list)
             if (rate == min(cont_loss_list) and cont_loss <= min_loss_rate) or cont_loss <= break_loss_rate:
-                target = LossTarget(symbol, kline.close, now, kline.open, kline.vol)
+                target = LossTarget(symbol, ts2date(kline.id), kline.open, kline.close, kline.vol)
+                if now - kline.id > 86400:
+                    LossTargetSQL.add_target(
+                        symbol=symbol,
+                        date=target.date,
+                        high=kline.high,
+                        low=kline.low,
+                        open=kline.open,
+                        close=kline.close,
+                        vol=kline.vol
+                    )
                 target.set_info(infos[symbol])
                 targets[symbol] = target
                 return
@@ -201,15 +295,19 @@ class LossDealerClient(BaseDealerClient):
             return
         
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
-        targets = self.user.filter_targets(targets)
-        logger.info(f'Targets of {self.user.username} are {",".join(targets.keys())}')
-        return targets
+        date = ts2date(now - end * 86400)
+        logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
+        return targets, date
 
     def watch_targets(self, aver_length=AVER_LENGTH):
         def worker():
             time_list = []
             
             while True:
+                if not self.date or not self.targets.get(self.date, {}):
+                    time.sleep(1)
+                    continue
+
                 try:
                     tickers = self.market_client.get_market_tickers()
                     now = time.time()
@@ -220,7 +318,7 @@ class LossDealerClient(BaseDealerClient):
                         else:
                             break
 
-                    for target in self.targets.values():
+                    for target in self.targets[self.date].values():
                         target.update_price(tickers, start)
                         self.check_target(target)
                 except Exception as e:
@@ -238,27 +336,28 @@ class LossDealerClient(BaseDealerClient):
                 return
 
             target.set_buy(summary.aver_price, summary.vol, summary.amount)
-            Order.filled_order(summary, self.user.account_id)
 
         @retry(tries=5, delay=0.05)
         def cancel_callback(summary):
-            target.set_buy(summary.aver_price, summary.vol, summary.amount)
-            Order.cancel_order(summary, self.user.account_id)
+            if summary.aver_price <=0:
+                logger.error(f'Fail to buy {target.symbol}')
+                return
 
-            # if target.keep_buy:
-            #     self.buy_limit_target(target, summary.created_vol - summary.vol)
+            target.set_buy(summary.aver_price, summary.vol, summary.amount)
 
         if not vol:
-            vol = float(self.user.buy_amount) -  target.own_amount * target.buy_price
+            vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
 
         if not price:
-            price = target.get_target_buy_price(rate=limit_rate)
+            price = target.price
+        price *= 1 + limit_rate
 
         summary = self.user.buy_limit(target, vol, price)
         if summary != None:
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
-            Order.add_order(summary, self.user.account_id)
+            summary.label = target.date
+            OrderSQL.add_order(summary, target.date, self.user.account_id)
         else:
             logger.error(f'Failed to buy {target.symbol}')
         return summary
@@ -274,13 +373,11 @@ class LossDealerClient(BaseDealerClient):
         def filled_callback(summary):
             target.selling = 0
             target.set_sell(summary.amount)
-            Order.filled_order(summary, self.user.account_id)
 
         @retry(tries=5, delay=0.05)
         def cancel_callback(summary):
             target.selling = 0
             target.set_sell(summary.amount)
-            Order.cancel_order(summary, self.user.account_id)
 
         if target.selling >= selling_level:
             return
@@ -294,7 +391,8 @@ class LossDealerClient(BaseDealerClient):
         if summary != None:
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
-            Order.add_order(summary, self.user.account_id)
+            summary.label = target.date
+            OrderSQL.add_order(summary, target.date, self.user.account_id)
         else:
             logger.error(f'Failed to sell {target.symbol}')
         return summary
@@ -304,7 +402,6 @@ class LossDealerClient(BaseDealerClient):
         def cancel_sell_callback(summary=None):
             if summary:
                 target.set_sell(summary.amount)
-                Order.cancel_order(summary, self.user.account_id)
 
             sell_amount = self.get_sell_amount(target)
             self.sell_limit_target(target, price, sell_amount, selling_level)
@@ -313,7 +410,6 @@ class LossDealerClient(BaseDealerClient):
         def cancel_buy_callback(summary=None):
             if summary:
                 target.set_buy(summary.aver_price, summary.vol, summary.amount)
-                Order.cancel_order(summary, self.user.account_id)
 
             sell_amount = self.get_sell_amount(target)
             self.sell_limit_target(target, price, sell_amount, selling_level)
@@ -324,7 +420,7 @@ class LossDealerClient(BaseDealerClient):
         
         for summary in self.user.orders:
             if (summary.symbol == target.symbol and summary.order_id in (self.user.sell_id if direction == 'sell' else self.user.buy_id)
-                and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
+                and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED] and summary.label == target.date
             ):
                 try:
                     summary.add_cancel_callback(callback, [summary])
@@ -345,18 +441,16 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=0.05)
         def callback(summary=None):
             if summary:
-                vol = min(float(self.buy_amount), summary.created_vol-summary.vol)
                 target.set_buy(summary.aver_price, summary.vol, summary.amount)
-                Order.cancel_order(summary, self.user.account_id)
-            else:
-                vol = float(self.buy_amount) - target.own_amount * target.buy_price
+
+            vol = float(self.buy_amount) - target.own_amount * target.buy_price
             self.buy_limit_target(target, price, vol, limit_rate)
 
         symbol = target.symbol
         is_canceled = False
 
         for summary in self.user.orders:
-            if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id 
+            if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id and summary.label == target.date
                 and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
             ):
                 try:

@@ -24,10 +24,11 @@ class OrderSummaryStatus:
         return OrderSummaryStatus.str_dict[num]
 
 class OrderSummary:
-    def __init__(self, order_id, symbol, direction):
+    def __init__(self, order_id, symbol, direction, label=''):
         self.order_id = order_id
         self.symbol = symbol
         self.direction = direction
+        self.label = label
         self.limit = True
         self.created_price = 0
         self.created_amount = 0
@@ -35,21 +36,19 @@ class OrderSummary:
         self.aver_price = 0
         self.amount = 0
         self.vol = 0
-        self.remain_amount = 0
+        self.remain = 0
         self.fee = 0
-        self.orders: list[OrderUpdate] = []
-        self.status = 0
         self.error_msg = ''
+        self.status = 0
         self.filled_callback = None
         self.filled_callback_args = []
         self.cancel_callback = None
         self.cancel_callback_args = []
 
     def report(self):
-        logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain_amount} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
+        logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 
     def create(self, data: OrderUpdate):
-        self.orders.append(data)
         if 'market' in data.type:
             self.limit = False
         self.status = OrderSummaryStatus.CREATED
@@ -65,15 +64,15 @@ class OrderSummary:
         self.fee = self.vol * 0.002
         if 'partial-filled' == data.orderStatus:
             self.status = OrderSummaryStatus.PARTIAL_FILLED
-            self.remain_amount = float(data.remainAmt)
+            self.remain = float(data.remainAmt)
         elif 'filled' == data.orderStatus:
             self.status = OrderSummaryStatus.FILLED
-            self.remain_amount = 0
+            self.remain = 0
         self.report()
 
     def cancel_update(self, data: OrderUpdate):
         self.status = OrderSummaryStatus.CANCELED
-        self.remain_amount = float(data.remainAmt)
+        self.remain = float(data.remainAmt)
         self.report()
 
     def finish(self):
