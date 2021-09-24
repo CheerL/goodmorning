@@ -150,6 +150,7 @@ class LossDealerClient(BaseDealerClient):
         targets: list[LossTargetSQL] = LossTargetSQL.get_targets([
             LossTargetSQL.date >= start_date
         ])
+        infos = self.market_client.get_all_symbols_info()
 
         # target_dict: dict[str, dict[str, LossTarget]] = {}
         for target in targets:
@@ -157,6 +158,7 @@ class LossDealerClient(BaseDealerClient):
             date_target_dict[target.symbol] = LossTarget(
                 target.symbol, target.date, target.open, target.close, target.vol
             )
+            date_target_dict[target.symbol].set_info(infos[target.symbol])
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
@@ -172,6 +174,7 @@ class LossDealerClient(BaseDealerClient):
                     self.targets[order.date][order.symbol] = LossTarget(
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
+                    self.targets[order.date][order.symbol].set_info(infos[order.symbol])
 
                 target = self.targets[order.date][order.symbol]
                 self.check_order(order, target)
