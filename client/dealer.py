@@ -377,7 +377,7 @@ class LossDealerClient(BaseDealerClient):
         is_canceled = False
         callback = cancel_sell_callback if direction == 'sell' else cancel_buy_callback
         
-        for summary in self.user.orders:
+        for summary in self.user.orders.values():
             if (summary.symbol == target.symbol and summary.order_id in (self.user.sell_id if direction == 'sell' else self.user.buy_id)
                 and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED] and summary.label == target.date
             ):
@@ -408,7 +408,7 @@ class LossDealerClient(BaseDealerClient):
         symbol = target.symbol
         is_canceled = False
 
-        for summary in self.user.orders:
+        for summary in self.user.orders.values():
             if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id and summary.label == target.date
                 and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
             ):
