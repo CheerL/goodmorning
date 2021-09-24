@@ -59,7 +59,7 @@ def main(user: User):
             sell_price = max(target.sell_price, target.price*(1-SELL_UP_RATE))
             if target.own_amount * target.price > 5:
                 client.cancel_and_sell_limit_target(target, sell_price, 4)
-                Timer(20, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
+                Timer(60, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
 
 
 
@@ -88,20 +88,19 @@ def main(user: User):
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
-    scheduler.add_job(client.report, trigger='cron', hour='0-23', second=0, kwargs={'force': False})
+    scheduler.add_job(client.report, trigger='cron', hour='0-1,8-23', second=0, kwargs={'force': False})
     scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=30, kwargs={'force': True})
     # scheduler.add_job(client.report, 'interval', minutes=1, kwargs={'force': True})
     # scheduler.start()
 
     client.resume()
-    for summary in client.user.orders.values():
+    for summary in client.user.orders.copy().values():
         print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
     for target in client.targets.get(client.date, {}).values():
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     client.watch_targets()
-    sell_targets('2021-09-23')
 
     client.wait_state(10)
     kill_all_threads()

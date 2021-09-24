@@ -386,7 +386,9 @@ class LossDealerClient(BaseDealerClient):
         symbol = target.symbol
         is_canceled = False
         
-        for summary in self.user.orders.values():
+        order_id_list = list(self.user.orders.keys())
+        for order_id in order_id_list:
+            summary = self.user.orders[order_id]
             if (summary.symbol == target.symbol and summary.order_id in (self.user.sell_id if direction == 'sell' else self.user.buy_id)
                 and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED] and summary.label == target.date
             ):
@@ -421,7 +423,9 @@ class LossDealerClient(BaseDealerClient):
         symbol = target.symbol
         is_canceled = False
 
-        for summary in self.user.orders.values():
+        order_id_list = list(self.user.orders.keys())
+        for order_id in order_id_list:
+            summary = self.user.orders[order_id]
             if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id and summary.label == target.date
                 and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
             ):
@@ -463,8 +467,18 @@ class LossDealerClient(BaseDealerClient):
                 self.user.buy_id.append(order_id)
             else:
                 self.user.sell_id.append(order_id)
-
-        if detail.filled_amount != summary.amount or detail.filled_cash_amount != summary.vol:
+        
+        status = {
+            'submitted': 1,
+            'partial-filled': 2,
+            'filled': 3,
+            'canceled': 4,
+            'partial-canceled': 4
+        }[detail.state]
+        if (detail.filled_amount != summary.amount
+            or detail.filled_cash_amount != summary.vol
+            or status != summary.status
+        ):
             if order.direction == 'buy':
                 target.set_sell(summary.amount)
                 target.set_buy(detail.filled_cash_amount, detail.filled_amount)
@@ -473,13 +487,7 @@ class LossDealerClient(BaseDealerClient):
 
             summary.ts = max(detail.finished_at, detail.created_at)
             summary.created_ts = detail.created_at
-            summary.status = {
-                'submitted': 1,
-                'partial-filled': 2,
-                'filled': 3,
-                'canceled': 4,
-                'partial-canceled': 4
-            }[detail.state]
+            summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
             summary.aver_price = summary.vol / summary.amount
@@ -504,6 +512,7 @@ class LossDealerClient(BaseDealerClient):
                 #     summary.remain = 0
 
     def report(self, force):
+        logger.info(f'Start {force} report')
         now = time.time()
         start_date = ts2date(now - (MAX_DAY + 2) * 86400)
 
@@ -524,15 +533,6 @@ class LossDealerClient(BaseDealerClient):
             order_id = int(order.order_id)
             self.check_order(order, self.targets[order.date][order.symbol])
             summary = self.user.orders[order_id]
-            if summary.status in [1, 2]:
-                ts = summary.created_ts / 1000
-                symbol = summary.symbol
-                price = summary.created_price
-                amount = summary.remain
-                report_info['opening'].append((
-                    ts2time(ts), symbol, amount, price
-                ))
-
             if summary.amount != order.amount or summary.vol != order.vol:
                 amount = summary.amount - order.amount
                 vol = summary.vol - order.vol
@@ -552,6 +552,18 @@ class LossDealerClient(BaseDealerClient):
                     'finished': 1 if summary.status in [-1, 3, 4] else 0
                 }
                 OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
+
+            if summary.status in [1, 2]:
+                ts = summary.created_ts / 1000
+                symbol = summary.symbol
+                price = summary.created_price
+                amount = summary.remain
+                report_info['opening'].append((
+                    ts2time(ts), symbol, amount, price
+                ))
+
+            elif summary.status in [-1, 3, 4]:
+                OrderSQL.update([OrderSQL.order_id==order.order_id], {'finished': 1})
 
         if not force and not report_info['new_sell'] and not report_info['new_buy']:
             return

@@ -136,4 +136,3 @@ class LossTarget(BaseTarget):
 
         if self.recent_price:
             self.price = sum(self.recent_price) / len(self.recent_price)
-            # print(self.symbol, self.price)

@@ -579,7 +579,6 @@ class LossUser(BaseUser):
 
         if not TEST:
             self.buy_amount = buy_amount
-        print(self.buy_amount)
         targets = {
             target.symbol: target for target in
             sorted(targets.values(), key=lambda x: -x.vol)[:buy_num]

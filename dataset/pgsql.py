@@ -232,8 +232,8 @@ class Order(Base):
                 account=str(account_id),
                 direction=summary.direction,
                 aver_price=0,
-                amount=-1,
-                vol=-1,
+                amount=0,
+                vol=0,
                 finished=0
             )
             session.add(order)
