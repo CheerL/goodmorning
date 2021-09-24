@@ -345,20 +345,19 @@ class LossDealerClient(BaseDealerClient):
             target.selling = 0
             target.set_sell(summary.amount)
 
-        filled_callback = filled_callback or _filled_callback
-        cancel_callback = cancel_callback or _cancel_callback
+        
 
         if target.selling >= selling_level:
             return
         elif target.selling != 0:
             return self.cancel_and_sell_limit_target(target, price, selling_level)
 
+        filled_callback = filled_callback or _filled_callback
+        cancel_callback = cancel_callback or _cancel_callback
         target.selling = selling_level
-        sell_amount = sell_amount if sell_amount else self.get_sell_amount(target)
-
+        sell_amount = sell_amount or self.get_sell_amount(target)
         summary = self.user.sell_limit(target, sell_amount, price)
         if summary != None:
-            print('summary', summary, target.symbol)
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
             summary.label = target.date
@@ -371,6 +370,7 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
             if summary:
+                target.selling = 0
                 if direction == 'sell':
                     target.set_sell(summary.amount)
                 else:

@@ -32,14 +32,14 @@ def main(user: User):
         #     client.sell_limit_target(target, target.sell_price, selling_level=5)
 
         # @retry(tries=5, delay=0.05)
-        # def cancel():
-        #     for summary in client.user.orders.values():
-        #         if (summary.symbol == target.symbol and summary.order_id in client.user.sell_id
-        #             and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
-        #             and summary.label == target.date
-        #         ):
-        #             summary.add_cancel_callback(cancel_callback, [summary])
-        #             client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+        # def cancel(target):
+        #     # for summary in client.user.orders.values():
+        #     #     if (summary.symbol == target.symbol and summary.order_id in client.user.sell_id
+        #     #         and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
+        #     #         and summary.label == target.date
+        #     #     ):
+        #     #         summary.add_cancel_callback(cancel_callback, [summary])
+        #     #         client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
         #     client.cancel_and_sell_limit_target(target, target.sell_price, 5)
 
         date = date or client.date
@@ -59,7 +59,7 @@ def main(user: User):
             sell_price = max(target.sell_price, target.price*(1-SELL_UP_RATE))
             if target.own_amount * target.price > 5:
                 client.cancel_and_sell_limit_target(target, sell_price, 4)
-                Timer(60, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
+                Timer(20, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
 
 
 
@@ -88,7 +88,7 @@ def main(user: User):
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
-    scheduler.add_job(client.report, trigger='cron', hour='0-1,8-23', second=0, kwargs={'force': False})
+    scheduler.add_job(client.report, trigger='cron', hour='0-23', second=0, kwargs={'force': False})
     scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=30, kwargs={'force': True})
     # scheduler.add_job(client.report, 'interval', minutes=1, kwargs={'force': True})
     # scheduler.start()
