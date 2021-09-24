@@ -217,6 +217,10 @@ class Order(Base):
     date = Column(VARCHAR(20))
     account = Column(VARCHAR(200))
     direction = Column(VARCHAR(10))
+    aver_price = Column(REAL)
+    amount = Column(REAL)
+    vol = Column(REAL)
+    finished = Column(INTEGER)
 
     @classmethod
     def add_order(cls, summary, date, account_id):
@@ -226,7 +230,12 @@ class Order(Base):
                 symbol=summary.symbol,
                 date=date,
                 account=str(account_id),
-                direction=summary.direction
+                direction=summary.direction,
+                aver_price=0,
+                amount=0,
+                vol=0,
+                fee=0,
+                finished=0
             )
             session.add(order)
             session.commit()
@@ -235,6 +244,12 @@ class Order(Base):
     def get_orders(cls, conditions=[]):
         with get_session() as session:
             return session.query(cls).filter(*conditions).order_by(cls.date, cls.direction)
+
+    @classmethod
+    def update(cls, conditions=[], load={}):
+        with get_session() as session:
+            session.query(cls).filter(*conditions).update(load)
+            session.commit()
 
 
 def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:

@@ -77,20 +77,23 @@ def main(user: User):
             now_target.set_init_price(target.init_price)
             client.cancel_and_buy_limit_target(now_target, target.init_price)
 
-    user.start()
-    client = Client.init_dealer(user)
     watch_dog = replace_watch_dog()
+    user.start(watch_dog)
+    client = Client.init_dealer(user)
     scheduler = watch_dog.scheduler
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
+    scheduler.add_job(client.report, trigger='cron', hour='0-1,8-23', second=0, kwargs={'force': False})
+    scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=30, kwargs={'force': True})
+    # scheduler.add_job(client.report, 'interval', minutes=1, kwargs={'force': True})
+    # scheduler.start()
 
     client.resume()
-    print(client.date, client.targets)
     for summary in client.user.orders.values():
         print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
-    for target in client.targets[client.date].values():
+    for target in client.targets.get(client.date, {}).values():
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     client.watch_targets()

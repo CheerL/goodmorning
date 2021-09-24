@@ -94,6 +94,78 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
         ))
         session.commit()
 
+
+@retry(tries=5, delay=0.2)
+def wx_loss_report(account_id, wxuid, username, report_info):
+    if not wxuid:
+        return
+
+    float_profit = sum([each[4] for each in report_info['holding']])
+    summary = f'{strftime(time.time())} {username} 收益报告'
+    msg = f'''
+### 用户
+
+{username}
+''' + \
+('''
+### 买入
+
+| 币种 | 时间 | 价格 | 成交量 | 成交额 |
+| ---- | ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[2]:.4f} | {each[3]:.3f} |'
+    for each in report_info['new_buy']
+])
+) if report_info['new_buy'] else '' + \
+('''
+### 卖出
+
+| 币种 | 时间 | 价格 | 成交量 | 成交额 |
+| ---- | ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[2]:.4f} | {each[3]:.3f} |'
+    for each in report_info['new_sell']
+])
+) if report_info['new_sell'] else '' + \
+('''
+### 当前挂单
+
+| 币种 | 时间 | 价格 | 未成交量 | 
+| ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each[1]} | {each[0]} | {each[3]:.6g} | {each[2]:.4f} |'
+    for each in report_info['opening']
+])
+) if report_info['opening'] else '' + \
+'''
+### 当前持有
+
+| 币种 | 数量 | 成本价 | 现价 | 浮盈 | 浮盈率 |
+| ---- | ---- | ---- | ---- | ---- |
+''' + \
+'\n'.join([
+    f'| {each[0]} | {each[1]:.4f} | {each[2]:.6g} | {each[3]:.6g} | {each[4]:.3f} | {each[5]:.2%} |'
+    for each in report_info['holding']
+]) + \
+f'''
+### 总结
+
+- 浮盈: **{float_profit:.3f} USDT**
+
+- 日收益: **{"?"} USDT**
+
+- 总日收益: **{"?"} USDT**
+
+- 月收益: **{"?"} USDT**
+
+- 总收益: **{"?"} USDT**
+'''
+
+    wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
+
 @retry(tries=5, delay=0.2)
 def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_info, sell_info, total_profit, month_profit):
     if not wxuid:

@@ -2,7 +2,7 @@ import sys
 import time
 import datetime
 
-from client import State, WatcherClient, WatcherMasterClient
+from client.watcher import State, WatcherClient, WatcherMasterClient
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 from huobi.model.market.trade_detail import TradeDetail
 from retry import retry

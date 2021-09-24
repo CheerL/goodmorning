@@ -81,17 +81,22 @@ class BaseUser:
             users = users[:1]
         return users
 
-    def start(self):
+    def start(self, watch_dog=None):
         self.account_client.sub_account_update(
             AccountBalanceMode.TOTAL,
             self.balance_callback,
             self.error_callback('balance')
         )
+        if watch_dog:
+            watch_dog.after_connection_created('balance')
+
         self.trade_client.sub_order_update(
             '*', 
             self.trade_callback(),
             self.error_callback('order')
         )
+        if watch_dog:
+            watch_dog.after_connection_created('order')
 
         while 'usdt' not in self.balance:
             time.sleep(0.1)

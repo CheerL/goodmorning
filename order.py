@@ -40,6 +40,8 @@ class OrderSummary:
         self.fee = 0
         self.error_msg = ''
         self.status = 0
+        self.created_ts = 0
+        self.ts = 0
         self.filled_callback = None
         self.filled_callback_args = []
         self.cancel_callback = None
