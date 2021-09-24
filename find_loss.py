@@ -13,6 +13,7 @@ from client.dealer import LossDealerClient as Client
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from order import OrderSummaryStatus
 from dataset.pgsql import Order as OrderSQL
+from websocket_handler import replace_watch_dog, WatchDog
 
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
@@ -78,19 +79,20 @@ def main(user: User):
 
     user.start()
     client = Client.init_dealer(user)
-    scheduler = Scheduler()
+    watch_dog = replace_watch_dog()
+    scheduler = watch_dog.scheduler
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
-    scheduler.start()
 
     client.resume()
-    # print(client.date, client.targets)
-    # for summary in client.user.orders.values():
-    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price)
+    print(client.date, client.targets)
+    for summary in client.user.orders.values():
+        print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
-    # for target in client.targets[client.date].values():
-    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    for target in client.targets[client.date].values():
+        print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+
     client.watch_targets()
 
     client.wait_state(10)
