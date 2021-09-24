@@ -106,51 +106,44 @@ def wx_loss_report(account_id, wxuid, username, report_info):
 ### 用户
 
 {username}
-''' + \
-('''
+''' + ('''
+
 ### 买入
 
 | 币种 | 时间 | 价格 | 成交量 | 成交额 |
 | ---- | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
+''' + '\n'.join([
     f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[2]:.4f} | {each[3]:.3f} |'
     for each in report_info['new_buy']
-])
-) if report_info['new_buy'] else '' + \
-('''
+]) if report_info['new_buy'] else '') + ('''
+
 ### 卖出
 
 | 币种 | 时间 | 价格 | 成交量 | 成交额 |
 | ---- | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
+''' + '\n'.join([
     f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[2]:.4f} | {each[3]:.3f} |'
     for each in report_info['new_sell']
-])
-) if report_info['new_sell'] else '' + \
-('''
+]) if report_info['new_sell'] else '') + (
+'''
 ### 当前挂单
 
 | 币种 | 时间 | 价格 | 未成交量 | 
 | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
+''' + '\n'.join([
     f'| {each[1]} | {each[0]} | {each[3]:.6g} | {each[2]:.4f} |'
     for each in report_info['opening']
-])
-) if report_info['opening'] else '' + \
-'''
+]) if report_info['opening'] else '') + '''
+
 ### 当前持有
 
 | 币种 | 数量 | 成本价 | 现价 | 浮盈 | 浮盈率 |
 | ---- | ---- | ---- | ---- | ---- |
-''' + \
-'\n'.join([
+''' + '\n'.join([
     f'| {each[0]} | {each[1]:.4f} | {each[2]:.6g} | {each[3]:.6g} | {each[4]:.3f} | {each[5]:.2%} |'
     for each in report_info['holding']
-]) + \
-f'''
+]) + f'''
+
 ### 总结
 
 - 浮盈: **{float_profit:.3f} USDT**
