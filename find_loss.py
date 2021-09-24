@@ -20,23 +20,29 @@ MAX_DAY = config.getint('loss', 'MAX_DAY')
 
 def main(user: User):
     @retry(tries=10, delay=1, logger=logger)
-    def sell_targets():
+    def sell_targets(date=None):
         assert client.targets, 'No targets'
 
-        @retry(tries=5, delay=0.05)
-        def cancel_callback(summary=None):
-            if summary:
-                target.set_sell(summary.amount)
+        # @retry(tries=5, delay=0.05)
+        # def cancel_callback(summary=None):
+        #     if summary:
+        #         target.set_sell(summary.amount)
 
-            target.selling = 0
-            client.sell_limit_target(target, target.sell_price, selling_level=5)
+        #     target.selling = 0
+        #     client.sell_limit_target(target, target.sell_price, selling_level=5)
 
-        @retry(tries=5, delay=0.05)
-        def cancel(summary):
-            if summary.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
-                client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+        # @retry(tries=5, delay=0.05)
+        # def cancel():
+        #     for summary in client.user.orders.values():
+        #         if (summary.symbol == target.symbol and summary.order_id in client.user.sell_id
+        #             and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
+        #             and summary.label == target.date
+        #         ):
+        #             summary.add_cancel_callback(cancel_callback, [summary])
+        #             client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+        #     client.cancel_and_sell_limit_target(target, target.sell_price, 5)
 
-        date = client.date
+        date = date or client.date
         clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
         clear_targets = client.targets.get(clear_date, {})
         tickers = client.market_client.get_market_tickers()
@@ -52,10 +58,8 @@ def main(user: User):
         for target in client.targets[date].values():
             sell_price = max(target.sell_price, target.price*(1-SELL_UP_RATE))
             if target.own_amount * target.price > 5:
-                summary = client.cancel_and_sell_limit_target(target, sell_price, selling_level=4)
-                if summary:
-                    summary.add_cancel_callback(cancel_callback, [summary])
-                    Timer(60, cancel, [summary]).start()
+                client.cancel_and_sell_limit_target(target, sell_price, 4)
+                Timer(60, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
 
 
 
@@ -97,6 +101,7 @@ def main(user: User):
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     client.watch_targets()
+    sell_targets('2021-09-23')
 
     client.wait_state(10)
     kill_all_threads()
