@@ -426,7 +426,14 @@ class LossDealerClient(BaseDealerClient):
         order_id = int(order.order_id)
         symbol = order.symbol
 
-        detail = self.user.trade_client.get_order(order_id)
+        try:
+            detail = self.user.trade_client.get_order(order_id)
+        except Exception as e:
+            if 'record invaild' not in e:
+                raise e
+            else:
+                return
+
         detail.filled_amount = float(detail.filled_amount)
         detail.filled_cash_amount = float(detail.filled_cash_amount)
         detail.price = float(detail.price)
