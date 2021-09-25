@@ -346,7 +346,6 @@ class BaseUser:
             'symbol': order.symbol,
             'time': strftime(order.finished_at / 1000, fmt='%Y-%m-%d %H:%M:%S.%f'),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
-            # 'price': round(float(order.price), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
             'currency': order.symbol[:-4].upper(),

@@ -17,31 +17,11 @@ from websocket_handler import replace_watch_dog, WatchDog
 
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
+PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 
 def main(user: User):
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(date=None):
-        assert client.targets, 'No targets'
-
-        # @retry(tries=5, delay=0.05)
-        # def cancel_callback(summary=None):
-        #     if summary:
-        #         target.set_sell(summary.amount)
-
-        #     target.selling = 0
-        #     client.sell_limit_target(target, target.sell_price, selling_level=5)
-
-        # @retry(tries=5, delay=0.05)
-        # def cancel(target):
-        #     # for summary in client.user.orders.values():
-        #     #     if (summary.symbol == target.symbol and summary.order_id in client.user.sell_id
-        #     #         and summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]
-        #     #         and summary.label == target.date
-        #     #     ):
-        #     #         summary.add_cancel_callback(cancel_callback, [summary])
-        #     #         client.user.trade_client.cancel_order(summary.symbol, summary.order_id)
-        #     client.cancel_and_sell_limit_target(target, target.sell_price, 5)
-
         date = date or client.date
         clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
         clear_targets = client.targets.get(clear_date, {})
@@ -55,13 +35,14 @@ def main(user: User):
                 if target.own_amount * sell_price > 5:
                     client.cancel_and_sell_limit_target(target, sell_price, 6)
 
-        for target in client.targets[date].values():
-            sell_price = max(target.sell_price, target.price*(1-SELL_UP_RATE))
+        for target in client.targets.get(date, {}).values():
+            sell_price = max(target.sell_price, target.now_price*(1-SELL_UP_RATE))
             if target.own_amount * target.price > 5:
                 client.cancel_and_sell_limit_target(target, sell_price, 4)
-                Timer(60, client.cancel_and_sell_limit_target, args=[target, target.sell_price, 5]).start()
-
-
+                Timer(
+                    60, client.cancel_and_sell_limit_target,
+                    args=[target, target.sell_price, 5]
+                ).start()
 
     def set_targets(end=0):
         targets, date = client.find_targets(end=end)
@@ -90,8 +71,7 @@ def main(user: User):
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
     scheduler.add_job(client.report, trigger='cron', hour='0-1,8-23', second=0, kwargs={'force': False})
     scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=30, kwargs={'force': True})
-    # scheduler.add_job(client.report, 'interval', minutes=1, kwargs={'force': True})
-    # scheduler.start()
+    scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.resume()
     for summary in client.user.orders.copy().values():
@@ -100,8 +80,7 @@ def main(user: User):
     for target in client.targets.get(client.date, {}).values():
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
-    client.watch_targets()
-
+    # client.watch_targets()
     client.wait_state(10)
     kill_all_threads()
 

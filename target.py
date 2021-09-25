@@ -10,6 +10,9 @@ BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 HIGH_RATE = config.getfloat('loss', 'HIGH_RATE')
 LOW_RATE = config.getfloat('loss', 'LOW_RATE')
 SELL_RATE = config.getfloat('loss', 'SELL_RATE')
+AVER_INTERVAL_LENGTH = config.getfloat('loss', 'AVER_INTERVAL_LENGTH')
+PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
+AVER_NUM = int(AVER_INTERVAL_LENGTH // PRICE_INTERVAL)
 
 class BaseTarget:
     def __init__(self, symbol, price, time):
@@ -32,7 +35,7 @@ class BaseTarget:
         self.own = True
 
     def get_target_buy_price(self, rate=BUY_RATE):
-        buy_price = (1 + rate / 100) * self.price
+        buy_price = (1 + rate / 100) * self.now_price
         # return self.check_price(buy_price)
         return buy_price
 
@@ -81,8 +84,9 @@ class LossTarget(BaseTarget):
         self.date = date
         self.buy_vol = 0
         self.selling = 0
-        self.ticker_id = -1
+        self.ticker_id = 0
         self.recent_price = []
+        self.now_price = 0
 
         self.high_mark_price = 0
         self.high_mark_back_price = 0
@@ -119,20 +123,18 @@ class LossTarget(BaseTarget):
         if self.own_amount * self.buy_price <= 5:
             self.own = False
 
-    def update_price(self, tickers, start):
-        if self.ticker_id != -1 and tickers[self.ticker_id].symbol != self.symbol:
-            self.ticker_id = -1
-
-        if self.ticker_id == -1:
+    def update_price(self, tickers, num=AVER_NUM):
+        if tickers[self.ticker_id].symbol != self.symbol:
             for i, ticker in enumerate(tickers):
                 if ticker.symbol == self.symbol:
                     self.ticker_id = i
                     break
-                    
         else:
             ticker = tickers[self.ticker_id]
 
-        self.recent_price = self.recent_price[start:] + [ticker.close]
+        self.now_price = ticker.close
+        self.recent_price.append(self.now_price)
+        self.recent_price = self.recent_price[-num:]
 
         if self.recent_price:
             self.price = sum(self.recent_price) / len(self.recent_price)

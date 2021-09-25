@@ -19,7 +19,6 @@ STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
 MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
-AVER_LENGTH = config.getfloat('loss', 'AVER_LENGTH')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
@@ -214,12 +213,9 @@ class LossDealerClient(BaseDealerClient):
         targets = {}
         now = time.time()
 
+        @retry(tries=5, delay=1)
         def worker(symbol):
-            try:
-                klines = self.market_client.get_candlestick(symbol, '1day', min_before+end+1)[end:]
-            except Exception as e:
-                print(symbol, e)
-                return
+            klines = self.market_client.get_candlestick(symbol, '1day', min_before+end+1)[end:]
 
             if len(klines) <= min_before:
                 return
@@ -261,34 +257,14 @@ class LossDealerClient(BaseDealerClient):
         logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
         return targets, date
 
-    def watch_targets(self, aver_length=AVER_LENGTH):
-        def worker():
-            time_list = []
-            
-            while True:
-                if not self.date or not self.targets.get(self.date, {}):
-                    time.sleep(1)
-                    continue
+    def watch_targets(self):
+        if not self.date or not self.targets.get(self.date, {}):
+            return
 
-                try:
-                    tickers = self.market_client.get_market_tickers()
-                    now = time.time()
-                    time_list.append(now)
-                    for start, each in enumerate(time_list.copy()):
-                        if each < now - aver_length:
-                            time_list.pop(0)
-                        else:
-                            break
-
-                    for target in self.targets[self.date].values():
-                        target.update_price(tickers, start)
-                        self.check_target(target)
-                except Exception as e:
-                    logger.error(e)
-
-                time.sleep(0.5)
-
-        Timer(0, worker).start()
+        tickers = self.market_client.get_market_tickers()
+        for target in self.targets[self.date].values():
+            target.update_price(tickers)
+            self.check_target(target)
 
     def buy_limit_target(self, target: LossTarget, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None):
         @retry(tries=5, delay=0.05)
@@ -314,7 +290,7 @@ class LossDealerClient(BaseDealerClient):
             vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
 
         if not price:
-            price = target.price
+            price = target.now_price
         price *= 1 + limit_rate
 
         summary = self.user.buy_limit(target, vol, price)
@@ -468,6 +444,21 @@ class LossDealerClient(BaseDealerClient):
             else:
                 self.user.sell_id.append(order_id)
         
+        if 'market' in detail.type:
+            summary.limit = False
+            summary.create_price = 0
+        else:
+            summary.create_price = detail.price
+
+        if detail.type in ['buy-limit', 'sell-limit', 'sell-market']:
+            summary.create_amount = detail.amount
+            summary.remain = summary.created_amount - summary.amount
+
+        elif detail.type in ['buy-market']:
+            summary.created_vol = detail.amount
+            summary.remain = summary.created_vol - summary.vol
+        summary.created_ts = detail.created_at
+
         status = {
             'submitted': 1,
             'partial-filled': 2,
@@ -475,6 +466,8 @@ class LossDealerClient(BaseDealerClient):
             'canceled': 4,
             'partial-canceled': 4
         }[detail.state]
+
+
         if (detail.filled_amount != summary.amount
             or detail.filled_cash_amount != summary.vol
             or status != summary.status
@@ -486,33 +479,13 @@ class LossDealerClient(BaseDealerClient):
                 target.set_sell(detail.filled_amount - summary.amount)
 
             summary.ts = max(detail.finished_at, detail.created_at)
-            summary.created_ts = detail.created_at
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
             summary.aver_price = summary.vol / summary.amount
             summary.fee = summary.vol * 0.002
 
-            if 'market' in detail.type:
-                summary.limit = False
-                summary.create_price = 0
-            else:
-                summary.create_price = detail.price
-
-            if detail.type in ['buy-limit', 'sell-limit', 'sell-market']:
-                summary.create_amount = detail.amount
-                summary.remain = summary.created_amount - summary.amount
-                # if summary.remain / summary.created_amount < 1e-6:
-                #     summary.remain = 0
-
-            elif detail.type in ['buy-market']:
-                summary.created_vol = detail.amount
-                summary.remain = summary.created_vol - summary.vol
-                # if summary.remain / summary.created_vol < 1e-6:
-                #     summary.remain = 0
-
     def report(self, force):
-        logger.info(f'Start {force} report')
         now = time.time()
         start_date = ts2date(now - (MAX_DAY + 2) * 86400)
 
