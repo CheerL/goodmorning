@@ -453,19 +453,19 @@ class LossDealerClient(BaseDealerClient):
         
         if 'market' in detail.type:
             summary.limit = False
-            summary.create_price = 0
+            summary.created_price = 0
         else:
-            summary.create_price = detail.price
+            summary.created_price = detail.price
+        
 
         if detail.type in ['buy-limit', 'sell-limit', 'sell-market']:
-            summary.create_amount = detail.amount
+            summary.created_amount = detail.amount
             summary.remain = summary.created_amount - summary.amount
 
         elif detail.type in ['buy-market']:
             summary.created_vol = detail.amount
             summary.remain = summary.created_vol - summary.vol
         summary.created_ts = detail.created_at
-
         status = {
             'submitted': 1,
             'partial-filled': 2,
@@ -489,7 +489,7 @@ class LossDealerClient(BaseDealerClient):
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
-            summary.aver_price = summary.vol / summary.amount
+            summary.aver_price = 0 if not summary.amount else summary.vol / summary.amount
             summary.fee = summary.vol * 0.002
 
     def report(self, force):
