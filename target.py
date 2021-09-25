@@ -49,12 +49,14 @@ class BaseTarget:
         self.limit_order_min_order_amt = info.limit_order_min_order_amt
 
     def check_amount(self, amount):
-        precision_num = 10 ** self.amount_precision
-        return math.floor(amount * precision_num) / precision_num
+        checked_amount = round(amount, self.amount_precision)
+        if checked_amount > amount:
+            return round(amount - 0.1 ** self.amount_precision, self.amount_precision)
+        else:
+            return checked_amount
 
     def check_price(self, price):
-        precision_num = 10 ** self.price_precision
-        return math.floor(price * precision_num) / precision_num
+        return round(price, self.price_precision)
 
 class Target(BaseTarget):
     def __init__(self, symbol, price, time, high_stop_profit=True):
@@ -109,11 +111,12 @@ class LossTarget(BaseTarget):
         if vol <= 0 or amount <= 0:
             return
 
+        self.own = True
         self.own_amount += amount * 0.998
         self.buy_vol += vol
-        self.buy_price = self.buy_vol / self.own_amount * 0.998
-        self.own = True
-        self.sell_price = self.buy_price * (1+sell_rate)
+        if self.own_amount:
+            self.buy_price = self.buy_vol / self.own_amount * 0.998
+            self.sell_price = self.buy_price * (1+sell_rate)
 
     def set_sell(self, amount):
         if amount <= 0:

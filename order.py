@@ -62,7 +62,7 @@ class OrderSummary:
         new_vol = new_price * new_amount
         self.amount += new_amount
         self.vol += new_vol
-        self.aver_price = self.vol / self.amount
+        self.aver_price = self.vol / self.amount if self.amount else 0
         self.fee = self.vol * 0.002
         if 'partial-filled' == data.orderStatus:
             self.status = OrderSummaryStatus.PARTIAL_FILLED
