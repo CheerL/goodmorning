@@ -429,7 +429,7 @@ class LossDealerClient(BaseDealerClient):
         try:
             detail = self.user.trade_client.get_order(order_id)
         except HuobiApiException as e:
-            if 'record invaild' not in e.error_messagge:
+            if 'record invaild' not in e.error_message:
                 raise e
             else:
                 return
