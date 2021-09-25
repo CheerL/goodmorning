@@ -8,7 +8,7 @@ from utils import config, logger, user_config, get_rate
 from utils.parallel import run_thread_pool
 from utils.datetime import date2ts, ts2date, ts2time
 from order import OrderSummary, OrderSummaryStatus
-
+from huobi.exception.huobi_api_exception import HuobiApiException
 from wampy.roles.subscriber import subscribe
 from client import ControlledClient, Topic, State, WS_URL
 from user import User, LossUser
@@ -428,8 +428,8 @@ class LossDealerClient(BaseDealerClient):
 
         try:
             detail = self.user.trade_client.get_order(order_id)
-        except Exception as e:
-            if 'record invaild' not in e:
+        except HuobiApiException as e:
+            if 'record invaild' not in e.error_messagge:
                 raise e
             else:
                 return
