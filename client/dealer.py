@@ -389,7 +389,7 @@ class LossDealerClient(BaseDealerClient):
             if summary:
                 target.set_buy(summary.vol, summary.amount)
 
-            vol = float(self.buy_amount) - target.own_amount * target.buy_price
+            vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
             self.buy_limit_target(
                 target, price, vol, limit_rate,
                 filled_callback=filled_callback,
@@ -577,9 +577,10 @@ class LossDealerClient(BaseDealerClient):
             report_info['holding'].append((
                 symbol, amount, buy_price, price, profit, percent
             ))
+        usdt = self.user.get_amount('usdt', True, False)
     
         # for name, infos in report_info.items():
         #     print(name)
         #     for each in infos:
         #         print(each)
-        wx_loss_report(self.user.account_id, self.user.wxuid, self.user.username, report_info)
+        wx_loss_report(self.user.account_id, self.user.wxuid, self.user.username, report_info, usdt)
