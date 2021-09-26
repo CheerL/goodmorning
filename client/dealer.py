@@ -40,6 +40,27 @@ class BaseDealerClient(ControlledClient):
         client.start()
         return client
 
+class SingleDealerClient:
+    def __init__(self, market_client: MarketClient, user: User, *args, **kwargs):
+        # super().__init__(url=url)
+        self.market_client : MarketClient = market_client
+        self.targets = {}
+        self.user = user
+        self.client_type = 'single_dealer'
+        self.state = 0
+
+    @classmethod
+    @retry(tries=5, delay=1, logger=logger)
+    def init_dealer(cls, user):
+        market_client = MarketClient()
+        client = cls(market_client, user)
+        # client.start()
+        return client
+
+    def wait_state(self, state=State.STARTED):
+        while self.state != state:
+            time.sleep(0.1)
+
 
 class DealerClient(BaseDealerClient):
     def __init__(self, market_client: MarketClient, user: User, url=WS_URL):
@@ -135,7 +156,7 @@ class DealerClient(BaseDealerClient):
             self.user.cancel_and_sell_ioc(target, price, count)
 
 
-class LossDealerClient(BaseDealerClient):
+class LossDealerClient(SingleDealerClient):
     def __init__(self, market_client: MarketClient, user: LossUser, url=WS_URL):
         super().__init__(market_client=market_client, user=None, url=url)
         self.user: LossUser = user

@@ -13,8 +13,8 @@ from utils import logger
 
 HEART_BEAT_MS = 30000
 RECONNECT_MS = 32000
-RESTART_MS = 621500
-RESTART_RANGE = 60000
+RESTART_MS = 6215790
+RESTART_RANGE = 600000
 ConnectionState.RECONNECTING = 6
 
 def replace_watch_dog():

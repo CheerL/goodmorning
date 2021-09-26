@@ -81,7 +81,8 @@ def main(user: User):
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     # client.watch_targets()
-    client.wait_state(10)
+    client.wait_state(1)
+
     kill_all_threads()
 
 
