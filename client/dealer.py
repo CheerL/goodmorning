@@ -599,9 +599,16 @@ class LossDealerClient(SingleDealerClient):
                 symbol, amount, buy_price, price, profit, percent
             ))
         usdt = self.user.get_amount('usdt', True, False)
-    
-        # for name, infos in report_info.items():
-        #     print(name)
-        #     for each in infos:
-        #         print(each)
+        float_profit = sum([each[4] for each in report_info['holding']])
+
         wx_loss_report(self.user.account_id, self.user.wxuid, self.user.username, report_info, usdt)
+        logger.info('Summary')
+        for each in report_info['new_buy']:
+            logger.info(f'New buy: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U')
+        for each in report_info['new_sell']:
+            logger.info(f'New sell: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U')
+        for each in report_info['opening']:
+            logger.info(f'Opening order: {each[0]}, {each[1]}, left amount {each[2]:.4f}, price {each[3]:.6g}U')
+        for each in report_info['holding']:
+            logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%} |')
+        logger.info(f'Holding profit {float_profit}U, Usable money {usdt}U')

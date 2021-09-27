@@ -326,10 +326,10 @@ class BaseUser:
 
     @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency, available=False, check=True):
-        if check:
-            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
         if available:
             return self.available_balance[currency]
+        if check:
+            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
         return self.balance[currency]
 
     @retry(tries=5, delay=0.1)
