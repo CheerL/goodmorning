@@ -69,7 +69,7 @@ def main(user: User):
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
-    scheduler.add_job(client.report, trigger='cron', hour='0-1,8-23', second=0, kwargs={'force': False})
+    scheduler.add_job(client.report, trigger='cron', hour='0,8-23', second=0, kwargs={'force': False})
     scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=30, kwargs={'force': True})
     scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
@@ -81,7 +81,7 @@ def main(user: User):
         print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     # client.watch_targets()
-    client.wait_state(1)
+    client.wait_state(10)
 
     kill_all_threads()
 

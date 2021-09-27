@@ -128,10 +128,10 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt):
 '''
 ### 当前挂单
 
-| 币种 | 时间 | 价格 | 未成交量 | 
-| ---- | ---- | ---- | ---- |
+| 币种 | 时间 | 方向 | 价格 | 未成交量 | 
+| ---- | ---- |  ---- | ---- | ---- |
 ''' + '\n'.join([
-    f'| {each[1]} | {each[0]} | {each[3]:.6g} | {each[2]:.4f} |'
+    f'| {each[1]} | {each[0]} | {"买入" if each[4]=="buy" else "卖出"} | {each[3]:.6g} | {each[2]:.4f} |'
     for each in report_info['opening']
 ]) if report_info['opening'] else '') + '''
 

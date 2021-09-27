@@ -501,7 +501,7 @@ class LossDealerClient(SingleDealerClient):
             or status != summary.status
         ):
             if order.direction == 'buy':
-                target.set_sell(summary.amount)
+                target.set_sell(summary.amount, summary.vol)
                 target.set_buy(detail.filled_cash_amount, detail.filled_amount)
             else:
                 target.set_sell(detail.filled_amount - summary.amount)
@@ -560,7 +560,7 @@ class LossDealerClient(SingleDealerClient):
                 price = summary.created_price
                 amount = summary.remain
                 report_info['opening'].append((
-                    ts2time(ts), symbol, amount, price
+                    ts2time(ts), symbol, amount, price, summary.direction
                 ))
 
             elif summary.status in [-1, 3, 4]:
@@ -608,7 +608,7 @@ class LossDealerClient(SingleDealerClient):
         for each in report_info['new_sell']:
             logger.info(f'New sell: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U')
         for each in report_info['opening']:
-            logger.info(f'Opening order: {each[0]}, {each[1]}, left amount {each[2]:.4f}, price {each[3]:.6g}U')
+            logger.info(f'Opening order: {each[0]}, {each[1]}, {each[4]}, left amount {each[2]:.4f}, price {each[3]:.6g}U')
         for each in report_info['holding']:
             logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%} |')
         logger.info(f'Holding profit {float_profit}U, Usable money {usdt}U')

@@ -111,18 +111,20 @@ class LossTarget(BaseTarget):
         if vol <= 0 or amount <= 0:
             return
 
+        own_vol = self.own_amount * self.buy_price
         self.own = True
         self.own_amount += amount * 0.998
         self.buy_vol += vol
         if self.own_amount:
-            self.buy_price = self.buy_vol / self.own_amount * 0.998
+            self.buy_price = (own_vol+vol) / self.own_amount * 0.998
             self.sell_price = self.buy_price * (1+sell_rate)
 
-    def set_sell(self, amount):
+    def set_sell(self, amount, vol=0):
         if amount <= 0:
             return
 
         self.own_amount -= amount
+        self.buy_vol -= vol
         if self.own_amount * self.buy_price <= 5:
             self.own = False
 
