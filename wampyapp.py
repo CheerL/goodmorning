@@ -21,7 +21,7 @@ STOP_PROFIT_SLEEP = config.getfloat('time', 'STOP_PROFIT_SLEEP')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 REPORT_PRICE = user_config.getboolean('setting', 'REPORT_PRICE')
-WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
+WATCHER_NUM = config.getint('watcher', 'WATCHER_NUM')
 
 WS_HOST = config.get('data', 'WsHost')
 WS_PORT = config.getint('data', 'WsPort')
@@ -183,10 +183,9 @@ class WatcherMasterClient(WatcherClient):
             key=lambda symbol: vols[symbol],
             reverse=True
         )
-        k = math.ceil(len(self.symbols) / WATCHER_TASK_NUM)
 
-        self.tasks = [[] for _ in range(k)]
-        tasks_vol = [0] * k
+        self.tasks = [[] for _ in range(WATCHER_NUM)]
+        tasks_vol = [0] * WATCHER_NUM
         for symbol in self.symbols:
             i = tasks_vol.index(min(tasks_vol))
             self.tasks[i].append(symbol)

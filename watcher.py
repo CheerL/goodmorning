@@ -23,7 +23,6 @@ BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
 LOW_STOP_PROFIT_TIME = config.getfloat('time', 'LOW_STOP_PROFIT_TIME')
-WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 GOOD_SYMBOL = config.get('buy', 'GOOD_SYMBOL').split(',')
 
 BUY_BACK_RATE = BUY_BACK_RATE / 100
@@ -157,7 +156,7 @@ def main():
         client : WatcherMasterClient = init_watcher(WatcherMasterClient)
         logger.info(f'Total task num is {len(client.symbols)}')
         if TEST:
-            client.get_task(WATCHER_TASK_NUM)
+            client.get_task()
             now = datetime.datetime.now()
             run_time = now + datetime.timedelta(seconds=5)
             clear_time = run_time + datetime.timedelta(seconds=CLEAR_TIME)
@@ -178,7 +177,7 @@ def main():
         logger.info('Sub watcher')
         client : WatcherClient = init_watcher(WatcherClient)
         client.wait_state(State.STARTED)
-        client.get_task(WATCHER_TASK_NUM)
+        client.get_task()
 
         if not client.task:
             return
