@@ -83,6 +83,9 @@ def main(user: User):
     # client.watch_targets()
     client.wait_state(10)
 
+    target = client.targets['2021-09-27']['zksusdt']
+    client.sell_limit_target(target, target.sell_price)
+
     kill_all_threads()
 
 
