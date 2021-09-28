@@ -396,7 +396,6 @@ class LossDealerClient(SingleDealerClient):
             summary.fee = summary.vol * 0.002
 
     def report(self, force):
-        logger.info('Start report')
         now = time.time()
         start_date = ts2date(now - (MAX_DAY + 2) * 86400)
 

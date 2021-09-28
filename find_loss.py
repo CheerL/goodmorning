@@ -69,13 +69,12 @@ def main(user: User):
     scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.resume()
-    for summary in client.user.orders.copy().values():
-        print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
+    # for summary in client.user.orders.copy().values():
+    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
-    for target in client.targets.get(client.date, {}).values():
-        print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    # for target in client.targets.get(client.date, {}).values():
+    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
-    print(type(user.account_id))
     client.wait_state(10)
 
     kill_all_threads()
