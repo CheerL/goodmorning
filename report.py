@@ -96,7 +96,7 @@ def add_profit(account_id, pay, income, profit, percent, now=None):
 
 
 @retry(tries=5, delay=0.2)
-def wx_loss_report(account_id, wxuid, username, report_info, usdt):
+def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, month_profit, all_profit):
     if not wxuid:
         return
 
@@ -150,13 +150,13 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt):
 
 - 浮盈: **{float_profit:.3f} USDT**
 
-- 日收益: **{"?"} USDT**
+- 日收益: **{day_profit:.3f} USDT**
 
-- 总日收益: **{"?"} USDT**
+- 合计日收益: **{float_profit+day_profit:.3f} USDT**
 
-- 月收益: **{"?"} USDT**
+- 月收益: **{month_profit:.3f} USDT**
 
-- 总收益: **{"?"} USDT**
+- 总收益: **{all_profit:.3f} USDT**
 '''
 
     wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)

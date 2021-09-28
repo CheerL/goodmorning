@@ -7,16 +7,13 @@ from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderSide, OrderType, AccountBalanceMode
 from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
-from huobi.model.market.candlestick import Candlestick
 from retry.api import retry
 from threading import Timer
 
 from utils import config, logger, strftime, timeout_handle, user_config
-from utils.datetime import ts2date
 from report import wx_report, add_profit, get_profit, wx_name
-from target import Target, LossTarget
+from target import Target
 from order import OrderSummary, OrderSummaryStatus
-from dataset.pgsql import Order as OrderSQL, LossTarget as LossTargetSQL
 
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
@@ -24,10 +21,6 @@ ALL_STOP_PROFIT_RATE = config.getfloat('sell', 'ALL_STOP_PROFIT_RATE')
 IOC_RATE = config.getfloat('sell', 'IOC_RATE')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 HIGH_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'HIGH_STOP_PROFIT_HOLD_TIME')
-MIN_NUM = config.getint('loss', 'MIN_NUM')
-MAX_NUM = config.getint('loss', 'MAX_NUM')
-MAX_DAY = config.getint('loss', 'MAX_DAY')
-TEST = user_config.getboolean('setting', 'TEST')
 
 AccountBalanceMode.TOTAL = '2'
 
@@ -564,22 +557,3 @@ class User(BaseUser):
                 client.after_buy(target.symbol, 0)
 
         Timer(0, buy_callback).start()
-
-
-class LossUser(BaseUser):
-    def filter_targets(self, targets):
-        targets_num = len(targets)
-        usdt_amount = self.get_amount('usdt', available=True, check=False)
-        buy_num = max(min(targets_num, MAX_NUM), MIN_NUM)
-        buy_amount = usdt_amount // buy_num
-        if buy_amount < 6:
-            buy_amount = 6
-            buy_num = int(usdt_amount // buy_amount)
-
-        if not TEST:
-            self.buy_amount = buy_amount
-        targets = {
-            target.symbol: target for target in
-            sorted(targets.values(), key=lambda x: -x.vol)[:buy_num]
-        }
-        return targets

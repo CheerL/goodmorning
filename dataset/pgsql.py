@@ -1,5 +1,6 @@
 import time as _time
 import re
+from utils.datetime import ts2date
 from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func, Table
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
@@ -214,6 +215,7 @@ class Order(Base):
     id = Column(INTEGER, primary_key=True)
     order_id = Column(VARCHAR(50))
     symbol = Column(VARCHAR(100))
+    tm = Column(VARCHAR(50))
     date = Column(VARCHAR(20))
     account = Column(VARCHAR(200))
     direction = Column(VARCHAR(10))
@@ -229,6 +231,7 @@ class Order(Base):
                 order_id=str(summary.order_id),
                 symbol=summary.symbol,
                 date=date,
+                tm='',
                 account=str(account_id),
                 direction=summary.direction,
                 aver_price=0,
@@ -250,6 +253,16 @@ class Order(Base):
             session.query(cls).filter(*conditions).update(load)
             session.commit()
 
+    @classmethod
+    def get_profit(cls, account):
+        with get_session() as session:
+            today = ts2date()
+            table = Table('order_result', Base.metadata, autoload=True, autoload_with=session.bind)
+            data = session.query(table).filter(table.c.account==str(account)).all()
+            day_profit = sum([each.profit for each in data if each.sell_tm.startswith(today)])
+            month_profit = sum([each.profit for each in data if each.sell_tm.startswith(today[:7])])
+            all_profit = sum([each.profit for each in data])
+            return day_profit, month_profit, all_profit
 
 def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
