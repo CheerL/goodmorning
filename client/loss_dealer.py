@@ -388,7 +388,7 @@ class LossDealerClient(SingleDealerClient):
             else:
                 target.set_sell(detail.filled_amount - summary.amount)
 
-            summary.ts = detail.finished_at / 1000
+            summary.ts = detail.created_at / 1000 if detail.state == 'submitted' else detail.finished_at / 1000 
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
