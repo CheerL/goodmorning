@@ -101,14 +101,14 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, m
         return
 
     float_profit = sum([each[4] for each in report_info['holding']])
-    summary = f'{strftime(time.time())} {username} 收益报告'
+    summary = f'{strftime(time.time())} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
     msg = f'''
 ### 用户
 
 {username}
 ''' + ('''
 
-### 买入
+### 新买入
 
 | 币种 | 时间 | 价格 | 成交量 | 成交额 |
 | ---- | ---- | ---- | ---- | ---- |
@@ -117,7 +117,7 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, m
     for each in report_info['new_buy']
 ]) if report_info['new_buy'] else '') + ('''
 
-### 卖出
+### 新卖出
 
 | 币种 | 时间 | 价格 | 成交量 | 成交额 |
 | ---- | ---- | ---- | ---- | ---- |
