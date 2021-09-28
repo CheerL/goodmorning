@@ -21,7 +21,7 @@ def main(user: User):
         clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
         clear_targets = client.targets.get(clear_date, {})
         tickers = client.market_client.get_market_tickers()
-        
+
         for ticker in tickers:
             symbol = ticker.symbol
             if symbol in clear_targets:
@@ -41,7 +41,7 @@ def main(user: User):
 
     def set_targets(end=0):
         targets, date = client.find_targets(end=end)
-        targets = client.user.filter_targets(targets)
+        targets = client.filter_targets(targets)
         client.targets[date] = targets
         client.date = max(client.targets.keys())
 

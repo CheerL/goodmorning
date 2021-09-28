@@ -32,7 +32,7 @@ class LossDealerClient(SingleDealerClient):
 
     def resume(self):
         now = time.time()
-        start_date = ts2date(now - (MAX_DAY + 2) * 86400)
+        start_date = ts2date(now - (MAX_DAY + 3) * 86400)
         targets: list[LossTargetSQL] = LossTargetSQL.get_targets([
             LossTargetSQL.date >= start_date
         ])
@@ -185,7 +185,7 @@ class LossDealerClient(SingleDealerClient):
                 return
 
             target.set_buy(summary.vol, summary.amount)
-        
+
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
 
@@ -223,8 +223,6 @@ class LossDealerClient(SingleDealerClient):
         def _cancel_callback(summary):
             target.selling = 0
             target.set_sell(summary.amount)
-
-        
 
         if target.selling >= selling_level:
             return
