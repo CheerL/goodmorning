@@ -340,7 +340,6 @@ class LossDealerClient(SingleDealerClient):
         detail.price = float(detail.price)
         detail.amount = float(detail.amount)
 
-
         if order_id in self.user.orders:
             summary = self.user.orders[order_id]
         else:
@@ -413,7 +412,12 @@ class LossDealerClient(SingleDealerClient):
         for order in orders:
             order_id = int(order.order_id)
             self.check_order(order, self.targets[order.date][order.symbol])
+            
+            if order_id not in self.user.orders:
+                continue
+            
             summary = self.user.orders[order_id]
+
             if summary.amount != order.amount or summary.vol != order.vol:
                 amount = summary.amount - order.amount
                 vol = summary.vol - order.vol
@@ -469,7 +473,7 @@ class LossDealerClient(SingleDealerClient):
                 info = target_info[ticker.symbol]
                 info['price'] = ticker.close
                 info['vol'] = info['amount'] * info['price']
-        
+
         for symbol, info in target_info.items():
             amount = info['amount']
             buy_vol = info['buy_vol']
