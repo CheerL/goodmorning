@@ -116,8 +116,8 @@ class WatcherClient(ControlledClient):
         self.targets : dict[str, Target] = {}
         self.redis_conn: Redis = Redis()
 
-    def get_task(self, num) -> 'list[str]':
-        self.task = self.rpc.req_task(num)
+    def get_task(self) -> 'list[str]':
+        self.task = self.rpc.req_task()
 
     def send_buy_signal(self, symbol, price, init_price, trade_time, now):
         if now > trade_time + 0.2:
