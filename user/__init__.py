@@ -5,6 +5,8 @@ from retry import retry
 from target import BaseTarget as Target
 
 class BaseUser:
+    user_type = 'Base'
+
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
         self.sercet_key = secret_key
@@ -20,13 +22,12 @@ class BaseUser:
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
         self.buy_amount = buy_amount
-        self.type = 'base'
 
     @classmethod
     @retry(tries=5, delay=1, logger=logger)
-    def init_users(cls, num=-1) -> 'list[BaseUser]':
-        ACCESSKEY = user_config.get('setting', 'AccessKey')
-        SECRETKEY = user_config.get('setting', 'SecretKey')
+    def init_users(cls, num=-1):
+        ACCESSKEY = user_config.get('setting', f'{cls.user_type}AccessKey')
+        SECRETKEY = user_config.get('setting', f'{cls.user_type}SecretKey')
         WXUIDS = user_config.get('setting', 'WxUid')
         BUY_AMOUNT = user_config.get('setting', 'BuyAmount')
         TEST = user_config.getboolean('setting', 'Test')

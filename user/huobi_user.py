@@ -13,12 +13,13 @@ from websocket_handler import replace_watch_dog
 AccountBalanceMode.TOTAL = '2'
 
 class HuobiUser(BaseUser):
+    user_type = 'Huobi'
+
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.watch_dog = replace_watch_dog()
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
-        self.type = 'huobi'
 
     def get_asset(self) -> float:
         asset = float(self.account_client.get_account_asset_valuation('spot', 'USD').balance)
