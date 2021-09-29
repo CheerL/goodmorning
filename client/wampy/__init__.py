@@ -1,6 +1,5 @@
 import time
 
-from utils.logging import quite_logger
 from utils import config, logger
 
 from wampy.constants import DEFAULT_REALM, DEFAULT_ROLES, DEFAULT_TIMEOUT

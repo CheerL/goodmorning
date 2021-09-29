@@ -6,14 +6,14 @@ import time
 
 import pytz
 from gevent import monkey
-monkey.patch_all(select=False)
+monkey.patch_all()
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic, input_checker
 
-from utils.logging import create_logger, quite_logger
+from utils.logging import create_logger
 from utils.parallel import kill_thread
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,7 +47,6 @@ WebSocketDefine.Uri = WS_URL
 RestApiDefine.Url = URL
 PrintBasic.print_basic = lambda data, name=None: None
 input_checker.reg_ex = "[ _`~!@#$%^&()+=|{}':;',\\[\\].<>/?~！@#￥%……&（）——+|{}【】‘；：”“’。，、？]|\n|\t"
-quite_logger(all_logger=True)
 
 
 def get_rate(a, b, k=5):

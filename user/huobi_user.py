@@ -54,7 +54,6 @@ class HuobiUser(BaseUser):
         self.watch_dog.after_connection_created('order')
 
     def balance_callback(self, event: AccountUpdateEvent):
-        print(event)
         update: AccountUpdate = event.data
 
         if not update.changeTime:

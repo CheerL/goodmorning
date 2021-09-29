@@ -1,14 +1,13 @@
-import time
 import re
 
 from huobi.client.generic import GenericClient
-from huobi.client.market import MarketClient as _MarketClient
+from huobi.client.market import MarketClient as HuobiMarketClient
 from huobi.model.generic.symbol import Symbol
 
 from utils import timeout_handle
 
 
-class MarketClient(_MarketClient):
+class MarketClient(HuobiMarketClient):
     exclude_list = [
         'htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt',
         'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt',
