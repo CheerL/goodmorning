@@ -2,7 +2,7 @@ import sys
 import time
 import datetime
 
-from client.watcher import State, WatcherClient, WatcherMasterClient
+from client.wampy.watcher import State, MorningWatcherClient as WatcherClient, MorningWatcherMasterClient as WatcherMasterClient
 from huobi.model.market.trade_detail_event import TradeDetailEvent
 from huobi.model.market.trade_detail import TradeDetail
 from retry import retry
@@ -10,7 +10,7 @@ from retry import retry
 from market import MarketClient
 from utils import config, kill_all_threads, logger, user_config, test_config
 from websocket_handler import replace_watch_dog, WatchDog
-from target import Target
+from target import MorningTarget as Target
 
 TEST = user_config.getboolean('setting', 'Test')
 MIN_RATE = config.getfloat('buy', 'MIN_RATE')

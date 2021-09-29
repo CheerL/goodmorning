@@ -58,7 +58,7 @@ class BaseTarget:
     def check_price(self, price):
         return round(price, self.price_precision)
 
-class Target(BaseTarget):
+class MorningTarget(BaseTarget):
     def __init__(self, symbol, price, time, high_stop_profit=True):
         super().__init__(symbol, price, time) 
         self.stop_loss_price = 0

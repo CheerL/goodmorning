@@ -1,3 +1,4 @@
+
 import sys
 import argparse
 import os
@@ -7,6 +8,8 @@ from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
 from utils import ROOT, config
 from dataset.pgsql import get_session, get_Trade, Target
+
+### Too old
 
 DB_PATH = os.path.join(ROOT, 'test', 'db')
 PGHOST = config.get('data', 'PGHost')

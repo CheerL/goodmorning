@@ -2,14 +2,14 @@
 import argparse
 import time
 
-from retry.api import retry
+from retry import retry
 from threading import Timer
 from utils import config, kill_all_threads, logger
 from utils.parallel import run_process
 from utils.datetime import date2ts, ts2date
-from user import BaseUser  as User
+from user.huobi_user import HuobiUser  as User
 from client.loss_dealer import LossDealerClient as Client
-from websocket_handler import replace_watch_dog
+
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
@@ -41,7 +41,7 @@ def main(user: User):
 
     def set_targets(end=0):
         targets, date = client.find_targets(end=end)
-        targets = client.user.filter_targets(targets)
+        targets = client.filter_targets(targets)
         client.targets[date] = targets
         client.date = max(client.targets.keys())
 
@@ -57,10 +57,10 @@ def main(user: User):
             now_target.set_init_price(target.init_price)
             client.cancel_and_buy_limit_target(now_target, target.init_price)
 
-    watch_dog = replace_watch_dog()
-    user.start(watch_dog)
+
+    user.start()
     client = Client.init_dealer(user)
-    scheduler = watch_dog.scheduler
+    scheduler = user.watch_dog.scheduler
     scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
@@ -69,6 +69,7 @@ def main(user: User):
     scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.resume()
+    logger.info('Finsh loading data')
     # for summary in client.user.orders.copy().values():
     #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
@@ -85,6 +86,6 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num', default=-1, type=int)
     args = parser.parse_args()
 
-    logger.info('Dealer')
+    logger.info('Start Loss Strategy')
     users = User.init_users(num=args.num)
     run_process([(main, (user,), user.username) for user in users], is_lock=True)

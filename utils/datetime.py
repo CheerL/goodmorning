@@ -20,8 +20,8 @@ def ts2dt(ts=0):
         dt = datetime.datetime.now()
     return dt.astimezone(tz=tz)
 
-def ts2time(ts=0):
-    return ts2dt(ts).strftime('%Y-%m-%d %H:%M:%S')
+def ts2time(ts=0, fmt='%Y-%m-%d %H:%M:%S'):
+    return ts2dt(ts).strftime(fmt)
 
 def ts2date(ts=0):
-    return ts2dt(ts).strftime('%Y-%m-%d')
+    return ts2time(ts, '%Y-%m-%d')

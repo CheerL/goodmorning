@@ -2,15 +2,12 @@ import time
 import datetime
 import argparse
 
-from client.dealer import DealerClient as Client, State
+from client.wampy.dealer import MorningDealerClient as Client, State
 from utils.parallel import run_process
 from utils import config, kill_all_threads, logger, user_config
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
-from market import MarketClient
-from retry import retry
 from user import User
-from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
-from target import Target
+from target import MorningTarget as Target
 
 TEST = user_config.getboolean('setting', 'Test')
 LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))

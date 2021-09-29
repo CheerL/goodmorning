@@ -3,18 +3,18 @@ import math
 from threading import Timer
 from market import MarketClient
 from dataset.redis import Redis
-from target import Target
+from target import MorningTarget as Target
 from utils import config, get_target_time, logger
 
 from wampy.roles.subscriber import subscribe
 from wampy.roles.callee import callee
-from client import ControlledClient, Topic, State, WS_URL
+from client.wampy import ControlledClient, Topic, State, WS_URL
 
 WATCHER_TASK_NUM = config.getint('watcher', 'WATCHER_TASK_NUM')
 IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 
-class WatcherClient(ControlledClient):
+class MorningWatcherClient(ControlledClient):
     def __init__(self, market_client: MarketClient, url=WS_URL):
         super().__init__(url=url)
         self.market_client : MarketClient = market_client
@@ -70,7 +70,7 @@ class WatcherClient(ControlledClient):
             self.targets[symbol].set_buy_price(price)
 
 
-class WatcherMasterClient(WatcherClient):
+class MorningWatcherMasterClient(MorningWatcherClient):
     def __init__(self, market_client: MarketClient, url=WS_URL):
         super().__init__(market_client=market_client, url=url)
         self.client_info = {
