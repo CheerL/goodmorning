@@ -63,6 +63,7 @@ class LossDealerClient(SingleDealerClient):
 
                 target = self.targets[order.date][order.symbol]
                 self.check_order(order, target)
+                time.sleep(0.05)
             except Exception as e:
                 logger.error(e)
 
