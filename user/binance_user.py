@@ -10,9 +10,49 @@ from utils import logger
 from target import BaseTarget as Target
 from order import OrderSummary
 from user import BaseUser
-from websocket_handler import replace_watch_dog
 
+import time
 # AccountBalanceMode.TOTAL = '2'
+
+class ListenKey:
+    def __init__(self, api: Spot):
+        self.api = api
+        self.key = self.api.new_listen_key()['listenKey']
+        self.update_time = time.time()
+        self.create_time = self.update_time
+
+    def update(self):
+        self.key = self.api.renew_listen_key(self.key)
+        self.update_time = time.time()
+
+    def recreate(self):
+        self.api.close_listen_key(self.key)
+        self.key = self.api.new_listen_key()['listenKey']
+        self.update_time = time.time()
+        self.create_time = self.update_time
+
+    def check(self):
+        now = time.time()
+        if now > self.create_time + 12 * 60 * 60:
+            self.recreate()
+        elif now > self.update_time + 30 * 60:
+            self.update()
+
+class OrderUpdate:
+    def __init__(self, update):
+        self.orderId = 0
+        self.tradePrice = ""
+        self.tradeVolume = ""
+        self.tradeId = 0
+        self.tradeTime = 0
+        self.aggressor = False
+        self.remainAmt = ""
+        self.orderStatus = 0
+        self.clientOrderId = ""
+        self.eventType = ""
+        self.symbol = ""
+        self.type = 0
+        self.accountId = 0
 
 class BinanceUser(BaseUser):
     user_type = 'Binance'
@@ -20,63 +60,50 @@ class BinanceUser(BaseUser):
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.api = Spot(key=access_key, secret=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
-
-    def get_asset(self) -> float:
-        pass
-        # asset = float(self.account_client.get_account_asset_valuation('spot', 'USD').balance)
-        # return asset
+        self.listen_key = ListenKey(self.api)
+        self.websocket = SpotWebsocketClient()
 
     def get_account_id(self) -> int:
         return 0
-        # return next(filter(
-        #     lambda account: account.type=='spot' and account.state =='working',
-        #     self.account_client.get_accounts()
-        # )).id
 
     def get_order(self, order_id):
-        return self.trade_client.get_order(order_id)
+        symbol = self.orders[order_id].symbol
+        return self.api.get_order(symbol, orderId=order_id)
 
     def cancel_order(self, order_id):
         symbol = self.orders[order_id].symbol
-        self.trade_client.cancel_order(symbol, order_id)
+        self.api.cancel_order(symbol, orderId=order_id)
 
     def sub_balance_update(self, **kwargs):
-        self.account_client.sub_account_update(
-            AccountBalanceMode.TOTAL,
-            self.balance_callback,
-            self.error_callback('balance')
-        )
-        self.watch_dog.after_connection_created('balance')
+        self.listen_key.check()
+        self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
 
-    def sub_order_update(self, **kwargs):
-        self.trade_client.sub_order_update(
-            '*', 
-            self.trade_callback,
-            self.error_callback('order')
-        )
-        self.watch_dog.after_connection_created('order')
 
-    def balance_callback(self, event):
-        update: AccountUpdate = event.data
+    def user_data_callback(self, update):
+        print(update)
+        if update['e'] == 'outboundAccountPosition':
+            self.balance_callback(update)
+        elif update['e'] == 'executionReport':
+            self.trade_callback(update)
 
-        if not update.changeTime:
-            update.changeTime = 0
+    def balance_callback(self, update):
+        change_time = update['E']
 
-        if (update.currency not in self.balance_update_time
-            or update.changeTime > self.balance_update_time[update.currency]
-        ):
-            self.balance[update.currency] = float(update.balance)
-            self.available_balance[update.currency] = float(update.available)
-            self.balance_update_time[update.currency] = int(update.changeTime) / 1000
+        for sub_update in update['B']:
+            currency = sub_update['a']
+            if change_time > self.balance_update_time[currency]:
+                self.available_balance[currency] = float(sub_update['f'])
+                self.balance[currency] = float(sub_update['f'])+float(sub_update['l'])
+                self.balance_update_time[update.currency] = change_time
 
-    def trade_callback(self, event):
+    def trade_callback(self, update):
         @retry(tries=3, delay=0.01)
-        def _warpper(event: OrderUpdateEvent):
-            update: OrderUpdate = event.data
-            symbol = update.symbol
-            direction = 'buy' if 'buy' in update.type else 'sell'
-            etype = update.eventType
-            order_id = update.orderId
+        def _warpper(update):
+            symbol = update['s']
+            direction = update['S']
+            etype = update['x']
+            now_etype = update['X']
+            order_id = update['i']
 
             if order_id in self.orders:
                 summary = self.orders[order_id]
@@ -85,7 +112,7 @@ class BinanceUser(BaseUser):
                 self.orders[order_id] = summary
 
             try:
-                if etype == 'creation':
+                if etype == 'New':
                     summary.create(update)
 
                 elif etype == 'trade':
@@ -104,7 +131,8 @@ class BinanceUser(BaseUser):
                 raise e
 
         try:
-            _warpper(event)
+            update['from'] = 'binance'
+            _warpper(update)
         except Exception as e:
             if not isinstance(e, KeyError):
                 logger.error(f"max tries | {type(e)} {e}")

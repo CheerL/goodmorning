@@ -38,7 +38,7 @@ class HuobiUser(BaseUser):
         symbol = self.orders[order_id].symbol
         self.trade_client.cancel_order(symbol, order_id)
 
-    def sub_balance_update(self, **kwargs):
+    def sub_balance_and_order(self, **kwargs):
         self.account_client.sub_account_update(
             AccountBalanceMode.TOTAL,
             self.balance_callback,
@@ -46,7 +46,6 @@ class HuobiUser(BaseUser):
         )
         self.watch_dog.after_connection_created('balance')
 
-    def sub_order_update(self, **kwargs):
         self.trade_client.sub_order_update(
             '*', 
             self.trade_callback,

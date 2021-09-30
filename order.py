@@ -50,9 +50,12 @@ class OrderSummary:
     def report(self):
         logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 
-    def create(self, data: OrderUpdate):
-        if 'market' in data.type:
+    def create(self, data):
+        if isinstance(data, OrderUpdate) and 'market' in data.type:
             self.limit = False
+        elif isinstance(data, dict) and data['from'] == 'binance' and data['o'] == 'MARKET':
+            self.limit = False
+            
         self.status = OrderSummaryStatus.CREATED
         self.report()
 
@@ -70,11 +73,15 @@ class OrderSummary:
         elif 'filled' == data.orderStatus:
             self.status = OrderSummaryStatus.FILLED
             self.remain = 0
+            if self.filled_callback:
+                self.filled_callback(self.filled_callback_args)
         self.report()
 
     def cancel_update(self, data: OrderUpdate):
         self.status = OrderSummaryStatus.CANCELED
         self.remain = float(data.remainAmt)
+        if self.cancel_callback:
+            self.cancel_callback(self.cancel_callback_args)
         self.report()
 
     def finish(self):

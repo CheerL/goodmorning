@@ -1,3 +1,6 @@
+import time
+import math
+
 from order import OrderSummary
 from report import wx_name
 from utils import logger, user_config
@@ -68,23 +71,19 @@ class BaseUser:
             assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
         return self.balance[currency]
 
-    def start(self, balance_update_kwargs={}, order_update_kwargs={}):
-        self.sub_balance_update(**balance_update_kwargs)
-        # self.sub_order_update(**order_update_kwargs)
+    def start(self, **kwargs):
+        self.sub_balance_and_order(**kwargs)
 
-        # while 'usdt' not in self.balance:
-        #     time.sleep(0.1)
+        while 'usdt' not in self.balance:
+            time.sleep(0.1)
 
-        # usdt = self.balance['usdt']
-        # if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
-        #     self.buy_amount = max(math.floor(usdt / float(self.buy_amount[1:])), 5)
-        # else:
-        #     self.buy_amount = float(self.buy_amount)
+        usdt = self.balance['usdt']
+        if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
+            self.buy_amount = max(math.floor(usdt / float(self.buy_amount[1:])), 5)
+        else:
+            self.buy_amount = float(self.buy_amount)
 
-    def sub_balance_update(self, **kwargs):
-        raise NotImplementedError
-
-    def sub_order_update(self, **kwargs):
+    def sub_balance_and_order(self, **kwargs):
         raise NotImplementedError
 
     def buy(self, target: Target, vol):
