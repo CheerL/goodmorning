@@ -137,10 +137,10 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, m
 
 ### 当前持有
 
-| 币种 | 数量 | 成本价 | 现价 | 浮盈 | 浮盈率 |
+| 币种 | 买入日期 | 成本价 | 现价 | 浮盈 | 浮盈率 | 数量 |
 | ---- | ---- | ---- | ---- | ---- |
 ''' + '\n'.join([
-    f'| {each[0]} | {each[1]:.4f} | {each[2]:.6g} | {each[3]:.6g} | {each[4]:.3f} | {each[5]:.2%} |'
+    f'| {each[0]} | {each[6]} | {each[2]:.6g} | {each[3]:.6g} | {each[4]:.3f} | {each[5]:.2%} | {each[1]:.4f} |'
     for each in report_info['holding']
 ]) + f'''
 

@@ -463,7 +463,7 @@ class LossDealerClient(SingleDealerClient):
                 amount = target.own_amount
                 vol = amount * price
                 if target.own and amount and vol >= 5:
-                    target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0})
+                    target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0, 'date': target.date})
                     target_info[symbol]['amount'] += amount
                     target_info[symbol]['buy_vol'] += target.buy_vol
 
@@ -481,8 +481,9 @@ class LossDealerClient(SingleDealerClient):
             price = info['price']
             profit = price * amount - buy_vol
             percent = profit / buy_vol
+            date = info['date']
             report_info['holding'].append((
-                symbol, amount, buy_price, price, profit, percent
+                symbol, amount, buy_price, price, profit, percent, date
             ))
 
         usdt = self.user.get_amount('usdt', True, False)
