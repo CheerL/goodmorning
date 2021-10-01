@@ -30,7 +30,6 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
         'linkusdt', 'adausdt', 'jstusdt', 'vetusdt', 'xmxusdt',
         'newusdt', 'uipusdt', 'smtusdt'
     ]
-    min_usdt_amount = 6
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -45,6 +44,7 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
             info.symbol: info
             for info in self.generic_client.get_exchange_symbols()
             if info.symbol.endswith('usdt')
+            and info.state == 'online'
             and not re.search('\d', info.symbol)
             and info.symbol not in [
                 'bchausdt', 'mcousdt', 'borusdt',
@@ -65,6 +65,8 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
 class HuobiUser(BaseUser):
     user_type = 'Huobi'
     MarketClient = HuobiMarketClient
+    min_usdt_amount = 6
+    fee_rate = 0.002
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.watch_dog = replace_watch_dog()
@@ -148,7 +150,7 @@ class HuobiUser(BaseUser):
                     summary.create(update)
 
                 elif etype == 'trade':
-                    summary.update(update)
+                    summary.update(update, self.fee_rate)
 
                 elif etype == 'cancellation':
                     summary.cancel_update(update)

@@ -10,9 +10,9 @@ from utils import config, user_config
 
 PGHOST = config.get('data', 'PGHost')
 PGPORT = config.getint('data', 'PGPort')
-PGUSER = 'postgres'
+PGUSER = user_config.get('setting', 'PGUser')
 PGPASSWORD = user_config.get('setting', 'PGPassword')
-PGNAME = 'goodmorning'
+PGNAME = user_config.get('setting', 'PGDatabase')
 
 Base = declarative_base()
 TRADE_CLASS = {}
@@ -120,6 +120,7 @@ class LossTarget(Base):
     id = Column(INTEGER, primary_key=True)
     date = Column(VARCHAR(20))
     symbol = Column(VARCHAR(30))
+    exchange = Column(VARCHAR(30))
     open = Column(REAL)
     close = Column(REAL)
     high = Column(REAL)
@@ -131,7 +132,8 @@ class LossTarget(Base):
         with get_session() as session:
             target = session.query(cls).filter(
                 cls.symbol==kwargs['symbol'],
-                cls.date==kwargs['date']
+                cls.date==kwargs['date'],
+                cls.exchange==kwargs['exchange']
             ).first()
             if not target:
                 session.add(cls(**kwargs))

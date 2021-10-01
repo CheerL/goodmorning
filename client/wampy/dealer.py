@@ -48,7 +48,7 @@ class MorningDealerClient(ControlledClient, BaseDealerClient):
                 logger.error(f'Fail to buy {target.symbol}')
                 return
 
-            amount = min(self.user.get_amount(target.base_currency), summary.amount * 0.998)
+            amount = min(self.user.get_amount(target.base_currency), summary.amount * (1-self.user.fee_rate))
             assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
             self.user.sell_limit(target, amount, target.stop_profit_price)
             Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
@@ -72,7 +72,7 @@ class MorningDealerClient(ControlledClient, BaseDealerClient):
                 logger.error(f'Fail to buy {target.symbol}')
                 return
 
-            amount = min(self.user.get_amount(target.base_currency), summary.amount * 0.998)
+            amount = min(self.user.get_amount(target.base_currency), summary.amount * (1-self.user.fee_rate))
             assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
             self.user.sell_limit(target, amount, target.stop_profit_price)
             Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
@@ -160,7 +160,7 @@ class MorningDealerClient(ControlledClient, BaseDealerClient):
                 if summary.order_id in self.user.sell_id
                 and summary.symbol == target.symbol
             ])
-            remain = 0.998 * buy_amount - sell_amount
+            remain = (1-self.user.fee_rate) * buy_amount - sell_amount
             logger.info(f'{target.symbol} buy {buy_amount} sell {sell_amount} left {remain}')
             try:
                 if (remain / buy_amount) > 0.01:

@@ -89,6 +89,7 @@ class LossTarget(BaseTarget):
         self.ticker_id = 0
         self.recent_price = []
         self.now_price = 0
+        self.fee_rate = 0
 
         self.high_mark_price = 0
         self.high_mark_back_price = 0
@@ -99,6 +100,10 @@ class LossTarget(BaseTarget):
         self.sell_price = 0
 
         self.set_init_price(close)
+
+    def set_info(self, info, fee_rate):
+        super().set_info(info)
+        self.fee_rate = fee_rate
 
     def set_init_price(self, price, high_rate=HIGH_RATE, low_rate=LOW_RATE):
         self.init_price = price
@@ -112,10 +117,10 @@ class LossTarget(BaseTarget):
 
         own_vol = self.own_amount * self.buy_price
         self.own = True
-        self.own_amount += amount * 0.998
+        self.own_amount += amount * (1 - self.fee_rate)
         self.buy_vol += vol
         if self.own_amount:
-            self.buy_price = (own_vol+vol) / self.own_amount * 0.998
+            self.buy_price = (own_vol+vol) / self.own_amount * (1 - self.fee_rate)
             self.sell_price = self.buy_price * (1+sell_rate)
 
     def set_sell(self, amount, vol=0):
@@ -124,7 +129,7 @@ class LossTarget(BaseTarget):
 
         self.own_amount -= amount
         self.buy_vol -= vol
-        if self.own_amount * self.buy_price <= 5:
+        if self.own_amount * self.buy_price <= self.min_order_value:
             self.own = False
 
     def update_price(self, tickers, num=AVER_NUM):

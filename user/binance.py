@@ -3,7 +3,7 @@
 # from huobi.constant import OrderSource, OrderType, AccountBalanceMode
 # from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 # from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
-from utils import logger
+from utils import logger, user_config
 from binance.spot import Spot
 from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
 from binance.websocket.spot.websocket_client import SpotWebsocketClient
@@ -17,6 +17,8 @@ import re
 import time
 import math
 # AccountBalanceMode.TOTAL = '2'
+
+
 
 class BinanceMarketClient(BaseMarketClient):
     exclude_list = []
@@ -32,6 +34,8 @@ class BinanceMarketClient(BaseMarketClient):
             info['symbol']: Symbol(info)
             for info in self.api.exchange_info()['symbols']
             if info['symbol'].endswith('USDT')
+            and info['status'] == 'TRADING'
+            and not 'DOWN' in info['symbol']
             and not re.search('\d', info['symbol'])
             and info['symbol'] not in []
         }
@@ -65,6 +69,7 @@ class BinanceUser(BaseUser):
     user_type = 'Binance'
     MarketClient = BinanceMarketClient
     min_usdt_amount = 11
+    fee_rate = 0.001
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.api = Spot(key=access_key, secret=secret_key)
@@ -76,13 +81,29 @@ class BinanceUser(BaseUser):
         self.api.new_order = self.api.new_order_test
         self.scheduler = Scheduler()
         self.scheduler.add_job(self.listen_key.check, 'interval', minutes=5)
-        self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
+        self.scheduler.add_job(self.api.ping, 'interval', max_instances=5, seconds=5)
         # self.scheduler.add_job(lambda : print(111), 'interval', seconds=5)
         self.scheduler.start()
         self.websocket.start()
 
+    @classmethod
+    def init_users(cls, num=-1):
+        users = super().init_users(num=num)
+        ACCOUNT_ID = user_config.get('setting', f'BinanceID')
+        TEST = user_config.getboolean('setting', 'Test')
+
+        ids = [int(id.strip()) for id in ACCOUNT_ID.split(',')]
+        if num == -1 and TEST:
+            ids = ids[:1]
+        else:
+            ids = [ids[num]]
+
+        for id, user in zip(ids, users):
+            user.account_id = id
+        return users
+
     def get_account_id(self) -> int:
-        return 0
+        return -1
 
     def get_order(self, order_id):
         symbol = self.orders[order_id].symbol
@@ -151,7 +172,7 @@ class BinanceUser(BaseUser):
                     summary.create(update)
 
                 elif etype == 'TRADE':
-                    summary.update(update)
+                    summary.update(update, self.fee_rate)
 
                 elif etype == 'CANCELED':
                     summary.cancel_update(update)

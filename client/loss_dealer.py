@@ -32,7 +32,8 @@ class LossDealerClient(BaseDealerClient):
         now = time.time()
         start_date = ts2date(now - (MAX_DAY + 2) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
-            TargetSQL.date >= start_date
+            TargetSQL.date >= start_date,
+            TargetSQL.exchange == self.user.user_type
         ])
         infos = self.market_client.all_symbol_info
 
@@ -41,7 +42,7 @@ class LossDealerClient(BaseDealerClient):
             date_target_dict[target.symbol] = Target(
                 target.symbol, target.date, target.open, target.close, target.vol
             )
-            date_target_dict[target.symbol].set_info(infos[target.symbol])
+            date_target_dict[target.symbol].set_info(infos[target.symbol], self.user.fee_rate)
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
@@ -57,7 +58,7 @@ class LossDealerClient(BaseDealerClient):
                     self.targets[order.date][order.symbol] = Target(
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
-                    self.targets[order.date][order.symbol].set_info(infos[order.symbol])
+                    self.targets[order.date][order.symbol].set_info(infos[order.symbol], self.user.fee_rate)
 
                 target = self.targets[order.date][order.symbol]
                 self.check_order(order, target)
@@ -77,14 +78,14 @@ class LossDealerClient(BaseDealerClient):
     def check_target(self, target: Target):
         if target.high_mark:
             if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE):
-                self.sell_limit_target(target, target.high_mark_back_price)
+                self.sell_target(target, target.high_mark_back_price)
                 return
         elif target.price >= target.high_mark_price:
             target.high_mark = True
         
         if target.low_mark:
             if target.own and target.price <= target.sell_price * (1+SELL_UP_RATE):
-                self.sell_limit_target(target, target.sell_price, selling_level=2)
+                self.sell_target(target, target.sell_price, selling_level=2)
                 return
         elif target.price >= target.low_mark_price:
             target.low_mark = True
@@ -142,6 +143,7 @@ class LossDealerClient(BaseDealerClient):
                 if now - kline.id > 86400:
                     TargetSQL.add_target(
                         symbol=symbol,
+                        exchange=self.user.user_type,
                         date=target.date,
                         high=kline.high,
                         low=kline.low,
@@ -149,7 +151,7 @@ class LossDealerClient(BaseDealerClient):
                         close=kline.close,
                         vol=kline.vol
                     )
-                target.set_info(infos[symbol])
+                target.set_info(infos[symbol], self.user.fee_rate)
                 targets[symbol] = target
 
         
@@ -174,7 +176,7 @@ class LossDealerClient(BaseDealerClient):
         assert available_amount > 0.9 * target.own_amount, assert_word
         return min(target.own_amount, available_amount)
 
-    def buy_limit_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None):
+    def buy_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True):
         @retry(tries=5, delay=0.05)
         def _filled_callback(summary):
             if summary.aver_price <=0:
@@ -201,7 +203,11 @@ class LossDealerClient(BaseDealerClient):
             price = target.now_price
         price *= 1 + limit_rate
 
-        summary = self.user.buy_limit(target, vol, price)
+        if limit:
+            summary = self.user.buy_limit(target, vol, price)
+        else:
+            summary = self.user.buy(target, vol)
+
         if summary != None:
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
@@ -211,7 +217,7 @@ class LossDealerClient(BaseDealerClient):
             logger.error(f'Failed to buy {target.symbol}')
         return summary
 
-    def sell_limit_target(self, target: Target, price, sell_amount=0, selling_level=1, filled_callback=None, cancel_callback=None):
+    def sell_target(self, target: Target, price, sell_amount=0, selling_level=1, filled_callback=None, cancel_callback=None, limit=True):
         @retry(tries=5, delay=0.05)
         def _filled_callback(summary):
             target.selling = 0
@@ -231,7 +237,11 @@ class LossDealerClient(BaseDealerClient):
         cancel_callback = cancel_callback or _cancel_callback
         target.selling = selling_level
         sell_amount = sell_amount or self.get_sell_amount(target)
-        summary = self.user.sell_limit(target, sell_amount, price)
+        if limit:
+            summary = self.user.sell_limit(target, sell_amount, price)
+        else:
+            summary = self.user.sell(target, sell_amount)
+
         if summary != None:
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
@@ -252,10 +262,11 @@ class LossDealerClient(BaseDealerClient):
                     target.set_buy(summary.vol, summary.amount)
 
             sell_amount = self.get_sell_amount(target)
-            self.sell_limit_target(
+            self.sell_target(
                 target, price, sell_amount, selling_level,
                 filled_callback=filled_callback,
-                cancel_callback=cancel_callback
+                cancel_callback=cancel_callback,
+                limit=sell_amount * price > target.min_order_value
             )
 
         symbol = target.symbol
@@ -288,7 +299,7 @@ class LossDealerClient(BaseDealerClient):
                 target.set_buy(summary.vol, summary.amount)
 
             vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
-            self.buy_limit_target(
+            self.buy_target(
                 target, price, vol, limit_rate,
                 filled_callback=filled_callback,
                 cancel_callback=cancel_callback
@@ -358,7 +369,7 @@ class LossDealerClient(BaseDealerClient):
         elif detail.type in ['buy-market']:
             summary.created_vol = detail.amount
             summary.remain = summary.created_vol - summary.vol
-        summary.created_ts = detail.created_at /1000
+        summary.created_ts = detail.created_at / 1000
         summary.ts = max(detail.created_at, detail.finished_at) / 1000 
         status = {
             'submitted': 1,
@@ -388,7 +399,7 @@ class LossDealerClient(BaseDealerClient):
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
             summary.aver_price = summary.vol / summary.amount if summary.amount else 0
-            summary.fee = summary.vol * 0.002
+            summary.fee = summary.vol * self.user.fee_rate
 
     def report(self, force):
         now = time.time()
@@ -443,10 +454,10 @@ class LossDealerClient(BaseDealerClient):
                 ))
 
             elif summary.status in [-1, 3, 4]:
-                OrderSQL.update(
-                    [OrderSQL.order_id==order.order_id],
-                    {'finished': 1, 'tm': ts2time(summary.ts)}
-                )
+                load = {'finished': 1}
+                if summary.ts:
+                    load['tm'] = ts2time(summary.ts)
+                OrderSQL.update([OrderSQL.order_id==order.order_id],load)
 
         if not force and not report_info['new_sell'] and not report_info['new_buy']:
             return
@@ -458,7 +469,7 @@ class LossDealerClient(BaseDealerClient):
                 price = target.price
                 amount = target.own_amount
                 vol = amount * price
-                if target.own and amount and vol >= 5:
+                if target.own and amount and vol >= 1:
                     target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0, 'date': target.date})
                     target_info[symbol]['amount'] += amount
                     target_info[symbol]['buy_vol'] += target.buy_vol

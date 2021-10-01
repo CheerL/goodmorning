@@ -1,9 +1,3 @@
-import time
-import math
-
-from gevent import monkey
-monkey.patch_all()
-
 from order import OrderSummary
 from report import wx_name
 from utils import logger, user_config, timeout_handle
@@ -66,6 +60,7 @@ class BaseUser:
     user_type = 'Base'
     MarketClient = BaseMarketClient
     min_usdt_amount = 0
+    fee_rate = 0
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
@@ -103,7 +98,7 @@ class BaseUser:
             users = [cls(*user_data) for user_data in zip(access_keys, secret_keys, buy_amounts, wxuids)]
         else:
             users = [cls(access_keys[num], secret_keys[num], buy_amounts[num], wxuids[num])]
-                                                    
+
         if TEST:
             users = users[:1]
         return users

@@ -61,7 +61,7 @@ class OrderSummary:
         self.status = OrderSummaryStatus.CREATED
         self.report()
 
-    def update(self, data):
+    def update(self, data, fee_rate):
         if isinstance(data, OrderUpdate):
             new_price = float(data.tradePrice)
             new_amount = float(data.tradeVolume)
@@ -69,7 +69,7 @@ class OrderSummary:
             self.ts = data.tradeTime / 1000
             self.amount += new_amount
             self.vol += new_vol
-            self.fee = self.vol * 0.002
+            self.fee = self.vol * fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
             if 'partial-filled' == data.orderStatus:
                 self.status = OrderSummaryStatus.PARTIAL_FILLED

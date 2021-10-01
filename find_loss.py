@@ -28,17 +28,15 @@ def main(user: User):
             if symbol in clear_targets:
                 target = clear_targets[symbol]
                 sell_price = ticker.close*(1-SELL_UP_RATE)
-                if target.own_amount * sell_price > 5:
-                    client.cancel_and_sell_limit_target(target, sell_price, 6)
+                client.cancel_and_sell_limit_target(target, sell_price, 6)
 
         for target in client.targets.get(date, {}).values():
             sell_price = max(target.sell_price, target.now_price*(1-SELL_UP_RATE))
-            if target.own_amount * target.price > 5:
-                client.cancel_and_sell_limit_target(target, sell_price, 4)
-                Timer(
-                    60, client.cancel_and_sell_limit_target,
-                    args=[target, target.sell_price, 5]
-                ).start()
+            client.cancel_and_sell_limit_target(target, sell_price, 4)
+            Timer(
+                60, client.cancel_and_sell_limit_target,
+                args=[target, target.sell_price, 5]
+            ).start()
 
     def set_targets(end=0):
         targets, date = client.find_targets(end=end)
@@ -47,7 +45,7 @@ def main(user: User):
         client.date = max(client.targets.keys())
 
         for target in client.targets[client.date].values():
-            client.buy_limit_target(target)
+            client.buy_target(target)
 
     def update_targets(end=1):
         def cancel(target):
@@ -85,11 +83,11 @@ def main(user: User):
 
     client.resume()
     logger.info('Finish loading data')
-    # for summary in client.user.orders.copy().values():
-    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
+    for summary in client.user.orders.copy().values():
+        print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
-    # for target in client.targets.get(client.date, {}).values():
-    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    for target in client.targets.get(client.date, {}).values():
+        print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     client.wait_state(10)
 

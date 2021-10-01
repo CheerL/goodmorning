@@ -49,7 +49,7 @@ class Symbol:
 
 class Candlestick:
     def __init__(self, kline):
-        self.id = kline[0]
+        self.id = int(kline[0] / 1000)
         #self.timestamp = 0
         self.open = float(kline[1])
         self.high = float(kline[2])
