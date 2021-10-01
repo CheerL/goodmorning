@@ -131,13 +131,14 @@ class LossTarget(BaseTarget):
     def update_price(self, tickers, num=AVER_NUM):
         if tickers[self.ticker_id].symbol != self.symbol:
             for i, ticker in enumerate(tickers):
-                if ticker.symbol == self.symbol:
+                symbol = ticker['symbol'] if isinstance(ticker, dict) else ticker.symbol
+                if symbol == self.symbol:
                     self.ticker_id = i
                     break
         else:
             ticker = tickers[self.ticker_id]
 
-        self.now_price = ticker.close
+        self.now_price = ticker['price'] if isinstance(ticker, dict) else ticker.close
         self.recent_price.append(self.now_price)
         self.recent_price = self.recent_price[-num:]
 

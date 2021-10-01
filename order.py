@@ -53,35 +53,59 @@ class OrderSummary:
     def create(self, data):
         if isinstance(data, OrderUpdate) and 'market' in data.type:
             self.limit = False
+            self.created_ts = self.ts = data.tradeTime / 1000
         elif isinstance(data, dict) and data['from'] == 'binance' and data['o'] == 'MARKET':
             self.limit = False
+            self.created_ts = self.ts = data['O'] / 1000
             
         self.status = OrderSummaryStatus.CREATED
         self.report()
 
-    def update(self, data: OrderUpdate):
-        new_price = float(data.tradePrice)
-        new_amount = float(data.tradeVolume)
-        new_vol = new_price * new_amount
-        self.amount += new_amount
-        self.vol += new_vol
-        self.aver_price = self.vol / self.amount if self.amount else 0
-        self.fee = self.vol * 0.002
-        if 'partial-filled' == data.orderStatus:
-            self.status = OrderSummaryStatus.PARTIAL_FILLED
-            self.remain = float(data.remainAmt)
-        elif 'filled' == data.orderStatus:
-            self.status = OrderSummaryStatus.FILLED
-            self.remain = 0
-            if self.filled_callback:
-                self.filled_callback(self.filled_callback_args)
+    def update(self, data):
+        if isinstance(data, OrderUpdate):
+            new_price = float(data.tradePrice)
+            new_amount = float(data.tradeVolume)
+            new_vol = new_price * new_amount
+            self.ts = data.tradeTime / 1000
+            self.amount += new_amount
+            self.vol += new_vol
+            self.fee = self.vol * 0.002
+            self.aver_price = self.vol / self.amount if self.amount else 0
+            if 'partial-filled' == data.orderStatus:
+                self.status = OrderSummaryStatus.PARTIAL_FILLED
+                self.remain = float(data.remainAmt)
+            elif 'filled' == data.orderStatus:
+                self.status = OrderSummaryStatus.FILLED
+                self.remain = 0
+                if self.filled_callback:
+                    self.filled_callback(*self.filled_callback_args)
+        elif isinstance(data, dict) and data['from'] == 'binance':
+            self.amount = float(data['z'])
+            self.vol = float(data['Z'])
+            self.fee = self.vol * 0.001
+            self.aver_price = self.vol / self.amount if self.amount else 0
+            self.ts = data['T'] / 1000
+
+            if 'PARTIALLY_FILLED' == data['X']:
+                self.status = OrderSummaryStatus.PARTIAL_FILLED
+                self.remain = self.created_amount - self.amount
+            elif 'FILLED' == data['X']:
+                self.status = OrderSummaryStatus.FILLED
+                self.remain = 0
+                if self.filled_callback:
+                    self.filled_callback(*self.filled_callback_args)
+
         self.report()
 
-    def cancel_update(self, data: OrderUpdate):
+    def cancel_update(self, data):
         self.status = OrderSummaryStatus.CANCELED
-        self.remain = float(data.remainAmt)
+        if isinstance(data, OrderUpdate):
+            self.remain = float(data.remainAmt)
+        elif isinstance(data, dict) and data['from'] == 'binance':
+            self.remain = float(data['q']) - float(data['z'])
+
         if self.cancel_callback:
-            self.cancel_callback(self.cancel_callback_args)
+            self.cancel_callback(*self.cancel_callback_args)
         self.report()
 
     def finish(self):

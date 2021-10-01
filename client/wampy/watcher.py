@@ -15,9 +15,9 @@ IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 
 class MorningWatcherClient(ControlledClient):
-    def __init__(self, market_client: MarketClient, url=WS_URL):
+    def __init__(self, user, url=WS_URL):
         super().__init__(url=url)
-        self.market_client : MarketClient = market_client
+        self.market_client = user.market_client
         self.client_type = 'watcher'
         self.high_stop_profit = True
         self.task : list[str] = []

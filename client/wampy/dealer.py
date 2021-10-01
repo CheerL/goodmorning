@@ -24,9 +24,9 @@ IOC_BATCH_NUM = config.getint('sell', 'IOC_BATCH_NUM')
 HIGH_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'HIGH_STOP_PROFIT_HOLD_TIME')
 
 class MorningDealerClient(ControlledClient, BaseDealerClient):
-    def __init__(self, market_client: MarketClient, user: User, url=WS_URL):
+    def __init__(self, user: User, url=WS_URL):
         super().__init__(url=url)
-        self.market_client : MarketClient = market_client
+        self.market_client = user.market_client
         self.targets = {}
         self.user = user
         self.client_type = 'dealer'

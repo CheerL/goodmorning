@@ -7,8 +7,53 @@ from utils import logger, user_config
 from retry import retry
 from target import BaseTarget as Target
 
+
+class BaseMarketClient:
+    exclude_list = []
+    exclude_price = 10
+
+    def __init__(self, **kwargs):
+        self.all_symbol_info = {}
+        self.symbols_info = {}
+        self.mark_price: 'dict[str, float]' = {}
+
+    def exclude(self, infos, base_price):
+        return {
+            symbol: info
+            for symbol, info in infos.items()
+            if symbol not in self.exclude_list
+            and symbol in base_price
+            and base_price[symbol] < self.exclude_price
+        }
+
+    def get_all_symbols_info(self):
+        return {}
+
+    def update_symbols_info(self) -> 'tuple[list[str], list[str]]':
+        new_symbols_info = self.get_all_symbols_info()
+        if len(self.all_symbol_info) != len(new_symbols_info):
+            self.all_symbol_info = new_symbols_info
+
+        price = self.get_price()
+        symbols_info = self.exclude(new_symbols_info, price)
+        new_symbols = [symbol for symbol in symbols_info.keys() if symbol not in self.symbols_info]
+        removed_symbols = [symbol for symbol in self.symbols_info.keys() if symbol not in symbols_info]
+        self.symbols_info = symbols_info
+        self.mark_price = price
+        return new_symbols, removed_symbols
+
+    def get_market_tickers(self, **kwargs):
+        raise NotImplementedError
+
+    def get_price(self) -> 'dict[str, float]':
+        return {}
+
+    def get_vol(self) -> 'dict[str, float]':
+        return {}
+
 class BaseUser:
     user_type = 'Base'
+    MarketClient = BaseMarketClient
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
@@ -25,9 +70,10 @@ class BaseUser:
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
         self.buy_amount = buy_amount
+        self.market_client = self.MarketClient()
 
     @classmethod
-    @retry(tries=5, delay=1, logger=logger)
+    # @retry(tries=5, delay=1, logger=logger)
     def init_users(cls, num=-1):
         ACCESSKEY = user_config.get('setting', f'{cls.user_type}AccessKey')
         SECRETKEY = user_config.get('setting', f'{cls.user_type}SecretKey')
@@ -49,9 +95,6 @@ class BaseUser:
             users = users[:1]
         return users
 
-    def get_asset(self) -> float:
-        raise NotImplementedError
-
     def get_account_id(self) -> int:
         raise NotImplementedError
 
@@ -62,9 +105,13 @@ class BaseUser:
         raise NotImplementedError
 
     @retry(tries=5, delay=0.05, logger=logger)
-    def get_amount(self, currency, available=False, check=True):
+    def get_amount(self, currency: str, available=False, check=True):
+        if currency.upper() in self.balance:
+            currency = currency.upper()
+
         if currency not in self.balance:
             return 0
+
         if available:
             return self.available_balance[currency]
         if check:
@@ -72,18 +119,6 @@ class BaseUser:
         return self.balance[currency]
 
     def start(self, **kwargs):
-        self.sub_balance_and_order(**kwargs)
-
-        while 'usdt' not in self.balance:
-            time.sleep(0.1)
-
-        usdt = self.balance['usdt']
-        if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
-            self.buy_amount = max(math.floor(usdt / float(self.buy_amount[1:])), 5)
-        else:
-            self.buy_amount = float(self.buy_amount)
-
-    def sub_balance_and_order(self, **kwargs):
         raise NotImplementedError
 
     def buy(self, target: Target, vol):

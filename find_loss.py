@@ -7,7 +7,7 @@ from threading import Timer
 from utils import config, kill_all_threads, logger
 from utils.parallel import run_process
 from utils.datetime import date2ts, ts2date
-from user.huobi_user import HuobiUser  as User
+from user.huobi import HuobiUser  as User
 from client.loss_dealer import LossDealerClient as Client
 
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')

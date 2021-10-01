@@ -1,19 +1,75 @@
+import time
+import math
+import re
+
+from utils import logger, timeout_handle
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderType, AccountBalanceMode
 from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
+from huobi.client.generic import GenericClient
+from huobi.client.market import MarketClient 
+from huobi.model.generic.symbol import Symbol
 from retry import retry
-from utils import logger
 from target import BaseTarget as Target
 from order import OrderSummary
-from user import BaseUser
+from user import BaseUser, BaseMarketClient
 from websocket_handler import replace_watch_dog
 
 AccountBalanceMode.TOTAL = '2'
 
+
+class HuobiMarketClient(MarketClient, BaseMarketClient):
+    exclude_list = [
+        'htusdt', 'btcusdt', 'bsvusdt', 'bchusdt', 'etcusdt',
+        'ethusdt', 'botusdt','mcousdt','lendusdt','venusdt',
+        'yamv2usdt', 'bttusdt', 'dogeusdt', 'shibusdt',
+        'filusdt', 'xrpusdt', 'trxusdt', 'nftusdt',
+        'thetausdt', 'dotusdt', 'eosusdt', 'maticusdt',
+        'linkusdt', 'adausdt', 'jstusdt', 'vetusdt', 'xmxusdt',
+        'newusdt', 'uipusdt', 'smtusdt'
+    ]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.generic_client = GenericClient()
+        self.all_symbol_info: 'dict[str, Symbol]' = {}
+        self.symbols_info: 'dict[str, Symbol]' = {}
+        self.mark_price: 'dict[str, float]' = {}
+        self.update_symbols_info()
+
+    def get_all_symbols_info(self):
+        return {
+            info.symbol: info
+            for info in self.generic_client.get_exchange_symbols()
+            if info.symbol.endswith('usdt')
+            and not re.search('\d', info.symbol)
+            and info.symbol not in [
+                'bchausdt', 'mcousdt', 'borusdt',
+                'venusdt', 'botusdt', 'lendusdt'
+            ]
+        }
+
+    @timeout_handle({})
+    def get_price(self) -> 'dict[str, float]':
+        return {
+            pair.symbol: pair.close
+            for pair in self.get_market_tickers()
+        }
+
+    @timeout_handle({})
+    def get_vol(self) -> 'dict[str, float]':
+        return {
+            pair.symbol: pair.vol
+            for pair in self.get_market_tickers()
+        }
+
+
+
 class HuobiUser(BaseUser):
     user_type = 'Huobi'
+    MarketClient = HuobiMarketClient
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.watch_dog = replace_watch_dog()
@@ -21,24 +77,7 @@ class HuobiUser(BaseUser):
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
 
-    def get_asset(self) -> float:
-        asset = float(self.account_client.get_account_asset_valuation('spot', 'USD').balance)
-        return asset
-
-    def get_account_id(self) -> int:
-        return next(filter(
-            lambda account: account.type=='spot' and account.state =='working',
-            self.account_client.get_accounts()
-        )).id
-
-    def get_order(self, order_id):
-        return self.trade_client.get_order(order_id)
-
-    def cancel_order(self, order_id):
-        symbol = self.orders[order_id].symbol
-        self.trade_client.cancel_order(symbol, order_id)
-
-    def sub_balance_and_order(self, **kwargs):
+    def start(self, **kwargs):
         self.account_client.sub_account_update(
             AccountBalanceMode.TOTAL,
             self.balance_callback,
@@ -52,6 +91,28 @@ class HuobiUser(BaseUser):
             self.error_callback('order')
         )
         self.watch_dog.after_connection_created('order')
+
+        while 'usdt' not in self.balance:
+            time.sleep(0.1)
+
+        usdt = self.balance['usdt']
+        if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
+            self.buy_amount = max(math.floor(usdt / float(self.buy_amount[1:])), 5)
+        else:
+            self.buy_amount = float(self.buy_amount)
+
+    def get_account_id(self) -> int:
+        return next(filter(
+            lambda account: account.type=='spot' and account.state =='working',
+            self.account_client.get_accounts()
+        )).id
+
+    def get_order(self, order_id):
+        return self.trade_client.get_order(order_id)
+
+    def cancel_order(self, order_id):
+        symbol = self.orders[order_id].symbol
+        self.trade_client.cancel_order(symbol, order_id)
 
     def balance_callback(self, event: AccountUpdateEvent):
         update: AccountUpdate = event.data
@@ -87,13 +148,9 @@ class HuobiUser(BaseUser):
 
                 elif etype == 'trade':
                     summary.update(update)
-                    if update.orderStatus == 'filled' and summary.filled_callback:
-                        summary.filled_callback(*summary.filled_callback_args)
 
                 elif etype == 'cancellation':
                     summary.cancel_update(update)
-                    if summary.cancel_callback:
-                        summary.cancel_callback(*summary.cancel_callback_args)
 
             except Exception as e:
                 if not isinstance(e, KeyError):

@@ -23,8 +23,8 @@ TEST = user_config.getboolean('setting', 'TEST')
 
 
 class LossDealerClient(BaseDealerClient):
-    def __init__(self, market_client: MarketClient, user: User):
-        super().__init__(market_client=market_client, user=user)
+    def __init__(self, user: User):
+        super().__init__(user=user)
         self.targets: dict[str, dict[str, Target]] = {}
         self.date = ts2date()
         self.client_type = 'loss_dealer'
@@ -35,7 +35,7 @@ class LossDealerClient(BaseDealerClient):
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date
         ])
-        infos = self.market_client.get_all_symbols_info()
+        infos = self.market_client.all_symbol_info
 
         for target in targets:
             date_target_dict = self.targets.setdefault(target.date, {})
@@ -55,13 +55,20 @@ class LossDealerClient(BaseDealerClient):
                     klines = self.market_client.get_candlestick(order.symbol, '1day', 5)
                     num = int((now - date2ts(order.date)) // 86400)
                     kline = klines[num]
-                    self.targets[order.date][order.symbol] = Target(
-                        order.symbol, order.date, kline.open, kline.close, kline.vol
-                    )
+                    if isinstance(kline, list):
+                        self.targets[order.date][order.symbol] = Target(
+                            order.symbol, order.date,
+                            float(kline[1]), float(kline[4]), float(kline[7])
+                        )
+                    else:
+                        self.targets[order.date][order.symbol] = Target(
+                            order.symbol, order.date, kline.open, kline.close, kline.vol
+                        )
                     self.targets[order.date][order.symbol].set_info(infos[order.symbol])
 
                 target = self.targets[order.date][order.symbol]
                 self.check_order(order, target)
+                time.sleep(0.05)
             except Exception as e:
                 logger.error(e)
 
@@ -333,6 +340,8 @@ class LossDealerClient(BaseDealerClient):
             if 'record invalid' not in str(e):
                 raise e
             else:
+                if not order.finished:
+                    order.update([OrderSQL.order_id==order.order_id], {'finished': 1})
                 return
 
         detail.filled_amount = float(detail.filled_amount)
@@ -346,7 +355,6 @@ class LossDealerClient(BaseDealerClient):
         else:
             summary = OrderSummary(order_id, symbol, order.direction, order.date)
             self.user.orders[order_id] = summary
-            summary.label = order.date
             if order.direction == 'buy':
                 self.user.buy_id.append(order_id)
             else:
@@ -366,7 +374,8 @@ class LossDealerClient(BaseDealerClient):
         elif detail.type in ['buy-market']:
             summary.created_vol = detail.amount
             summary.remain = summary.created_vol - summary.vol
-        summary.created_ts = detail.created_at
+        summary.created_ts = detail.created_at /1000
+        summary.ts = max(detail.created_at, detail.finished_at) / 1000 
         status = {
             'submitted': 1,
             'partial-filled': 2,
@@ -374,7 +383,6 @@ class LossDealerClient(BaseDealerClient):
             'canceled': 4,
             'partial-canceled': 4
         }[detail.state]
-
 
         if (detail.filled_amount != summary.amount
             or detail.filled_cash_amount != summary.vol
@@ -386,11 +394,10 @@ class LossDealerClient(BaseDealerClient):
             else:
                 target.set_sell(detail.filled_amount - summary.amount)
 
-            summary.ts = detail.created_at / 1000 if detail.state == 'submitted' else detail.finished_at / 1000 
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
-            summary.aver_price = 0 if not summary.amount else summary.vol / summary.amount
+            summary.aver_price = summary.vol / summary.amount if summary.amount else 0
             summary.fee = summary.vol * 0.002
 
     def report(self, force):
@@ -424,26 +431,25 @@ class LossDealerClient(BaseDealerClient):
                 price = vol / amount
                 # fee = vol * 0.02
                 symbol = summary.symbol
-
-                report_info['new_buy' if order.direction == 'buy' else 'new_sell'].append((
-                    ts2time(ts), symbol, amount, vol, price
+                tm = ts2time(summary.ts)
+                report_info[f'new_{order.direction}'].append((
+                    tm, symbol, amount, vol, price
                 ))
                 update_load = {
                     'amount': summary.amount,
                     'vol': summary.vol,
                     'aver_price': summary.aver_price,
-                    'finished': 1 if summary.status in [-1, 3, 4] else 0,
-                    'tm': ts2time(summary.ts)
+                    'finished': 0 if summary.status in [1, 2] else 1,
+                    'tm': tm
                 }
                 OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
 
             elif summary.status in [1, 2]:
-                ts = summary.created_ts / 1000
                 symbol = summary.symbol
                 price = summary.created_price
                 amount = summary.remain
                 report_info['opening'].append((
-                    ts2time(ts), symbol, amount, price, summary.direction
+                    ts2time(summary.created_ts), symbol, amount, price, summary.direction
                 ))
 
             elif summary.status in [-1, 3, 4]:
@@ -463,7 +469,7 @@ class LossDealerClient(BaseDealerClient):
                 amount = target.own_amount
                 vol = amount * price
                 if target.own and amount and vol >= 5:
-                    target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0})
+                    target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0, 'date': target.date})
                     target_info[symbol]['amount'] += amount
                     target_info[symbol]['buy_vol'] += target.buy_vol
 
@@ -481,8 +487,9 @@ class LossDealerClient(BaseDealerClient):
             price = info['price']
             profit = price * amount - buy_vol
             percent = profit / buy_vol
+            date = info['date']
             report_info['holding'].append((
-                symbol, amount, buy_price, price, profit, percent
+                symbol, amount, buy_price, price, profit, percent, date
             ))
 
         usdt = self.user.get_amount('usdt', True, False)

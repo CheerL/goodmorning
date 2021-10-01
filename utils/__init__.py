@@ -5,8 +5,8 @@ import threading
 import time
 
 import pytz
-from gevent import monkey
-monkey.patch_all()
+# from gevent import monkey
+# monkey.patch_all()
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
