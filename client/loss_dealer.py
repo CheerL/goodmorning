@@ -262,12 +262,13 @@ class LossDealerClient(BaseDealerClient):
                     target.set_buy(summary.vol, summary.amount)
 
             sell_amount = self.get_sell_amount(target)
-            self.sell_target(
-                target, price, sell_amount, selling_level,
-                filled_callback=filled_callback,
-                cancel_callback=cancel_callback,
-                limit=sell_amount * price > target.min_order_value
-            )
+            if sell_amount > target.sell_market_min_order_amt:
+                self.sell_target(
+                    target, price, sell_amount, selling_level,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=sell_amount * price > target.min_order_value
+                )
 
         symbol = target.symbol
         is_canceled = False

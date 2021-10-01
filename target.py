@@ -129,7 +129,7 @@ class LossTarget(BaseTarget):
 
         self.own_amount -= amount
         self.buy_vol -= vol
-        if self.own_amount * self.buy_price <= self.min_order_value:
+        if self.own_amount <= self.sell_market_min_order_amt:
             self.own = False
 
     def update_price(self, tickers, num=AVER_NUM):
