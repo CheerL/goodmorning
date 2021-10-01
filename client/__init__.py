@@ -16,8 +16,8 @@ class BaseDealerClient:
     @classmethod
     @retry(tries=5, delay=1, logger=logger)
     def init_dealer(cls, user):
-        quite_logger(all_logger=True)
         client = cls(user)
+        quite_logger(all_logger=True)
         return client
 
     def wait_state(self, state=1):

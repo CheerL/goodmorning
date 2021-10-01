@@ -1,5 +1,6 @@
 
 import argparse
+from inspect import cleandoc
 import time
 
 from user.huobi import HuobiUser  as User
@@ -18,10 +19,19 @@ PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 def main(user: User):
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(date=None):
+        logger.info('Start to sell')
         date = date or client.date
         clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
-        clear_targets = client.targets.get(clear_date, {})
+        clear_targets = {
+            symbol: target for symbol, target in
+            client.targets.get(clear_date, {}).items()
+            if target.own and target.own_amount > target.sell_market_min_order_amt
+        }
+        clear_symbols = ",".join([
+            target.symbol for target in clear_targets.values() if target.own
+        ])
         tickers = client.market_client.get_market_tickers()
+        logger.info(f'Clear day {clear_date}, targets are {clear_symbols}')
         
         for ticker in tickers:
             symbol = ticker.symbol
@@ -30,7 +40,12 @@ def main(user: User):
                 sell_price = ticker.close*(1-SELL_UP_RATE)
                 client.cancel_and_sell_limit_target(target, sell_price, 6)
 
+        logger.info(f'Sell targets of last day {date}')
         for target in client.targets.get(date, {}).values():
+            if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                target.own = False
+                continue
+
             sell_price = max(target.sell_price, target.now_price*(1-SELL_UP_RATE))
             client.cancel_and_sell_limit_target(target, sell_price, 4)
             Timer(
@@ -38,7 +53,9 @@ def main(user: User):
                 args=[target, target.sell_price, 5]
             ).start()
 
+
     def set_targets(end=0):
+        logger.info('Start to find new targets')
         targets, date = client.find_targets(end=end)
         targets = client.filter_targets(targets)
         client.targets[date] = targets
@@ -49,6 +66,7 @@ def main(user: User):
 
     def update_targets(end=1):
         def cancel(target):
+            logger.info(f'Too long time, stop to buy {target.symbol}')
             order_id_list = list(client.user.orders.keys())
             for order_id in order_id_list:
                 summary = client.user.orders[order_id]
@@ -62,6 +80,7 @@ def main(user: User):
                         logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
                         # break
 
+        logger.info('Start to update today\'s targets')
         date = ts2date(time.time()-end*86400)
         symbols = client.targets[date].keys()
         targets, _ = client.find_targets(symbols=symbols, end=end)
@@ -83,11 +102,11 @@ def main(user: User):
 
     client.resume()
     logger.info('Finish loading data')
-    for summary in client.user.orders.copy().values():
-        print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
+    # for summary in client.user.orders.copy().values():
+    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
-    for target in client.targets.get(client.date, {}).values():
-        print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    # for target in client.targets.get(client.date, {}).values():
+    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
 
     client.wait_state(10)
 
