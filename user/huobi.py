@@ -30,6 +30,7 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
         'linkusdt', 'adausdt', 'jstusdt', 'vetusdt', 'xmxusdt',
         'newusdt', 'uipusdt', 'smtusdt'
     ]
+    min_usdt_amount = 6
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -51,19 +52,13 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
             ]
         }
 
-    @timeout_handle({})
-    def get_price(self) -> 'dict[str, float]':
-        return {
-            pair.symbol: pair.close
-            for pair in self.get_market_tickers()
-        }
+    def get_candlestick(self, symbol, period, size=200):
+        if period == '1hour':
+            period = '60min'
+        return super().get_candlestick(symbol, period, size=size)
 
-    @timeout_handle({})
-    def get_vol(self) -> 'dict[str, float]':
-        return {
-            pair.symbol: pair.vol
-            for pair in self.get_market_tickers()
-        }
+    def get_market_tickers(self, **kwargs) -> list:
+        return super().get_market_tickers()
 
 
 
@@ -76,6 +71,7 @@ class HuobiUser(BaseUser):
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
+        self.scheduler = self.watch_dog.scheduler
 
     def start(self, **kwargs):
         self.account_client.sub_account_update(
@@ -108,7 +104,12 @@ class HuobiUser(BaseUser):
         )).id
 
     def get_order(self, order_id):
-        return self.trade_client.get_order(order_id)
+        detail = self.trade_client.get_order(order_id)
+        detail.filled_amount = float(detail.filled_amount)
+        detail.filled_cash_amount = float(detail.filled_cash_amount)
+        detail.price = float(detail.price)
+        detail.amount = float(detail.amount)
+        return detail
 
     def cancel_order(self, order_id):
         symbol = self.orders[order_id].symbol

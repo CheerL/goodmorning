@@ -1,7 +1,7 @@
 import threading
 
-from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
-# from apscheduler.schedulers.blocking import BlockingScheduler as Scheduler
+from apscheduler.schedulers.gevent import GeventScheduler
+from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
 from huobi.connection.impl.private_def import ConnectionState
 from huobi.connection.impl.websocket_manage import WebsocketManage
 from huobi.connection.impl.websocket_manage import websocket_connection_handler as WEBSOCKET_CONNECTION_HANDLER
@@ -17,12 +17,15 @@ RESTART_MS = 6215790
 RESTART_RANGE = 600000
 ConnectionState.RECONNECTING = 6
 
-def replace_watch_dog():
+def replace_watch_dog(gevent=False):
     old_watch_dog = SubscribeClient.subscribe_watch_dog
     [job] = old_watch_dog.scheduler.get_jobs()
     job.pause()
 
-    watch_dog = WatchDog()
+    if gevent:
+        watch_dog = GeventWatchDog()
+    else:
+        watch_dog = WatchDog()
     SubscribeClient.subscribe_watch_dog = watch_dog
     return watch_dog
 
@@ -100,3 +103,10 @@ class WatchDog(WebSocketWatchDog):
         self.mutex.acquire()
         self.websocket_manage_dict[name] = wm
         self.mutex.release()
+
+
+class GeventWatchDog(WatchDog):
+    def __init__(self, is_auto_connect=True, heart_beat_limit_ms=HEART_BEAT_MS, reconnect_after_ms=RECONNECT_MS, restart_ms=RESTART_MS):
+        super().__init__(is_auto_connect=is_auto_connect, heart_beat_limit_ms=heart_beat_limit_ms, reconnect_after_ms=reconnect_after_ms, restart_ms=restart_ms)
+        self.scheduler = GeventScheduler()
+        self.scheduler.add_job(check_reconnect, "interval", max_instances=1, seconds=1, args=[self])

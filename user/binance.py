@@ -3,64 +3,20 @@
 # from huobi.constant import OrderSource, OrderType, AccountBalanceMode
 # from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 # from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
-from utils import logger, timeout_handle
+from utils import logger
 from binance.spot import Spot
+from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
 from binance.websocket.spot.websocket_client import SpotWebsocketClient
 from retry import retry
 from target import BaseTarget as Target
 from order import OrderSummary
 from user import BaseUser, BaseMarketClient
+from user.binance_model import ListenKey, Candlestick, Symbol, OrderDetail, Ticker
 
 import re
 import time
 import math
 # AccountBalanceMode.TOTAL = '2'
-
-class ListenKey:
-    def __init__(self, api: Spot):
-        self.api = api
-        self.key = self.api.new_listen_key()['listenKey']
-        self.update_time = time.time()
-        self.create_time = self.update_time
-
-    def update(self):
-        self.key = self.api.renew_listen_key(self.key)
-        self.update_time = time.time()
-
-    def recreate(self):
-        self.api.close_listen_key(self.key)
-        self.key = self.api.new_listen_key()['listenKey']
-        self.update_time = time.time()
-        self.create_time = self.update_time
-
-    def check(self):
-        now = time.time()
-        if now > self.create_time + 12 * 60 * 60:
-            self.recreate()
-        elif now > self.update_time + 30 * 60:
-            self.update()
-
-class Symbol:
-    def __init__(self, info):
-        self.base_currency = info['baseAsset']
-        self.quote_currency = info['quoteAsset']
-        self.symbol = info['symbol']
-        self.state = info['status']
-
-        for each in info['filters']:
-            if each['filterType'] == 'PRICE_FILTER':
-                # print(each)
-                self.value_precision = self.price_precision = len(str(int(1/float(each['tickSize'])))) - 1
-            elif each['filterType'] == 'LOT_SIZE':
-                self.limit_order_min_order_amt = self.min_order_amt = float(each['minQty'])
-                self.limit_order_max_order_amt = self.max_order_amt = float(each['maxQty'])
-                self.amount_precision = len(str(int(1/float(each['stepSize'])))) - 1
-            elif each['filterType'] == 'MARKET_LOT_SIZE':
-                self.sell_market_min_order_amt = float(each['minQty'])
-                self.sell_market_max_order_amt = float(each['maxQty'])
-            elif each['filterType'] == 'MIN_NOTIONAL':
-                self.min_order_value = float(each['minNotional'])
-
 
 class BinanceMarketClient(BaseMarketClient):
     exclude_list = []
@@ -82,40 +38,33 @@ class BinanceMarketClient(BaseMarketClient):
 
     def get_market_tickers(self, symbol=None, all_info=False):
         if all_info:
-            return self.api.ticker_24hr(symbol)
-        return self.api.ticker_price(symbol)
+            raw_tickers = self.api.ticker_24hr(symbol)
+        else:
+            raw_tickers = self.api.ticker_price(symbol)
+        return [Ticker(raw_ticker) for raw_ticker in raw_tickers]
 
     def get_candlestick(self, symbol, interval: str, limit=10):
         if interval.endswith('day'):
             interval = interval.replace('day', 'd')
         elif interval.endswith('min'):
-            interval = interval.replace('min', 'm')
+            if interval == '60min':
+                interval = '1h'
+            else:
+                interval = interval.replace('min', 'm')
         elif interval.endswith('hour'):
             interval = interval.replace('hour', 'h')
         elif interval.endswith('week'):
             interval = interval.replace('week', 'w')
         elif interval.endswith('mon'):
             interval = interval.replace('mon', 'M')
-        return self.api.klines(symbol, interval, limit=limit)
-
-    @timeout_handle({})
-    def get_price(self) -> 'dict[str, float]':
-        return {
-            pair['symbol']: float(pair['price'])
-            for pair in self.get_market_tickers()
-        }
-
-    @timeout_handle({})
-    def get_vol(self) -> 'dict[str, float]':
-        return {
-            pair['symbol']: float(pair['quoteVolume'])
-            for pair in self.get_market_tickers(all_info=True)
-        }
+        raw_klines = self.api.klines(symbol, interval, limit=limit)
+        return [Candlestick(kline) for kline in reversed(raw_klines)]
 
 
 class BinanceUser(BaseUser):
     user_type = 'Binance'
     MarketClient = BinanceMarketClient
+    min_usdt_amount = 11
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.api = Spot(key=access_key, secret=secret_key)
@@ -124,21 +73,28 @@ class BinanceUser(BaseUser):
         self.market_client.update_symbols_info()
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
-        self.websocket.start()
         self.api.new_order = self.api.new_order_test
+        self.scheduler = Scheduler()
+        self.scheduler.add_job(self.listen_key.check, 'interval', minutes=5)
+        self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
+        # self.scheduler.add_job(lambda : print(111), 'interval', seconds=5)
+        self.scheduler.start()
+        self.websocket.start()
 
     def get_account_id(self) -> int:
         return 0
 
     def get_order(self, order_id):
         symbol = self.orders[order_id].symbol
-        return self.api.get_order(symbol, orderId=order_id)
+        raw_order = self.api.get_order(symbol, orderId=order_id)
+        return OrderDetail(raw_order)
 
     def cancel_order(self, order_id):
         symbol = self.orders[order_id].symbol
         self.api.cancel_order(symbol, orderId=order_id)
 
     def start(self, **kwargs):
+        
         self.listen_key.check()
         self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
 
@@ -156,7 +112,6 @@ class BinanceUser(BaseUser):
 
     def user_data_callback(self, update):
         try:
-            print(update)
             if 'e' not in update:
                 return
 

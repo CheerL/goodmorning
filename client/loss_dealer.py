@@ -1,7 +1,6 @@
 import time
 
 from retry import retry
-from market import MarketClient
 from target import LossTarget as Target
 from utils import config, logger, user_config, get_rate
 from utils.parallel import run_thread_pool
@@ -55,15 +54,9 @@ class LossDealerClient(BaseDealerClient):
                     klines = self.market_client.get_candlestick(order.symbol, '1day', 5)
                     num = int((now - date2ts(order.date)) // 86400)
                     kline = klines[num]
-                    if isinstance(kline, list):
-                        self.targets[order.date][order.symbol] = Target(
-                            order.symbol, order.date,
-                            float(kline[1]), float(kline[4]), float(kline[7])
-                        )
-                    else:
-                        self.targets[order.date][order.symbol] = Target(
-                            order.symbol, order.date, kline.open, kline.close, kline.vol
-                        )
+                    self.targets[order.date][order.symbol] = Target(
+                        order.symbol, order.date, kline.open, kline.close, kline.vol
+                    )
                     self.targets[order.date][order.symbol].set_info(infos[order.symbol])
 
                 target = self.targets[order.date][order.symbol]
@@ -101,12 +94,13 @@ class LossDealerClient(BaseDealerClient):
         usdt_amount = self.user.get_amount('usdt', available=True, check=False)
         buy_num = max(min(targets_num, MAX_NUM), MIN_NUM)
         buy_amount = usdt_amount // buy_num
-        if buy_amount < 6:
-            buy_amount = 6
+        if buy_amount < self.user.min_usdt_amount:
+            buy_amount = self.user.min_usdt_amount
             buy_num = int(usdt_amount // buy_amount)
 
         if not TEST:
             self.user.buy_amount = buy_amount
+
         targets = {
             target.symbol: target for target in
             sorted(targets.values(), key=lambda x: -x.vol)[:buy_num]
@@ -157,9 +151,7 @@ class LossDealerClient(BaseDealerClient):
                     )
                 target.set_info(infos[symbol])
                 targets[symbol] = target
-                return
 
-            return
         
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
         date = ts2date(now - end * 86400)
@@ -229,8 +221,6 @@ class LossDealerClient(BaseDealerClient):
         def _cancel_callback(summary):
             target.selling = 0
             target.set_sell(summary.amount)
-
-        
 
         if target.selling >= selling_level:
             return
@@ -335,7 +325,7 @@ class LossDealerClient(BaseDealerClient):
         symbol = order.symbol
 
         try:
-            detail = self.user.trade_client.get_order(order_id)
+            detail = self.user.get_order(order_id)
         except Exception as e:
             if 'record invalid' not in str(e):
                 raise e
@@ -343,12 +333,6 @@ class LossDealerClient(BaseDealerClient):
                 if not order.finished:
                     order.update([OrderSQL.order_id==order.order_id], {'finished': 1})
                 return
-
-        detail.filled_amount = float(detail.filled_amount)
-        detail.filled_cash_amount = float(detail.filled_cash_amount)
-        detail.price = float(detail.price)
-        detail.amount = float(detail.amount)
-
 
         if order_id in self.user.orders:
             summary = self.user.orders[order_id]
@@ -381,7 +365,13 @@ class LossDealerClient(BaseDealerClient):
             'partial-filled': 2,
             'filled': 3,
             'canceled': 4,
-            'partial-canceled': 4
+            'partial-canceled': 4,
+            'NEW': 1,
+            'PARTIAL_FILLED': 2,
+            'FILLED': 3,
+            'CANCELED': 4,
+            'REJECTED': 0,
+            'EXPIRED': 4
         }[detail.state]
 
         if (detail.filled_amount != summary.amount

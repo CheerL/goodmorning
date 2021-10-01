@@ -1,9 +1,12 @@
 import time
 import math
 
+from gevent import monkey
+monkey.patch_all()
+
 from order import OrderSummary
 from report import wx_name
-from utils import logger, user_config
+from utils import logger, user_config, timeout_handle
 from retry import retry
 from target import BaseTarget as Target
 
@@ -45,15 +48,24 @@ class BaseMarketClient:
     def get_market_tickers(self, **kwargs):
         raise NotImplementedError
 
+    @timeout_handle({})
     def get_price(self) -> 'dict[str, float]':
-        return {}
+        return {
+            pair.symbol: pair.close
+            for pair in self.get_market_tickers()
+        }
 
+    @timeout_handle({})
     def get_vol(self) -> 'dict[str, float]':
-        return {}
+        return {
+            pair.symbol: pair.vol
+            for pair in self.get_market_tickers(all_info=True)
+        }
 
 class BaseUser:
     user_type = 'Base'
     MarketClient = BaseMarketClient
+    min_usdt_amount = 0
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.access_key = access_key
@@ -71,9 +83,10 @@ class BaseUser:
         self.username = wx_name(self.wxuid[0])
         self.buy_amount = buy_amount
         self.market_client = self.MarketClient()
+        self.scheduler = None
 
     @classmethod
-    # @retry(tries=5, delay=1, logger=logger)
+    @retry(tries=5, delay=1, logger=logger)
     def init_users(cls, num=-1):
         ACCESSKEY = user_config.get('setting', f'{cls.user_type}AccessKey')
         SECRETKEY = user_config.get('setting', f'{cls.user_type}SecretKey')
@@ -106,10 +119,11 @@ class BaseUser:
 
     @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency: str, available=False, check=True):
-        if currency.upper() in self.balance:
+        if currency in self.balance:
+            pass
+        elif currency.upper() in self.balance:
             currency = currency.upper()
-
-        if currency not in self.balance:
+        else:
             return 0
 
         if available:

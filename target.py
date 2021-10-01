@@ -105,7 +105,6 @@ class LossTarget(BaseTarget):
         self.high_mark_price = price * (1+high_rate)
         self.high_mark_back_price = price * (1+high_rate/2)
         self.low_mark_price = max(price * (1+low_rate), (self.open+price)/2)
-        
 
     def set_buy(self, vol, amount, sell_rate=SELL_RATE):
         if vol <= 0 or amount <= 0:
@@ -131,14 +130,13 @@ class LossTarget(BaseTarget):
     def update_price(self, tickers, num=AVER_NUM):
         if tickers[self.ticker_id].symbol != self.symbol:
             for i, ticker in enumerate(tickers):
-                symbol = ticker['symbol'] if isinstance(ticker, dict) else ticker.symbol
-                if symbol == self.symbol:
+                if ticker.symbol == self.symbol:
                     self.ticker_id = i
                     break
         else:
             ticker = tickers[self.ticker_id]
 
-        self.now_price = ticker['price'] if isinstance(ticker, dict) else ticker.close
+        self.now_price = ticker.close
         self.recent_price.append(self.now_price)
         self.recent_price = self.recent_price[-num:]
 
