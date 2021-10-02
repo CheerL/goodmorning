@@ -78,7 +78,7 @@ class BinanceUser(BaseUser):
         self.market_client.update_symbols_info()
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
-        self.api.new_order = self.api.new_order_test
+        # self.api.new_order = self.api.new_order_test
         self.scheduler = Scheduler()
         self.scheduler.add_job(self.listen_key.check, 'interval', minutes=5)
         self.scheduler.add_job(self.api.ping, 'interval', max_instances=5, seconds=5)
