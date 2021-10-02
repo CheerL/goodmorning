@@ -2,8 +2,7 @@ import time
 import math
 import re
 
-from utils import logger
-from utils.datetime import TzConfig
+from utils import logger, datetime
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
 from huobi.constant import OrderSource, OrderType, AccountBalanceMode
@@ -75,7 +74,7 @@ class HuobiUser(BaseUser):
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
         self.scheduler = self.watch_dog.scheduler
-        TzConfig.tz_num = 8
+        datetime.TzConfig.tz_num = 8
 
     def start(self, **kwargs):
         self.account_client.sub_account_update(

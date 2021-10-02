@@ -1,6 +1,4 @@
 from utils import config
-from utils.datetime import ts2date
-import math
 
 MIN_STOP_LOSS_HOLD_TIME = config.getfloat('time', 'MIN_STOP_LOSS_HOLD_TIME')
 STOP_LOSS_RATE = config.getfloat('sell', 'STOP_LOSS_RATE')

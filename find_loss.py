@@ -2,15 +2,13 @@
 import argparse
 import time
 
-from gevent import monkey
-monkey.patch_all()
+from utils import config, kill_all_threads, logger, datetime
 from user.huobi import HuobiUser  as User
 from client.loss_dealer import LossDealerClient as Client
 
 from retry import retry
 from threading import Timer
-from utils import config, kill_all_threads, logger
-from utils.datetime import date2ts, ts2date
+
 
 
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
@@ -22,7 +20,7 @@ def main(user: User):
     def sell_targets(date=None):
         logger.info('Start to sell')
         date = date or client.date
-        clear_date = ts2date(date2ts(date) - MAX_DAY * 86400)
+        clear_date = datetime.ts2date(datetime.date2ts(date) - MAX_DAY * 86400)
         clear_targets = {
             symbol: target for symbol, target in
             client.targets.get(clear_date, {}).items()
@@ -82,7 +80,7 @@ def main(user: User):
                         # break
 
         logger.info('Start to update today\'s targets')
-        date = ts2date(time.time()-end*86400)
+        date = datetime.ts2date(time.time()-end*86400)
         symbols = client.targets[date].keys()
         targets, _ = client.find_targets(symbols=symbols, end=end)
         for symbol, target in targets.items():

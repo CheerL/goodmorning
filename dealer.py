@@ -2,12 +2,10 @@ import time
 import datetime
 import argparse
 
-from client.wampy.dealer import MorningDealerClient as Client, State
-from utils.parallel import run_process
-from utils import config, kill_all_threads, logger, user_config
+from utils import config, kill_all_threads, logger, user_config, parallel
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from user import User
-from target import MorningTarget as Target
+from client.wampy.dealer import MorningDealerClient as Client, State
 
 TEST = user_config.getboolean('setting', 'Test')
 LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
@@ -62,4 +60,4 @@ if __name__ == '__main__':
 
     logger.info('Dealer')
     users = User.init_users(num=args.num)
-    run_process([(main, (user,), user.username) for user in users], is_lock=True)
+    parallel.run_process([(main, (user,), user.username) for user in users], is_lock=True)

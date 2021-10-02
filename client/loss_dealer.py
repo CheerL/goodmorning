@@ -2,9 +2,7 @@ import time
 
 from retry import retry
 from target import LossTarget as Target
-from utils import config, logger, user_config, get_rate
-from utils.parallel import run_thread_pool
-from utils.datetime import date2ts, ts2date, ts2time
+from utils import config, logger, user_config, get_rate, datetime, parallel
 from order import OrderSummary, OrderSummaryStatus
 from client import BaseDealerClient
 from user import BaseUser as User
@@ -25,12 +23,12 @@ class LossDealerClient(BaseDealerClient):
     def __init__(self, user: User):
         super().__init__(user=user)
         self.targets: dict[str, dict[str, Target]] = {}
-        self.date = ts2date()
+        self.date = datetime.ts2date()
         self.client_type = 'loss_dealer'
 
     def resume(self):
         now = time.time()
-        start_date = ts2date(now - (MAX_DAY + 2) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
             TargetSQL.exchange == self.user.user_type
@@ -53,7 +51,7 @@ class LossDealerClient(BaseDealerClient):
             try:
                 if order.symbol not in self.targets.setdefault(order.date, {}):
                     klines = self.market_client.get_candlestick(order.symbol, '1day', 5)
-                    num = int((now - date2ts(order.date)) // 86400)
+                    num = int((now - datetime.date2ts(order.date)) // 86400)
                     kline = klines[num]
                     self.targets[order.date][order.symbol] = Target(
                         order.symbol, order.date, kline.open, kline.close, kline.vol
@@ -139,7 +137,7 @@ class LossDealerClient(BaseDealerClient):
             kline = klines[0]
             cont_loss = sum(cont_loss_list)
             if (rate == min(cont_loss_list) and cont_loss <= min_loss_rate) or cont_loss <= break_loss_rate:
-                target = Target(symbol, ts2date(kline.id), kline.open, kline.close, kline.vol)
+                target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 if now - kline.id > 86400:
                     TargetSQL.add_target(
                         symbol=symbol,
@@ -155,8 +153,8 @@ class LossDealerClient(BaseDealerClient):
                 targets[symbol] = target
 
         
-        run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
-        date = ts2date(now - end * 86400)
+        parallel.run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
+        date = datetime.ts2date(now - end * 86400)
         logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
         return targets, date
 
@@ -404,7 +402,7 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force):
         now = time.time()
-        start_date = ts2date(now - (MAX_DAY + 2) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
@@ -433,7 +431,7 @@ class LossDealerClient(BaseDealerClient):
                 price = vol / amount
                 # fee = vol * 0.02
                 symbol = summary.symbol
-                tm = ts2time(summary.ts)
+                tm = datetime.ts2time(summary.ts)
                 report_info[f'new_{order.direction}'].append((
                     tm, symbol, amount, vol, price
                 ))
@@ -451,13 +449,13 @@ class LossDealerClient(BaseDealerClient):
                 price = summary.created_price
                 amount = summary.remain
                 report_info['opening'].append((
-                    ts2time(summary.created_ts), symbol, amount, price, summary.direction
+                    datetime.ts2time(summary.created_ts), symbol, amount, price, summary.direction
                 ))
 
             elif summary.status in [-1, 3, 4]:
                 load = {'finished': 1}
                 if summary.ts:
-                    load['tm'] = ts2time(summary.ts)
+                    load['tm'] = datetime.ts2time(summary.ts)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],load)
 
         if not force and not report_info['new_sell'] and not report_info['new_buy']:

@@ -1,6 +1,5 @@
 import re
-from utils import datetime, config, user_config
-from utils.datetime import ts2date
+from utils import datetime, config, user_config, datetime
 from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func, Table
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
@@ -255,7 +254,7 @@ class Order(Base):
     @classmethod
     def get_profit(cls, account):
         with get_session() as session:
-            today = ts2date()
+            today = datetime.ts2date()
             table = Table('order_result', Base.metadata, autoload=True, autoload_with=session.bind)
             data = session.query(table).filter(table.c.account==str(account)).all()
             day_profit = sum([each.profit for each in data if each.sell_tm.startswith(today)])

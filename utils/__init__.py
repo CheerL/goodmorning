@@ -1,10 +1,11 @@
 import configparser
-import datetime
 import functools
 import os
 import threading
 import time
 
+from gevent import monkey
+monkey.patch_all(ssl=False)
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
@@ -24,8 +25,9 @@ LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 URL = 'https://api-aws.huobi.pro'
 WS_URL = 'wss://api-aws.huobi.pro'
 
-quite_logger(all_logger=True)
-logger = create_logger('goodmorning', LOG_PATH)
+logger_name = 'goodmorning'
+logger = create_logger(logger_name, LOG_PATH)
+quite_logger(all_logger=True, except_list=[logger_name])
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
 user_config = configparser.ConfigParser()

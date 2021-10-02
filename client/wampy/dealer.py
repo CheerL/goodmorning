@@ -2,10 +2,8 @@ import time
 
 from threading import Timer
 from retry import retry
-from market import MarketClient
 from target import MorningTarget as Target
-from utils import config, logger, user_config
-from utils.datetime import ts2time
+from utils import config, logger, user_config, datetime
 from wampy.roles.subscriber import subscribe
 from client.wampy import ControlledClient, Topic, State, WS_URL
 from client import BaseDealerClient
@@ -309,7 +307,7 @@ class MorningDealerClient(ControlledClient, BaseDealerClient):
 
         order_info = [{
             'symbol': order.symbol,
-            'time': ts2time(order.finished_at / 1000, '%Y-%m-%d %H:%M:%S.%f'),
+            'time': datetime.ts2time(order.finished_at / 1000, '%Y-%m-%d %H:%M:%S.%f'),
             'price': round(float(order.filled_cash_amount) / float(order.filled_amount), 6),
             'amount': round(float(order.filled_amount), 6),
             'fee': round(float(order.filled_fees), 6),
