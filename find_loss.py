@@ -1,8 +1,9 @@
 
 import argparse
-from inspect import cleandoc
 import time
 
+from gevent import monkey
+monkey.patch_all()
 from user.huobi import HuobiUser  as User
 from client.loss_dealer import LossDealerClient as Client
 

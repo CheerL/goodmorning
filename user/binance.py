@@ -1,11 +1,7 @@
-# from huobi.client.account import AccountClient
-# from huobi.client.trade import TradeClient
-# from huobi.constant import OrderSource, OrderType, AccountBalanceMode
-# from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
-# from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 from utils import logger, user_config
 from binance.spot import Spot
-from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
+# from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
+from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from binance.websocket.spot.websocket_client import SpotWebsocketClient
 from retry import retry
 from target import BaseTarget as Target
@@ -16,8 +12,6 @@ from user.binance_model import ListenKey, Candlestick, Symbol, OrderDetail, Tick
 import re
 import time
 import math
-# AccountBalanceMode.TOTAL = '2'
-
 
 
 class BinanceMarketClient(BaseMarketClient):
