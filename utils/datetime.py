@@ -1,22 +1,33 @@
 import pytz
 import datetime
 
-TZ = {'name':'Asia/Shanghai', 'num': 8}
-# TZ = {'name':'UTC', 'num': 0}
+TZ_DICT = {
+    0: 'UTC',
+    8: 'Asia/Shanghai'
+}
+
+class TzConfig:
+    tz_num = 8
 
 def date2dt(date_str=''):
-    tz = pytz.timezone(TZ['name'])
-    if date_str:
-        dt = datetime.datetime.strptime(date_str+f'+0{TZ["num"]}00', '%Y-%m-%d%z')
-    else:
-        dt = datetime.datetime.now()
-    return dt.astimezone(tz=tz)
+    return time2dt(date_str, '%Y-%m-%d')
 
 def date2ts(date_str=''):
     return date2dt(date_str).timestamp()
 
+def time2dt(time_str='', fmt='%Y-%m-%d %H:%M:%S'):
+    tz = pytz.timezone(TZ_DICT[TzConfig.tz_num])
+    if time_str:
+        dt = datetime.datetime.strptime(time_str+f'+0{TzConfig.tz_num}00', fmt+'%z')
+    else:
+        dt = datetime.datetime.now()
+    return dt.astimezone(tz=tz)
+
+def time2ts(time_str='', fmt='%Y-%m-%d %H:%M:%S'):
+    return time2dt(time_str, fmt).timestamp()
+
 def ts2dt(ts=0):
-    tz = pytz.timezone(TZ['name'])
+    tz = pytz.timezone(TZ_DICT[TzConfig.tz_num])
     if ts:
         dt = datetime.datetime.fromtimestamp(ts)
     else:

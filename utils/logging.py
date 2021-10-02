@@ -4,9 +4,13 @@ from logging.handlers import RotatingFileHandler
 
 FMT = "%(asctime)s {%(processName)s} [%(pathname)s:%(lineno)d] %(name)s-%(levelname)s: %(message)s"
 
+def no_addHandler(*args, **kwargs):
+    return
+
 def quite_logger(name=None, all_logger=False):
     if all_logger:
         root = logging.getLogger()
+        root.addHandler = no_addHandler
         for handler in root.handlers:
             root.removeHandler(handler)
         return

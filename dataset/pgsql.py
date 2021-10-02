@@ -1,12 +1,9 @@
-import time as _time
 import re
+from utils import datetime, config, user_config
 from utils.datetime import ts2date
 from sqlalchemy import Column, create_engine, VARCHAR, INTEGER, REAL, TEXT, func, Table
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.ext.declarative import declarative_base
-
-from utils import config, user_config
 
 PGHOST = config.get('data', 'PGHost')
 PGPORT = config.getint('data', 'PGPort')
@@ -275,8 +272,7 @@ def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPAS
 
 def get_time_from_str(time):
     if isinstance(time, str):
-        time = _time.strptime(time, '%Y-%m-%d %H:%M:%S')
-        time = _time.mktime(time)
+        time = datetime.time2ts(time)
 
     return time
 

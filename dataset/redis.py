@@ -1,6 +1,6 @@
 import redis
 import time
-from utils import config, user_config
+from utils import config, user_config, datetime
 
 RHOST = config.get('data', 'RHost')
 RPORT = config.getint('data', 'RPort')
@@ -58,7 +58,7 @@ class Redis(redis.StrictRedis):
             self.set(name, ','.join([targets, symbol]))
 
     def get_target(self):
-        now_str = time.strftime('%Y-%m-%d-%H', time.localtime())
+        now_str = datetime.ts2time(fmt='%Y-%m-%d-%H')
         name = f'target_{now_str}'
         targets = self.get(name)
         targets = targets.decode('utf-8') if targets else ''

@@ -1,13 +1,10 @@
-import datetime
-import os
-import sqlite3
-import time
+from utils import datetime
 
 import requests
 from wxpusher.wxpusher import BASEURL, WxPusher as _WxPusher
 from dataset.pgsql import Record, get_session, Profit, Message
 
-from utils import user_config, strftime, logger
+from utils import user_config, logger
 from retry import retry
 
 TOKEN = user_config.get('setting', 'Token')
@@ -69,17 +66,14 @@ def wx_name(uid):
 
 def get_profit(account_id):
     with get_session() as session:
-        month = datetime.date.fromtimestamp(time.time()).strftime('%Y-%m')
+        month = datetime.ts2time('%Y-%m')
         total_profit = Profit.get_sum_profit(session, account_id)
         month_profit = Profit.get_sum_profit(session, account_id, month)
         return total_profit, month_profit
 
-def add_profit(account_id, pay, income, profit, percent, now=None):
-    if not now:
-        now = time.time()
-
-    day = datetime.date.fromtimestamp(now)
-    month = day.strftime('%Y-%m')
+def add_profit(account_id, pay, income, profit, percent, now=0):
+    day = datetime.ts2date(now)
+    month = datetime.ts2time(now, fmt='%Y-%m')
     with get_session() as session:
         session.add(Profit(
             account=account_id,
@@ -99,7 +93,7 @@ def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, m
         return
 
     float_profit = sum([each[4] for each in report_info['holding']])
-    summary = f'{strftime(time.time())} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
+    summary = f'{datetime.ts2time()} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
     msg = f'''
 ### 用户
 
@@ -164,7 +158,7 @@ def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_inf
     if not wxuid:
         return
 
-    summary = f'{strftime(time.time())} {username} 今日支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
+    summary = f'{datetime.ts2time()} {username} 今日支出 {pay}, 收入 {income}, 利润 {profit}, 收益率 {percent}%'
     msg = f'''
 ### 用户
  

@@ -1,18 +1,19 @@
 import configparser
+import datetime
 import functools
 import os
 import threading
 import time
 
-import pytz
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
 from huobi.constant.system import RestApiDefine, WebSocketDefine
 from huobi.utils import PrintBasic, input_checker
 
-from utils.logging import create_logger
+from utils.logging import create_logger, quite_logger
 from utils.parallel import kill_thread
+from utils.datetime import ts2time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, 'config', 'config.ini')
@@ -23,6 +24,7 @@ LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 URL = 'https://api-aws.huobi.pro'
 WS_URL = 'wss://api-aws.huobi.pro'
 
+quite_logger(all_logger=True)
 logger = create_logger('goodmorning', LOG_PATH)
 config = configparser.ConfigParser()
 config.read(CONFIG_PATH)
@@ -53,13 +55,6 @@ def get_rate(a, b, k=5):
     else:
         return 0
 
-def strftime(timestamp, tz_name='Asia/Shanghai', fmt='%Y-%m-%d %H:%M:%S'):
-    tz = pytz.timezone(tz_name)
-    utc_time = pytz.utc.localize(
-        pytz.datetime.datetime.utcfromtimestamp(timestamp)
-    )
-    return utc_time.astimezone(tz).strftime(fmt)
-
 def get_target_time():
     TIME = config.get('time', 'TIME')
     now = time.time()
@@ -83,7 +78,7 @@ def get_target_time():
         ])
         target_time = target_list[0]
 
-    logger.info(f'Target time is {strftime(target_time)}')
+    logger.info(f'Target time is {ts2time(target_time)}')
     return target_time
 
 def timeout_handle(value):

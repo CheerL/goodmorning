@@ -1,5 +1,6 @@
 from utils import logger, user_config
 from binance.spot import Spot
+from utils.datetime import TzConfig
 # from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
 from binance.websocket.spot.websocket_client import SpotWebsocketClient
@@ -68,6 +69,7 @@ class BinanceUser(BaseUser):
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
         self.api = Spot(key=access_key, secret=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
+        TzConfig.tz_num = 0
         self.market_client.api = self.api
         self.market_client.update_symbols_info()
         self.listen_key = ListenKey(self.api)
