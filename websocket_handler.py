@@ -1,6 +1,5 @@
 import threading
 
-from apscheduler.schedulers.gevent import GeventScheduler
 from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
 from huobi.connection.impl.private_def import ConnectionState
 from huobi.connection.impl.websocket_manage import WebsocketManage
@@ -84,8 +83,8 @@ class WatchDog(WebSocketWatchDog):
         self.reconnect_after_ms = reconnect_after_ms if reconnect_after_ms > heart_beat_limit_ms else heart_beat_limit_ms
         self.restart_ms = restart_ms
         self.logger = logger
-        self.scheduler = Scheduler()
-        self.scheduler.add_job(check_reconnect, "interval", max_instances=1, seconds=1, args=[self])
+        self.scheduler = Scheduler({'apscheduler.job_defaults.max_instances': 5})
+        self.scheduler.add_job(check_reconnect, "interval", seconds=1, args=[self])
         self.start()
 
     def get_random_restart_at(self, wm):
@@ -108,5 +107,7 @@ class WatchDog(WebSocketWatchDog):
 class GeventWatchDog(WatchDog):
     def __init__(self, is_auto_connect=True, heart_beat_limit_ms=HEART_BEAT_MS, reconnect_after_ms=RECONNECT_MS, restart_ms=RESTART_MS):
         super().__init__(is_auto_connect=is_auto_connect, heart_beat_limit_ms=heart_beat_limit_ms, reconnect_after_ms=reconnect_after_ms, restart_ms=restart_ms)
-        self.scheduler = GeventScheduler()
-        self.scheduler.add_job(check_reconnect, "interval", max_instances=1, seconds=1, args=[self])
+        from apscheduler.schedulers.gevent import GeventScheduler
+        
+        self.scheduler = GeventScheduler({'apscheduler.job_defaults.max_instances': 5})
+        self.scheduler.add_job(check_reconnect, "interval", seconds=1, args=[self])

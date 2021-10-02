@@ -91,14 +91,14 @@ def main(user: User):
             Timer(3600, cancel, args=[now_target]).start()
     
     user.start()
-    client = Client.init_dealer(user)
     user.scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     user.scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
     user.scheduler.add_job(sell_targets, trigger='cron', hour=23, minute=57, second=0)
 
-    user.scheduler.add_job(client.report, trigger='cron', hour='9-11,13-15,17-19,21-23', minute=0, second=0, kwargs={'force': False})
-    user.scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=10, kwargs={'force': True})
+    client = Client.init_dealer(user)
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
+    user.scheduler.add_job(client.report, trigger='cron', hour='9-11,13-15,17-19,21-23', minute=0, second=0, kwargs={'force': False})
+    user.scheduler.add_job(client.report, trigger='cron', hour='0,8,12,16,20', minute=5, kwargs={'force': True})
 
     client.resume()
     logger.info('Finish loading data')

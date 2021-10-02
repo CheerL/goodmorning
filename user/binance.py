@@ -79,9 +79,9 @@ class BinanceUser(BaseUser):
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
         # self.api.new_order = self.api.new_order_test
-        self.scheduler = Scheduler()
+        self.scheduler = Scheduler({'apscheduler.job_defaults.max_instances': 5})
         self.scheduler.add_job(self.listen_key.check, 'interval', minutes=5)
-        self.scheduler.add_job(self.api.ping, 'interval', max_instances=5, seconds=5)
+        self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
         # self.scheduler.add_job(lambda : print(111), 'interval', seconds=5)
         self.scheduler.start()
         self.websocket.start()

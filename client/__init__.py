@@ -1,5 +1,6 @@
 import time
 
+from threading import Timer
 from user import BaseUser as User
 from retry import retry
 from utils import logger
@@ -17,7 +18,7 @@ class BaseDealerClient:
     @retry(tries=5, delay=1, logger=logger)
     def init_dealer(cls, user):
         client = cls(user)
-        quite_logger(all_logger=True)
+        Timer(2, quite_logger, kwargs={'all_logger':True}).start()
         return client
 
     def wait_state(self, state=1):

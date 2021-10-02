@@ -19,7 +19,7 @@ def main(user: User):
     try:
         logger.info('Start run sub process')
         client = Client.init_dealer(user)
-        scheduler = Scheduler()
+        scheduler = Scheduler({'apscheduler.job_defaults.max_instances': 5})
         client.user.start()
         client.wait_state(State.RUNNING)
         client.user.set_start_asset()
