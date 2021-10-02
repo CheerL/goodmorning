@@ -99,6 +99,8 @@ class WatchDog(WebSocketWatchDog):
 
     def after_connection_created(self, name):
         [wm] = [wm for wm in self.websocket_manage_list if wm not in self.websocket_manage_dict.values()]
+        wm.on_close = lambda: logger.info(f'[{name}] close')
+        # wm.on_close = lambda: None
         self.mutex.acquire()
         self.websocket_manage_dict[name] = wm
         self.mutex.release()
