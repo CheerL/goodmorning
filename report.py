@@ -126,7 +126,7 @@ def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, mo
 ''' + '\n'.join([
     f'| {each[1]} | {each[0]} | {"买入" if each[4]=="buy" else "卖出"} | {each[3]:.6g} | {each[2]:.4f} |'
     for each in report_info['opening']
-]) if report_info['opening'] else '') + '''
+]) if report_info['opening'] else '') + ('''
 
 ### 当前持有
 
@@ -135,7 +135,7 @@ def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, mo
 ''' + '\n'.join([
     f'| {each[0]} | {each[6]} | {each[2]:.6g} | {each[3]:.6g} | {each[4]:.3f} | {each[5]:.2%} | {each[1]:.4f} |'
     for each in report_info['holding']
-]) + f'''
+]) if report_info['holding'] else '') + f'''
 
 ### 总结
 
