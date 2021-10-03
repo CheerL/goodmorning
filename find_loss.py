@@ -2,6 +2,9 @@
 import argparse
 import time
 
+from gevent import monkey
+monkey.patch_all()
+
 from utils import config, kill_all_threads, logger, datetime
 from user.huobi import HuobiUser  as User
 from client.loss_dealer import LossDealerClient as Client

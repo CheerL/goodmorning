@@ -56,7 +56,7 @@ def check_reconnect(watch_dog: 'WatchDog'):
 
         elif websocket_manage.state == ConnectionState.WAIT_RECONNECT:
             if ts > websocket_manage.reconnect_at:
-                watch_dog.logger.warning(f"[{name}] Reconnect")
+                # watch_dog.logger.warning(f"[{name}] Reconnect")
                 websocket_manage.state = ConnectionState.RECONNECTING
                 websocket_manage.re_connect()
                 websocket_manage.created_at = ts
