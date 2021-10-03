@@ -1,9 +1,11 @@
 import time
 
-from threading import Timer
+from pytz import timezone
+
 from user.base import BaseUser as User
 from retry import retry
-from utils import logger
+from utils import logger, datetime
+from apscheduler.schedulers.background import BackgroundScheduler
 
 class BaseDealerClient:
     def __init__(self, user: User, *args, **kwargs):
@@ -11,6 +13,8 @@ class BaseDealerClient:
         self.targets = {}
         self.user = user
         self.client_type = 'base dealer'
+        self.report_scheduler = BackgroundScheduler(timezone=datetime.TZ_DICT[8])
+        self.report_scheduler.start()
         self.state = 0
 
     @classmethod

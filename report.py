@@ -88,6 +88,7 @@ def add_profit(account_id, pay, income, profit, percent, now=0):
 
 
 @retry(tries=5, delay=0.2)
+@datetime.force_tz(8)
 def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, month_profit, all_profit):
     if not wxuid:
         return

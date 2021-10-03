@@ -1,5 +1,6 @@
 import pytz
 import datetime
+import functools
 
 TZ_DICT = {
     0: pytz.timezone('UTC'),
@@ -12,6 +13,20 @@ class Tz:
     @classmethod
     def get_tz(cls):
         return TZ_DICT[cls.tz_num]
+
+def force_tz(tz_num=0):
+    def wrapper(func):
+        @functools.wraps(func)
+        def _wrapper(*args, **kwargs):
+            ori_tz_num = Tz.tz_num
+            Tz.tz_num = tz_num
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                Tz.tz_num = ori_tz_num
+            return result
+        return _wrapper
+    return wrapper
 
 def date2dt(date_str=''):
     return time2dt(date_str, '%Y-%m-%d')
