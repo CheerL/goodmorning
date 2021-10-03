@@ -66,9 +66,13 @@ class LossDealerClient(BaseDealerClient):
 
 
         for date, targets in self.targets.items():
-            date_symbols = list(set([summary.symbol for summary in self.user.orders.values() if summary.label == date]))
-            for symbol in targets.copy():
-                if symbol not in date_symbols:
+            date_symbols = list(set([
+                summary.symbol for summary
+                in self.user.orders.values()
+                if summary.label == date
+            ]))
+            for symbol, target in targets.copy().items():
+                if symbol not in date_symbols or target.own_amount < target.sell_market_min_order_amt:
                     del self.targets[date][symbol]
         
         self.date = max(self.targets.keys())

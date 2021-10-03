@@ -17,13 +17,26 @@ class ListenKey:
         self.update_time = time.time()
         self.create_time = self.update_time
 
-    def check(self):
+    def check(self, user=None):
         now = time.time()
         if now > self.create_time + 12 * 60 * 60:
             self.recreate()
         elif now > self.update_time + 30 * 60:
             self.update()
 
+        if not user:
+            return
+
+        for conn_name in user.websocket._conns.copy():
+            if len(conn_name) > 50:
+                if conn_name != self.key:
+                    user.websocket.stop_socket(conn_name)
+                else:
+                    factory = user.websocket.factories[conn_name]
+                    factory.protocol_instance.sendPong()
+
+        if self.key not in user.websocket._conns:
+            user.websocket.user_data(self.key, 1, user.user_data_callback)
 
 class Symbol:
     def __init__(self, info):

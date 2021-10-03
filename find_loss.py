@@ -92,7 +92,7 @@ def main(user):
             client.cancel_and_buy_limit_target(now_target, target.init_price)
             Timer(3600, cancel, args=[now_target]).start()
     
-    logger.info(f'Run {user.user_type}')
+    logger.info(f'Start Loss Strategy. Run {user.user_type}')
     user.start()
     user.scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     user.scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
@@ -105,6 +105,7 @@ def main(user):
 
     client.resume()
     logger.info('Finish loading data')
+
     # print(user.orders)
     # print(client.targets)
     # for summary in client.user.orders.copy().values():
@@ -118,13 +119,18 @@ def main(user):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', '--num', default=-1, type=int)
+    parser.add_argument('-t', '--type', default='', type=str)
+    parser.add_argument('-n', '--num', default=0, type=int)
     args = parser.parse_args()
 
-    logger.info('Start Loss Strategy')
-    User = {
-        'Binance': BinanceUser,
-        'Huobi': HuobiUser
-    }[EXCHANGE]
-    [user] = User.init_users(num=args.num)
+    User_dict = {User.user_type: User for User in [BinanceUser, HuobiUser]}
+
+    if args.type and args.type in User_dict:
+        exchange = args.type
+    elif EXCHANGE in User_dict:
+        exchange = EXCHANGE
+    else:
+        exchange = list(User_dict.keys())[0]
+
+    [user] = User_dict[exchange].init_users(num=args.num)
     main(user)

@@ -6,7 +6,6 @@ from huobi.connection.impl.private_def import ConnectionState
 from huobi.connection.impl.websocket_manage import WebsocketManage
 from huobi.connection.impl.websocket_manage import websocket_connection_handler as WEBSOCKET_CONNECTION_HANDLER
 from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
-from huobi.connection.subscribe_client import SubscribeClient
 from huobi.utils.time_service import get_current_timestamp
 
 from utils import logger, quite_logger
@@ -18,9 +17,11 @@ RESTART_RANGE = 600000
 ConnectionState.RECONNECTING = 6
 
 def replace_watch_dog(gevent=False):
+    from huobi.connection.subscribe_client import SubscribeClient
     old_watch_dog = SubscribeClient.subscribe_watch_dog
-    [job] = old_watch_dog.scheduler.get_jobs()
-    job.pause()
+    for job in old_watch_dog.scheduler.get_jobs():
+        job.pause()
+    old_watch_dog.scheduler.shutdown()
 
     if gevent:
         watch_dog = GeventWatchDog()
