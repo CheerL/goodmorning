@@ -8,7 +8,7 @@ class ListenKey:
         self.create_time = self.update_time
 
     def update(self):
-        self.key = self.api.renew_listen_key(self.key)
+        self.api.renew_listen_key(self.key)
         self.update_time = time.time()
 
     def recreate(self):

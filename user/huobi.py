@@ -2,6 +2,9 @@ import time
 import math
 import re
 
+from gevent import monkey
+monkey.patch_all()
+
 from utils import logger, datetime
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
@@ -14,7 +17,7 @@ from huobi.model.generic.symbol import Symbol
 from retry import retry
 from target import BaseTarget as Target
 from order import OrderSummary
-from user import BaseUser, BaseMarketClient
+from user.base import BaseUser, BaseMarketClient
 from user.huobi_websocket_handler import replace_watch_dog
 
 AccountBalanceMode.TOTAL = '2'
@@ -147,12 +150,13 @@ class HuobiUser(BaseUser):
                 summary = OrderSummary(order_id, symbol, direction)
                 self.orders[order_id] = summary
 
+            summary.fee_rate = self.fee_rate
             try:
                 if etype == 'creation':
                     summary.create(update)
 
                 elif etype == 'trade':
-                    summary.update(update, self.fee_rate)
+                    summary.update(update)
 
                 elif etype == 'cancellation':
                     summary.cancel_update(update)

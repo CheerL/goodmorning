@@ -7,7 +7,7 @@ from utils import config, logger, user_config, datetime
 from wampy.roles.subscriber import subscribe
 from client.wampy import ControlledClient, Topic, State, WS_URL
 from client import BaseDealerClient
-from user import BaseUser as User
+from user.base import BaseUser as User
 from order import OrderSummaryStatus
 from report import wx_report, add_profit, get_profit
 

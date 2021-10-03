@@ -4,7 +4,7 @@ import argparse
 
 from utils import config, kill_all_threads, logger, user_config, parallel
 from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
-from user import User
+from user.base import User
 from client.wampy.dealer import MorningDealerClient as Client, State
 
 TEST = user_config.getboolean('setting', 'Test')

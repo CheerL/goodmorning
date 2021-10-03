@@ -23,6 +23,7 @@ def quite_logger(name=None, all_logger=False, except_list=[]):
         logger.removeHandler(handler)
         
     if all_logger:
+        logging.lastResort.setLevel(100)
         logging.Manager.except_list = except_list
         logging.Manager._getLogger = logging.Manager.getLogger
         logging.Manager.getLogger = getLogger

@@ -1,7 +1,7 @@
 import time
 
 from threading import Timer
-from user import BaseUser as User
+from user.base import BaseUser as User
 from retry import retry
 from utils import logger
 

@@ -5,7 +5,7 @@ from target import LossTarget as Target
 from utils import config, logger, user_config, get_rate, datetime, parallel
 from order import OrderSummary, OrderSummaryStatus
 from client import BaseDealerClient
-from user import BaseUser as User
+from user.base import BaseUser as User
 from dataset.pgsql import Order as OrderSQL, LossTarget as TargetSQL
 from report import wx_loss_report
 
@@ -117,7 +117,11 @@ class LossDealerClient(BaseDealerClient):
 
         @retry(tries=5, delay=1)
         def worker(symbol):
-            klines = self.market_client.get_candlestick(symbol, '1day', min_before+end+1)[end:]
+            try:
+                klines = self.market_client.get_candlestick(symbol, '1day', min_before+end+1)[end:]
+            except Exception as e:
+                logger.error(f'[{symbol}]  {e}')
+                raise e
 
             if len(klines) <= min_before:
                 return
@@ -153,7 +157,7 @@ class LossDealerClient(BaseDealerClient):
                 targets[symbol] = target
 
         
-        parallel.run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 8)
+        parallel.run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)
         date = datetime.ts2date(now - end * 86400)
         logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
         return targets, date

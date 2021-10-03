@@ -38,6 +38,7 @@ class OrderSummary:
         self.vol = 0
         self.remain = 0
         self.fee = 0
+        self.fee_rate = 0
         self.error_msg = ''
         self.status = 0
         self.created_ts = 0
@@ -51,25 +52,35 @@ class OrderSummary:
         logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 
     def create(self, data):
-        if isinstance(data, OrderUpdate) and 'market' in data.type:
-            self.limit = False
+        if isinstance(data, OrderUpdate):
+            if 'market' in data.type:
+                self.limit = False
+
             self.created_ts = self.ts = data.tradeTime / 1000
-        elif isinstance(data, dict) and data['from'] == 'binance' and data['o'] == 'MARKET':
-            self.limit = False
-            self.created_ts = self.ts = data['O'] / 1000
+        elif isinstance(data, dict) and data['from'] == 'binance':
+            if data['o'] == 'MARKET':
+                self.limit = False
             
+            ts = data['E'] / 1000 
+            self.created_ts = ts
+            if ts < self.ts:
+                return
+
+            self.ts = ts
+
         self.status = OrderSummaryStatus.CREATED
         self.report()
 
-    def update(self, data, fee_rate):
+    def update(self, data):
         if isinstance(data, OrderUpdate):
+            ts = data.tradeTime / 1000
             new_price = float(data.tradePrice)
             new_amount = float(data.tradeVolume)
             new_vol = new_price * new_amount
-            self.ts = data.tradeTime / 1000
+            self.ts = ts
             self.amount += new_amount
             self.vol += new_vol
-            self.fee = self.vol * fee_rate
+            self.fee = self.vol * self.fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
             if 'partial-filled' == data.orderStatus:
                 self.status = OrderSummaryStatus.PARTIAL_FILLED
@@ -80,11 +91,15 @@ class OrderSummary:
                 if self.filled_callback:
                     self.filled_callback(*self.filled_callback_args)
         elif isinstance(data, dict) and data['from'] == 'binance':
+            ts = data['E'] / 1000
+            if ts < self.ts:
+                return
+
             self.amount = float(data['z'])
             self.vol = float(data['Z'])
-            self.fee = self.vol * 0.001
+            self.fee = self.vol * self.fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
-            self.ts = data['T'] / 1000
+            self.ts = ts
 
             if 'PARTIALLY_FILLED' == data['X']:
                 self.status = OrderSummaryStatus.PARTIAL_FILLED
@@ -98,12 +113,22 @@ class OrderSummary:
         self.report()
 
     def cancel_update(self, data):
-        self.status = OrderSummaryStatus.CANCELED
         if isinstance(data, OrderUpdate):
             self.remain = float(data.remainAmt)
+            self.ts = data.tradeTime / 1000
         elif isinstance(data, dict) and data['from'] == 'binance':
-            self.remain = float(data['q']) - float(data['z'])
+            ts = data['E'] / 1000
+            if ts < self.ts:
+                return
 
+            self.amount = float(data['z'])
+            self.vol = float(data['Z'])
+            self.fee = self.vol * self.fee_rate
+            self.aver_price = self.vol / self.amount if self.amount else 0
+            self.ts = ts
+            self.remain = float(data['q']) - float(data['z'])
+        
+        self.status = OrderSummaryStatus.CANCELED
         if self.cancel_callback:
             self.cancel_callback(*self.cancel_callback_args)
         self.report()

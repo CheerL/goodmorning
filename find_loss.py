@@ -2,12 +2,10 @@
 import argparse
 import time
 
-from gevent import monkey
-monkey.patch_all()
 
-from utils import config, kill_all_threads, logger, datetime, user_config
 from user.huobi import HuobiUser
 from user.binance import BinanceUser
+from utils import config, kill_all_threads, logger, datetime, user_config
 from client.loss_dealer import LossDealerClient as Client
 
 from retry import retry
@@ -111,7 +109,6 @@ def main(user):
     # print(client.targets)
     # for summary in client.user.orders.copy().values():
     #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
-
     # for target in client.targets.get(client.date, {}).values():
     #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
     client.wait_state(10)

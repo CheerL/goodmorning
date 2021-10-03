@@ -1,12 +1,12 @@
 from utils import logger, user_config, datetime
 from binance.spot import Spot
 # from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
-from apscheduler.schedulers.gevent import GeventScheduler as Scheduler
+from apscheduler.schedulers.twisted import TwistedScheduler as Scheduler
 from binance.websocket.spot.websocket_client import SpotWebsocketClient
 from retry import retry
 from target import BaseTarget as Target
 from order import OrderSummary
-from user import BaseUser, BaseMarketClient
+from user.base import BaseUser, BaseMarketClient
 from user.binance_model import ListenKey, Candlestick, Symbol, OrderDetail, Ticker
 
 import re
@@ -126,6 +126,7 @@ class BinanceUser(BaseUser):
             self.buy_amount = float(self.buy_amount)
 
     def user_data_callback(self, update):
+        print(update)
         try:
             if 'e' not in update:
                 return
@@ -161,12 +162,13 @@ class BinanceUser(BaseUser):
                 summary = OrderSummary(order_id, symbol, direction)
                 self.orders[order_id] = summary
 
+            summary.fee_rate = self.fee_rate
             try:
                 if etype == 'NEW':
                     summary.create(update)
 
                 elif etype == 'TRADE':
-                    summary.update(update, self.fee_rate)
+                    summary.update(update)
 
                 elif etype == 'CANCELED':
                     summary.cancel_update(update)
