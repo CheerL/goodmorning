@@ -124,7 +124,6 @@ class BinanceUser(BaseUser):
             self.buy_amount = float(self.buy_amount)
 
     def user_data_callback(self, update):
-        print(update)
         try:
             if 'e' not in update:
                 return

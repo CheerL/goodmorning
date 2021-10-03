@@ -47,7 +47,6 @@ class Symbol:
 
         for each in info['filters']:
             if each['filterType'] == 'PRICE_FILTER':
-                # print(each)
                 self.value_precision = self.price_precision = len(str(int(1/float(each['tickSize'])))) - 1
             elif each['filterType'] == 'LOT_SIZE':
                 self.limit_order_min_order_amt = self.min_order_amt = float(each['minQty'])
