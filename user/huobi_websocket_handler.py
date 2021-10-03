@@ -8,11 +8,11 @@ from huobi.connection.impl.websocket_watchdog import WebSocketWatchDog
 from huobi.connection.subscribe_client import SubscribeClient
 from huobi.utils.time_service import get_current_timestamp
 
-from utils import logger
+from utils import logger, quite_logger
 
 HEART_BEAT_MS = 30000
 RECONNECT_MS = 32000
-RESTART_MS = 6215790
+RESTART_MS = 1200000
 RESTART_RANGE = 600000
 ConnectionState.RECONNECTING = 6
 
@@ -56,7 +56,7 @@ def check_reconnect(watch_dog: 'WatchDog'):
 
         elif websocket_manage.state == ConnectionState.WAIT_RECONNECT:
             if ts > websocket_manage.reconnect_at:
-                # watch_dog.logger.warning(f"[{name}] Reconnect")
+                watch_dog.logger.warning(f"[{name}] Reconnect")
                 websocket_manage.state = ConnectionState.RECONNECTING
                 websocket_manage.re_connect()
                 websocket_manage.created_at = ts
@@ -100,7 +100,7 @@ class WatchDog(WebSocketWatchDog):
     def after_connection_created(self, name):
         [wm] = [wm for wm in self.websocket_manage_list if wm not in self.websocket_manage_dict.values()]
         wm.on_close = lambda: logger.info(f'[{name}] close')
-        # wm.on_close = lambda: None
+        quite_logger(wm.logger.name)
         self.mutex.acquire()
         self.websocket_manage_dict[name] = wm
         self.mutex.release()

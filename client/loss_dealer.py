@@ -162,7 +162,12 @@ class LossDealerClient(BaseDealerClient):
         if not self.date or not self.targets.get(self.date, {}):
             return
 
-        tickers = self.market_client.get_market_tickers()
+        try:
+            tickers = self.market_client.get_market_tickers()
+        except Exception as e:
+            logger.error(e)
+            return
+
         for target in self.targets[self.date].values():
             target.update_price(tickers)
             self.check_target(target)

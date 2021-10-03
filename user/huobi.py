@@ -15,7 +15,7 @@ from retry import retry
 from target import BaseTarget as Target
 from order import OrderSummary
 from user import BaseUser, BaseMarketClient
-from websocket_handler import replace_watch_dog
+from user.huobi_websocket_handler import replace_watch_dog
 
 AccountBalanceMode.TOTAL = '2'
 
