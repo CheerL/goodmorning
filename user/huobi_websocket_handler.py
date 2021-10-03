@@ -73,6 +73,7 @@ def check_reconnect(watch_dog: 'WatchDog'):
 
         elif websocket_manage.state == ConnectionState.CLOSED_ON_ERROR:
             if watch_dog.is_auto_connect:
+                logger.info('Try to reconnect')
                 close_and_wait_reconnect(websocket_manage, ts + watch_dog.reconnect_after_ms)
 
 class WatchDog(WebSocketWatchDog):
@@ -95,9 +96,9 @@ class WatchDog(WebSocketWatchDog):
 
     def on_connection_closed(self, websocket_manage):
         self.mutex.acquire()
-        self.websocket_manage_list.remove(websocket_manage)
-        [name] = [name for name, wm in self.websocket_manage_dict.items() if wm == websocket_manage]
-        del self.websocket_manage_dict[name]
+        # self.websocket_manage_list.remove(websocket_manage)
+        # [name] = [name for name, wm in self.websocket_manage_dict.items() if wm == websocket_manage]
+        # del self.websocket_manage_dict[name]
         self.mutex.release()
 
     def after_connection_created(self, name):
