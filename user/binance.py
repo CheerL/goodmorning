@@ -66,15 +66,15 @@ class BinanceUser(BaseUser):
     fee_rate = 0.001
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
+        datetime.Tz.tz_num = 0
         self.api = Spot(key=access_key, secret=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
-        datetime.TzConfig.tz_num = 0
         self.market_client.api = self.api
         self.market_client.update_symbols_info()
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
         # self.api.new_order = self.api.new_order_test
-        self.scheduler = Scheduler({'apscheduler.job_defaults.max_instances': 5})
+        self.scheduler = Scheduler(job_defaults={'max_instances': 5}, timezone=datetime.Tz.get_tz())
         self.scheduler.add_job(self.listen_key.check, 'interval', minutes=5)
         self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
         self.scheduler.start()

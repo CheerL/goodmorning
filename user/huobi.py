@@ -69,12 +69,13 @@ class HuobiUser(BaseUser):
     fee_rate = 0.002
 
     def __init__(self, access_key, secret_key, buy_amount, wxuid):
+        datetime.Tz.tz_num = 8
         self.watch_dog = replace_watch_dog(gevent=True)
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
         self.scheduler = self.watch_dog.scheduler
-        datetime.TzConfig.tz_num = 8
+        self.scheduler.timezone = datetime.Tz.get_tz()
 
     def start(self, **kwargs):
         self.account_client.sub_account_update(

@@ -76,7 +76,7 @@ def check_reconnect(watch_dog: 'WatchDog'):
 
 class WatchDog(WebSocketWatchDog):
     websocket_manage_dict = dict()
-    _Scheduler = BackgroundScheduler
+    SchedulerType = BackgroundScheduler
 
     def __init__(self, is_auto_connect=True, heart_beat_limit_ms=HEART_BEAT_MS, reconnect_after_ms=RECONNECT_MS, restart_ms=RESTART_MS):
         threading.Thread.__init__(self)
@@ -85,7 +85,7 @@ class WatchDog(WebSocketWatchDog):
         self.reconnect_after_ms = reconnect_after_ms if reconnect_after_ms > heart_beat_limit_ms else heart_beat_limit_ms
         self.restart_ms = restart_ms
         self.logger = logger
-        self.scheduler = self._Scheduler({'apscheduler.job_defaults.max_instances': 5})
+        self.scheduler = self.SchedulerType(job_defaults={'max_instances': 5})
         self.scheduler.add_job(check_reconnect, "interval", seconds=1, args=[self])
         self.start()
 
@@ -109,4 +109,4 @@ class WatchDog(WebSocketWatchDog):
 
 
 class GeventWatchDog(WatchDog):
-    _Scheduler = GeventScheduler
+    SchedulerType = GeventScheduler

@@ -5,8 +5,9 @@ import time
 from gevent import monkey
 monkey.patch_all()
 
-from utils import config, kill_all_threads, logger, datetime
-from user.huobi import HuobiUser  as User
+from utils import config, kill_all_threads, logger, datetime, user_config
+from user.huobi import HuobiUser
+from user.binance import BinanceUser
 from client.loss_dealer import LossDealerClient as Client
 
 from retry import retry
@@ -17,8 +18,9 @@ from threading import Timer
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
+EXCHANGE = user_config.get('setting', 'Exchange')
 
-def main(user: User):
+def main(user):
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(date=None):
         logger.info('Start to sell')
@@ -92,6 +94,7 @@ def main(user: User):
             client.cancel_and_buy_limit_target(now_target, target.init_price)
             Timer(3600, cancel, args=[now_target]).start()
     
+    logger.info(f'Run {user.user_type}')
     user.start()
     user.scheduler.add_job(set_targets, trigger='cron', hour=23, minute=59, second=0)
     user.scheduler.add_job(update_targets, trigger='cron', hour=0, minute=0, second=10)
@@ -104,12 +107,13 @@ def main(user: User):
 
     client.resume()
     logger.info('Finish loading data')
+    # print(user.orders)
+    # print(client.targets)
     # for summary in client.user.orders.copy().values():
     #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
 
     # for target in client.targets.get(client.date, {}).values():
     #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
-
     client.wait_state(10)
 
     kill_all_threads()
@@ -121,5 +125,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logger.info('Start Loss Strategy')
+    User = {
+        'Binance': BinanceUser,
+        'Huobi': HuobiUser
+    }[EXCHANGE]
     [user] = User.init_users(num=args.num)
     main(user)
