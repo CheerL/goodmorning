@@ -88,14 +88,14 @@ def add_profit(account_id, pay, income, profit, percent, now=0):
 
 
 @retry(tries=5, delay=0.2)
-def wx_loss_report(account_id, wxuid, username, report_info, usdt, day_profit, month_profit, all_profit):
+def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, month_profit, all_profit):
     if not wxuid:
         return
 
     float_profit = sum([each[4] for each in report_info['holding']])
-    summary = f'{datetime.ts2time()} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
+    summary = f'{datetime.ts2time()} {user_type} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
     msg = f'''
-### 用户
+### {user_type}用户
 
 {username}
 ''' + ('''
