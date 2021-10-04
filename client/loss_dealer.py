@@ -66,11 +66,11 @@ class LossDealerClient(BaseDealerClient):
 
 
         for date, targets in self.targets.items():
-            date_symbols = list(set([
+            date_symbols = [
                 summary.symbol for summary
                 in self.user.orders.values()
                 if summary.label == date
-            ]))
+            ]
             for symbol, target in targets.copy().items():
                 if symbol not in date_symbols or target.own_amount < target.sell_market_min_order_amt:
                     del self.targets[date][symbol]
@@ -382,7 +382,7 @@ class LossDealerClient(BaseDealerClient):
             summary.created_vol = detail.amount
             summary.remain = summary.created_vol - summary.vol
         summary.created_ts = detail.created_at / 1000
-        summary.ts = max(detail.created_at, detail.finished_at) / 1000 
+        summary.ts = max(detail.created_at, detail.finished_at, detail.canceled_at) / 1000
         status = {
             'submitted': 1,
             'partial-filled': 2,

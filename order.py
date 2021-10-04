@@ -61,7 +61,7 @@ class OrderSummary:
             if data['o'] == 'MARKET':
                 self.limit = False
             
-            ts = data['E'] / 1000 
+            ts = data['O'] / 1000 
             self.created_ts = ts
             if ts < self.ts:
                 return
@@ -91,7 +91,7 @@ class OrderSummary:
                 if self.filled_callback:
                     self.filled_callback(*self.filled_callback_args)
         elif isinstance(data, dict) and data['from'] == 'binance':
-            ts = data['E'] / 1000
+            ts = data['T'] / 1000
             if ts < self.ts:
                 return
 
@@ -117,15 +117,14 @@ class OrderSummary:
             self.remain = float(data.remainAmt)
             self.ts = data.tradeTime / 1000
         elif isinstance(data, dict) and data['from'] == 'binance':
-            ts = data['E'] / 1000
-            if ts < self.ts:
+            if data['E'] / 1000< self.ts:
                 return
 
             self.amount = float(data['z'])
             self.vol = float(data['Z'])
             self.fee = self.vol * self.fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
-            self.ts = ts
+            self.ts = data['T'] / 1000
             self.remain = float(data['q']) - float(data['z'])
         
         self.status = OrderSummaryStatus.CANCELED
