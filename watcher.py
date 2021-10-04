@@ -177,10 +177,12 @@ def main():
         logger.info('Sub watcher')
         client : WatcherClient = init_watcher(WatcherClient)
         client.wait_state(State.STARTED)
-        client.get_task()
+    
+    client.get_task()
 
-        if not client.task:
-            return
+    if not client.task:
+        logger.info('No task and exit')
+        return
     
     if client.task:
         logger.info(f'Watcher task are: {", ".join(client.task)}')
@@ -196,6 +198,7 @@ def main():
     client.wait_state(State.RUNNING)
     client.wait_state(State.STARTED)
     if is_wait_stop:
+        logger.info('Waiting stop')
         client.wait_state(State.STOPPED)
 
     client.stop()
