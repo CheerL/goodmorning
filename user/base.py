@@ -79,6 +79,7 @@ class BaseUser:
         self.buy_amount = buy_amount
         self.market_client = self.MarketClient()
         self.scheduler = None
+        logger.info(f'Run {self.user_type}.')
 
     @classmethod
     @retry(tries=5, delay=1, logger=logger)

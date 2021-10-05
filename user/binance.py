@@ -41,7 +41,7 @@ class BinanceMarketClient(BaseMarketClient):
             raw_tickers = self.api.ticker_price(symbol)
         return [Ticker(raw_ticker) for raw_ticker in raw_tickers]
 
-    def get_candlestick(self, symbol, interval: str, limit=10):
+    def get_candlestick(self, symbol, interval: str, limit=10, start_ts=None, end_ts=None):
         if interval.endswith('day'):
             interval = interval.replace('day', 'd')
         elif interval.endswith('min'):
@@ -55,7 +55,26 @@ class BinanceMarketClient(BaseMarketClient):
             interval = interval.replace('week', 'w')
         elif interval.endswith('mon'):
             interval = interval.replace('mon', 'M')
-        raw_klines = self.api.klines(symbol, interval, limit=limit)
+        
+        if start_ts and end_ts:
+            raw_klines = []
+            start_time = start_ts * 1000
+            end_time = end_ts * 1000 - 1
+            while True:
+                klines = self.api.klines(symbol, interval, startTime=start_time, endTime=end_time, limit=1000)
+                if klines:
+                    raw_klines.extend(klines)
+                    start_time = klines[-1][0] + 1
+
+                    if len(klines) < 1000:
+                        break
+                    elif start_time > end_time:
+                        break
+                else:
+                    break
+
+        else:
+            raw_klines = self.api.klines(symbol, interval, limit=limit)
         return [Candlestick(kline) for kline in reversed(raw_klines)]
 
 
@@ -76,8 +95,7 @@ class BinanceUser(BaseUser):
         self.scheduler = Scheduler(job_defaults={'max_instances': 5}, timezone=datetime.Tz.get_tz())
         self.scheduler.add_job(self.listen_key.check, 'interval', seconds=3, args=[self])
         self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
-        self.scheduler.start()
-        self.websocket.start()
+        
 
     @classmethod
     def init_users(cls, num=-1):
@@ -108,8 +126,10 @@ class BinanceUser(BaseUser):
         self.api.cancel_order(symbol, orderId=order_id)
 
     def start(self, **kwargs):
-        self.listen_key.check()
-        self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
+        self.scheduler.start()
+        self.websocket.start()
+        self.listen_key.check(self)
+        # self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
 
         for coin_info in self.api.coin_info():
             currency = coin_info['coin']

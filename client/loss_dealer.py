@@ -8,15 +8,24 @@ from client import BaseDealerClient
 from user.base import BaseUser as User
 from dataset.pgsql import Order as OrderSQL, LossTarget as TargetSQL
 from report import wx_loss_report
+from threading import Timer
+
+TEST = user_config.getboolean('setting', 'TEST')
 
 MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+SELL_RATE = config.getfloat('loss', 'SELL_RATE')
+WITHDRAW_RATE = config.getfloat('loss', 'WITHDRAW_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 MIN_NUM = config.getint('loss', 'MIN_NUM')
 MAX_NUM = config.getint('loss', 'MAX_NUM')
-TEST = user_config.getboolean('setting', 'TEST')
+MIN_VOL = config.getfloat('loss', 'MIN_VOL')
+MAX_VOL = config.getfloat('loss', 'MAX_VOL')
+MIN_PRICE = config.getfloat('loss', 'MIN_PRICE')
+MAX_PRICE = config.getfloat('loss', 'MAX_PRICE')
+MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
 
 
 class LossDealerClient(BaseDealerClient):
@@ -25,6 +34,7 @@ class LossDealerClient(BaseDealerClient):
         self.targets: dict[str, dict[str, Target]] = {}
         self.date = datetime.ts2date()
         self.client_type = 'loss_dealer'
+        logger.info('Start loss strategy.')
 
     def resume(self):
         now = time.time()
@@ -76,18 +86,20 @@ class LossDealerClient(BaseDealerClient):
                     del self.targets[date][symbol]
         
         self.date = max(self.targets.keys())
+        logger.info('Finish loading data')
 
-    def check_target(self, target: Target):
+    def check_target_price(self, target: Target):
         if target.high_mark:
             if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE):
-                self.sell_target(target, target.high_mark_back_price)
+                self.cancel_and_sell_limit_target(target, target.high_mark_back_price, selling_level=2)
                 return
         elif target.price >= target.high_mark_price:
             target.high_mark = True
         
         if target.low_mark:
-            if target.own and target.price <= target.sell_price * (1+SELL_UP_RATE):
-                self.sell_target(target, target.sell_price, selling_level=2)
+            withdraw_price = target.buy_price * (1 + WITHDRAW_RATE)
+            if target.own and target.price <= withdraw_price* (1 + SELL_UP_RATE):
+                self.cancel_and_sell_limit_target(target, withdraw_price, selling_level=2)
                 return
         elif target.price >= target.low_mark_price:
             target.low_mark = True
@@ -110,9 +122,37 @@ class LossDealerClient(BaseDealerClient):
         }
         return targets
 
-    def find_targets(self, symbols=[], min_loss_rate=MIN_LOSS_RATE,
-        break_loss_rate=BREAK_LOSS_RATE, end=0, min_before=180
-    ):
+    def is_buy(self, klines):
+        if len(klines) <= MIN_BEFORE_DAYS:
+            return False
+
+        min_loss_rate=MIN_LOSS_RATE,
+        break_loss_rate=BREAK_LOSS_RATE
+
+        kline = klines[0]
+        rate = get_rate(kline.close, kline.open)
+        if rate >= 0:
+            return False
+
+        cont_loss_list = [rate]
+
+        for line in klines[1:]:
+            line_rate = get_rate(line.close, line.open)
+            if line_rate < 0:
+                cont_loss_list.append(line_rate)
+            else:
+                break
+
+        cont_loss = sum(cont_loss_list)
+        max_loss = min(cont_loss)
+        if (
+            (rate == max_loss and cont_loss <= min_loss_rate or cont_loss <= break_loss_rate)
+            and MIN_VOL <= kline.vol <= MAX_VOL and MIN_PRICE <= kline.close <= MAX_PRICE
+        ):
+            return True
+        return False
+
+    def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS):
         infos = self.market_client.get_all_symbols_info()
         if not symbols:
             symbols = infos.keys()
@@ -122,29 +162,13 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market_client.get_candlestick(symbol, '1day', min_before+end+1)[end:]
+                klines = self.market_client.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if len(klines) <= min_before:
-                return
-
-            rate = get_rate(klines[0].close, klines[0].open)
-            if rate >= 0:
-                return
-
-            cont_loss_list = [rate]
-
-            for kline in klines[1:]:
-                if kline.close < kline.open:
-                    cont_loss_list.append(get_rate(kline.close, kline.open))
-                else:
-                    break
-            
-            kline = klines[0]
-            cont_loss = sum(cont_loss_list)
-            if (rate == min(cont_loss_list) and cont_loss <= min_loss_rate) or cont_loss <= break_loss_rate:
+            if self.is_buy(klines):
+                kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 if now - kline.id > 86400:
                     TargetSQL.add_target(
@@ -178,7 +202,7 @@ class LossDealerClient(BaseDealerClient):
 
         for target in self.targets[self.date].values():
             target.update_price(tickers)
-            self.check_target(target)
+            self.check_target_price(target)
     
     @retry(tries=10, delay=0.05)
     def get_sell_amount(self, target):
@@ -522,3 +546,78 @@ class LossDealerClient(BaseDealerClient):
             logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%} |')
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
+
+    @retry(tries=10, delay=1, logger=logger)
+    def sell_targets(self, date=None):
+        logger.info('Start to sell')
+        date = date or self.date
+        clear_date = datetime.ts2date(datetime.date2ts(date) - MAX_DAY * 86400)
+        clear_targets = {
+            symbol: target for symbol, target in
+            self.targets.get(clear_date, {}).items()
+            if target.own and target.own_amount > target.sell_market_min_order_amt
+        }
+        clear_symbols = ",".join([
+            target.symbol for target in clear_targets.values() if target.own
+        ])
+        tickers = self.market_client.get_market_tickers()
+        logger.info(f'Clear day {clear_date}, targets are {clear_symbols}')
+
+        for ticker in tickers:
+            symbol = ticker.symbol
+            if symbol in clear_targets:
+                target = clear_targets[symbol]
+                market_price = ticker.close*(1-SELL_UP_RATE)
+                self.cancel_and_sell_limit_target(target, market_price, 6)
+
+        logger.info(f'Sell targets of last day {date}')
+        for target in self.targets.get(date, {}).values():
+            if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                target.own = False
+                continue
+
+            withdraw_price = target.buy_price * (1 + WITHDRAW_RATE)
+            market_price = target.now_price * (1 - SELL_UP_RATE)
+            sell_price = market_price if target.low_mark else withdraw_price
+            self.cancel_and_sell_limit_target(target, sell_price, 4)
+
+            long_sell_price = target.buy_price * (1 + SELL_RATE)
+            Timer(
+                60, self.cancel_and_sell_limit_target,
+                args=[target, long_sell_price, 5]
+            ).start()
+
+    def buy_targets(self, end=0):
+        logger.info('Start to find new targets')
+        targets, date = self.find_targets(end=end)
+        targets = self.filter_targets(targets)
+        self.targets[date] = targets
+        self.date = max(self.targets.keys())
+
+        for target in self.targets[self.date].values():
+            self.buy_target(target)
+
+    def update_targets(self, end=1):
+        def cancel(target):
+            logger.info(f'Too long time, stop to buy {target.symbol}')
+            order_id_list = list(self.user.orders.keys())
+            for order_id in order_id_list:
+                summary = self.user.orders[order_id]
+                if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id 
+                    and summary.label == target.date and summary.status in [1, 2]
+                ):
+                    try:
+                        self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                        logger.info(f'Cancel open buy order for {target.symbol}')
+                    except Exception as e:
+                        logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
+
+        logger.info('Start to update today\'s targets')
+        date = datetime.ts2date(time.time()-end*86400)
+        symbols = self.targets[date].keys()
+        targets, _ = self.find_targets(symbols=symbols, end=end)
+        for symbol, target in targets.items():
+            now_target = self.targets[date][symbol]
+            now_target.set_init_price(target.init_price)
+            self.cancel_and_buy_limit_target(now_target, target.init_price)
+            Timer(3600, cancel, args=[now_target]).start()

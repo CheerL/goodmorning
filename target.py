@@ -95,7 +95,6 @@ class LossTarget(BaseTarget):
 
         self.low_mark_price = 0
         self.low_mark = False
-        self.sell_price = 0
 
         self.set_init_price(close)
 
@@ -109,7 +108,7 @@ class LossTarget(BaseTarget):
         self.high_mark_back_price = price * (1+high_rate/2)
         self.low_mark_price = max(price * (1+low_rate), (self.open+price)/2)
 
-    def set_buy(self, vol, amount, sell_rate=SELL_RATE):
+    def set_buy(self, vol, amount):
         if vol <= 0 or amount <= 0:
             return
 
@@ -119,7 +118,6 @@ class LossTarget(BaseTarget):
         self.buy_vol += vol
         if self.own_amount:
             self.buy_price = (own_vol+vol) / self.own_amount * (1 - self.fee_rate)
-            self.sell_price = self.buy_price * (1+sell_rate)
 
     def set_sell(self, amount, vol=0):
         if amount <= 0:
