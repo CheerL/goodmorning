@@ -38,6 +38,9 @@ class LossDealerClient(BaseDealerClient):
 
     def resume(self):
         now = time.time()
+        self.date = datetime.ts2date(now - 86400)
+        self.targets[self.date] = {}
+
         start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
@@ -85,7 +88,13 @@ class LossDealerClient(BaseDealerClient):
                 if symbol not in date_symbols or target.own_amount < target.sell_market_min_order_amt:
                     del self.targets[date][symbol]
         
-        self.date = max(self.targets.keys())
+        for symbol, target in self.targets[self.date].items():
+            [ticker] = self.market_client.get_candlestick(symbol, '1day', 1)
+            if ticker.high >= target.high_mark_price:
+                target.high_mark = target.low_mark = True
+            elif ticker.high >= target.low_mark_price:
+                target.low_mark = True
+
         logger.info('Finish loading data')
 
     def check_target_price(self, target: Target):
@@ -126,9 +135,6 @@ class LossDealerClient(BaseDealerClient):
         if len(klines) <= MIN_BEFORE_DAYS:
             return False
 
-        min_loss_rate=MIN_LOSS_RATE,
-        break_loss_rate=BREAK_LOSS_RATE
-
         kline = klines[0]
         rate = get_rate(kline.close, kline.open)
         if rate >= 0:
@@ -146,7 +152,7 @@ class LossDealerClient(BaseDealerClient):
         cont_loss = sum(cont_loss_list)
         max_loss = min(cont_loss_list)
         if (
-            (rate == max_loss and cont_loss <= min_loss_rate or cont_loss <= break_loss_rate)
+            (rate == max_loss and cont_loss <= MIN_LOSS_RATE or cont_loss <= BREAK_LOSS_RATE)
             and MIN_VOL <= kline.vol <= MAX_VOL and MIN_PRICE <= kline.close <= MAX_PRICE
         ):
             return True
@@ -184,7 +190,6 @@ class LossDealerClient(BaseDealerClient):
                 target.set_info(infos[symbol], self.user.fee_rate)
                 targets[symbol] = target
 
-        
         parallel.run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)
         date = datetime.ts2date(now - end * 86400)
         logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
