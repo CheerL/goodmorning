@@ -144,7 +144,7 @@ class LossDealerClient(BaseDealerClient):
                 break
 
         cont_loss = sum(cont_loss_list)
-        max_loss = min(cont_loss)
+        max_loss = min(cont_loss_list)
         if (
             (rate == max_loss and cont_loss <= min_loss_rate or cont_loss <= break_loss_rate)
             and MIN_VOL <= kline.vol <= MAX_VOL and MIN_PRICE <= kline.close <= MAX_PRICE
