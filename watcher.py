@@ -22,7 +22,6 @@ MIN_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'MIN_STOP_PROFIT_HOLD_TIME')
 BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
-LOW_STOP_PROFIT_TIME = config.getfloat('time', 'LOW_STOP_PROFIT_TIME')
 GOOD_SYMBOL = config.get('buy', 'GOOD_SYMBOL').split(',')
 
 BUY_BACK_RATE = BUY_BACK_RATE / 100

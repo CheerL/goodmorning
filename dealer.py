@@ -13,7 +13,6 @@ from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 from target import Target
 
 TEST = user_config.getboolean('setting', 'Test')
-LOW_STOP_PROFIT_TIME = int(config.getfloat('time', 'LOW_STOP_PROFIT_TIME'))
 FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
 CHECK_SELL_TIME = int(config.getint('time', 'CHECK_SELL_TIME'))
 CLEAR_TIME = int(config.getint('time', 'CLEAR_TIME'))
@@ -124,16 +123,13 @@ def main(user: User):
         client.user.set_start_asset()
         if TEST:
             now = datetime.datetime.now() + datetime.timedelta(seconds=5)
-            low_stop_profit_time = now + datetime.timedelta(seconds=LOW_STOP_PROFIT_TIME)
             check_sell_time = now + datetime.timedelta(seconds=CHECK_SELL_TIME)
             buy_price_sell_time = now + datetime.timedelta(seconds=FINAL_STOP_PROFIT_TIME)
             end_time = now + datetime.timedelta(seconds=CLEAR_TIME + 12)
-            scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=low_stop_profit_time.hour, minute=low_stop_profit_time.minute, second=low_stop_profit_time.second)
             scheduler.add_job(client.check_and_sell, args=[True], trigger='cron', hour=check_sell_time.hour, minute=check_sell_time.minute, second=check_sell_time.second)
             scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=buy_price_sell_time.hour, minute=buy_price_sell_time.minute, second=buy_price_sell_time.second)
             scheduler.add_job(client.state_handler, args=[1], trigger='cron', hour=end_time.hour, minute=end_time.minute, second=end_time.second)
         else:
-            scheduler.add_job(client.stop_profit_handler, args=['', 0], trigger='cron', hour=0, minute=0, second=LOW_STOP_PROFIT_TIME)
             scheduler.add_job(client.check_and_sell, args=[True], trigger='cron', hour=0, minute=0, second=CHECK_SELL_TIME)
             scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=0, minute=0, second=FINAL_STOP_PROFIT_TIME)
             scheduler.add_job(client.state_handler, args=[1], trigger='cron', hour=0, minute=0, second=CLEAR_TIME + 12)
