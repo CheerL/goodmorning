@@ -102,25 +102,25 @@ class LossDealerClient(BaseDealerClient):
             elif ticker.high >= target.low_mark_price:
                 target.low_mark = True
 
-        # for date, targets in self.targets.items():
-        #     if date >= self.date:
-        #         continue
+        for date, targets in self.targets.items():
+            if date >= self.date:
+                continue
 
-        #     for target in targets.values():
-        #         if not target.own:
-        #             return
+            for target in targets.values():
+                if not target.own:
+                    return
 
-        #         amount = self.user.available_balance[target.base_currency]
-        #         if amount < target.sell_market_min_order_amt:
-        #             return
+                amount = min(self.user.available_balance[target.base_currency], target.own_amount)
+                if amount < target.sell_market_min_order_amt:
+                    return
 
-        #         self.sell_target(
-        #             target,
-        #             price=target.buy_price * (1 + SELL_RATE),
-        #             amount=amount,
-        #             selling_level=0,
-        #             limit=amount * target.now_price > target.min_order_value
-        #         )
+                self.sell_target(
+                    target,
+                    price=target.buy_price * (1 + SELL_RATE),
+                    amount=amount,
+                    selling_level=1,
+                    limit=amount * target.now_price > target.min_order_value
+                )
 
         logger.info('Finish loading data')
 
@@ -471,6 +471,8 @@ class LossDealerClient(BaseDealerClient):
                 target.set_buy(detail.filled_cash_amount, detail.filled_amount)
             else:
                 target.set_sell(detail.filled_amount - summary.amount)
+                if status in [1, 2] and not target.selling:
+                    target.selling = 2
 
             summary.status = status
             summary.amount = detail.filled_amount
