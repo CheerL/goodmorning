@@ -79,7 +79,9 @@ class LossDealerClient(BaseDealerClient):
                     self.targets[order.date][order.symbol] = loss_target
 
                 target = self.targets[order.date][order.symbol]
-                self.check_order(order, target)
+                summary = self.check_order(order, target)
+                if summary and summary.status in [1, 2] and not target.selling:
+                    target.selling = 2
                 time.sleep(0.05)
             except Exception as e:
                 logger.error(e)
@@ -99,8 +101,12 @@ class LossDealerClient(BaseDealerClient):
             [ticker] = self.market_client.get_candlestick(symbol, '1day', 1)
             if ticker.high >= target.high_mark_price:
                 target.high_mark = target.low_mark = True
+                if target.selling > 0:
+                    target.high_selling = True
             elif ticker.high >= target.low_mark_price:
                 target.low_mark = True
+                if target.selling > 0:
+                    target.low_selling = True
 
         for date, targets in self.targets.items():
             if date >= self.date:
@@ -126,16 +132,18 @@ class LossDealerClient(BaseDealerClient):
 
     def check_target_price(self, target: Target):
         if target.high_mark:
-            if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE):
-                self.cancel_and_sell_limit_target(target, target.high_mark_back_price, selling_level=2)
+            if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE) and not target.high_selling:
+                target.high_selling = True
+                self.cancel_and_sell_limit_target(target, target.high_mark_back_price, selling_level=2, force=True)
                 return
         elif target.price >= target.high_mark_price:
             target.high_mark = True
-        
+
         if target.low_mark:
             withdraw_price = target.buy_price * (1 + WITHDRAW_RATE)
-            if target.own and target.price <= withdraw_price* (1 + SELL_UP_RATE):
-                self.cancel_and_sell_limit_target(target, withdraw_price, selling_level=2)
+            if target.own and target.price <= withdraw_price* (1 + SELL_UP_RATE) and not target.low_selling:
+                target.low_selling = True
+                self.cancel_and_sell_limit_target(target, withdraw_price, selling_level=2, force=True)
                 return
         elif target.price >= target.low_mark_price:
             target.low_mark = True
@@ -327,7 +335,7 @@ class LossDealerClient(BaseDealerClient):
             logger.error(f'Failed to sell {target.symbol}')
         return summary
 
-    def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None):
+    def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
             if summary:
@@ -345,6 +353,9 @@ class LossDealerClient(BaseDealerClient):
                     cancel_callback=cancel_callback,
                     limit=sell_amount * price > target.min_order_value
                 )
+
+        if not force and direction=='sell' and selling_level <= target.selling:
+            return
 
         symbol = target.symbol
         is_canceled = False
@@ -471,14 +482,14 @@ class LossDealerClient(BaseDealerClient):
                 target.set_buy(detail.filled_cash_amount, detail.filled_amount)
             else:
                 target.set_sell(detail.filled_amount - summary.amount)
-                if status in [1, 2] and not target.selling:
-                    target.selling = 2
 
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
             summary.aver_price = summary.vol / summary.amount if summary.amount else 0
             summary.fee = summary.vol * self.user.fee_rate
+
+        return summary
 
     def report(self, force):
         now = time.time()

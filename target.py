@@ -99,9 +99,11 @@ class LossTarget(BaseTarget):
         self.high_mark_price = 0
         self.high_mark_back_price = 0
         self.high_mark = False
+        self.high_selling = False
 
         self.low_mark_price = 0
         self.low_mark = False
+        self.low_selling = False
 
         self.set_init_price(close)
 
