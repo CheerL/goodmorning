@@ -106,7 +106,7 @@ class LossDealerClient(BaseDealerClient):
             if date >= self.date:
                 continue
 
-            for target in targets:
+            for target in targets.values():
                 if not target.own:
                     return
 
