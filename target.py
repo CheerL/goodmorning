@@ -149,9 +149,9 @@ class LossTarget(BaseTarget):
         else:
             ticker = tickers[self.ticker_id]
 
-        self.now_price = ticker.close
-        self.recent_price.append(self.now_price)
-        self.recent_price = self.recent_price[-num:]
+        self.price = self.now_price = ticker.close
+        # self.recent_price.append(self.now_price)
+        # self.recent_price = self.recent_price[-num:]
 
-        if self.recent_price:
-            self.price = sum(self.recent_price) / len(self.recent_price)
+        # if self.recent_price:
+        #     self.price = sum(self.recent_price) / len(self.recent_price)
