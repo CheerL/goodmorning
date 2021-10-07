@@ -114,11 +114,11 @@ class LossDealerClient(BaseDealerClient):
 
             for target in targets.values():
                 if not target.own:
-                    return
+                    continue
 
                 amount = min(self.user.available_balance[target.base_currency], target.own_amount)
                 if amount < target.sell_market_min_order_amt:
-                    return
+                    continue
 
                 self.sell_target(
                     target,
