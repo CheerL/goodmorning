@@ -50,10 +50,12 @@ class LossDealerClient(BaseDealerClient):
 
         for target in targets:
             date_target_dict = self.targets.setdefault(target.date, {})
-            date_target_dict[target.symbol] = Target(
+            loss_target = Target(
                 target.symbol, target.date, target.open, target.close, target.vol
             )
-            date_target_dict[target.symbol].set_info(infos[target.symbol], self.user.fee_rate)
+            loss_target.set_info(infos[target.symbol], self.user.fee_rate)
+            loss_target.price = loss_target.now_price = self.market_client.mark_price[target.symbol]
+            date_target_dict[target.symbol] = loss_target
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
@@ -63,13 +65,18 @@ class LossDealerClient(BaseDealerClient):
         for order in orders:
             try:
                 if order.symbol not in self.targets.setdefault(order.date, {}):
-                    klines = self.market_client.get_candlestick(order.symbol, '1day', 5)
-                    num = int((now - datetime.date2ts(order.date)) // 86400)
-                    kline = klines[num]
-                    self.targets[order.date][order.symbol] = Target(
+                    klines = self.market_client.get_candlestick(order.symbol, '1day', 10)
+                    ts = datetime.date2ts(order.date)
+                    for kline in klines:
+                        if kline.id == ts:
+                            break
+
+                    loss_target = Target(
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
-                    self.targets[order.date][order.symbol].set_info(infos[order.symbol], self.user.fee_rate)
+                    loss_target.set_info(infos[order.symbol], self.user.fee_rate)
+                    loss_target.price = loss_target.now_price = self.market_client.mark_price[target.symbol]
+                    self.targets[order.date][order.symbol] = loss_target
 
                 target = self.targets[order.date][order.symbol]
                 self.check_order(order, target)
@@ -94,6 +101,25 @@ class LossDealerClient(BaseDealerClient):
                 target.high_mark = target.low_mark = True
             elif ticker.high >= target.low_mark_price:
                 target.low_mark = True
+
+        for date, targets in self.targets.items():
+            if date >= self.date:
+                continue
+
+            for target in targets:
+                if not target.own:
+                    return
+
+                amount = self.user.available_balance[target.base_currency]
+                if amount < target.sell_market_min_order_amt:
+                    return
+
+                self.sell_target(
+                    target,
+                    target.buy_price * (1 + SELL_RATE),
+                    amount,
+                    limit=amount * target.now_price > target.min_order_value
+                )
 
         logger.info('Finish loading data')
 

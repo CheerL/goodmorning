@@ -22,6 +22,13 @@ class BaseTarget:
 
         self.own = False
 
+        self.base_currency = ''
+        self.amount_precision = 0
+        self.price_precision = 0
+        self.min_order_value = 0
+        self.sell_market_min_order_amt = 0
+        self.limit_order_min_order_amt = 0
+
     def set_buy_price(self, price):
         if price <= 0:
             return
