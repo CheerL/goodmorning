@@ -181,7 +181,7 @@ class BinanceUser(BaseUser):
                 self.available_balance[currency] = float(sub_update['f'])
                 self.balance[currency] = float(sub_update['f'])+float(sub_update['l'])
                 self.balance_update_time[currency] = change_time
-                logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
+                # logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
 
     def trade_callback(self, update):
         @retry(tries=3, delay=0.01)

@@ -162,7 +162,7 @@ class HuobiUser(BaseUser):
             self.balance[currency] = float(update.balance)
             self.available_balance[currency] = float(update.available)
             self.balance_update_time[currency] = int(update.changeTime) / 1000
-            logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
+            # logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
 
     def trade_callback(self, event: OrderUpdateEvent):
         @retry(tries=3, delay=0.01)
