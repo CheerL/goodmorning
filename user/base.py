@@ -104,6 +104,9 @@ class BaseUser:
             users = users[:1]
         return users
 
+    def update_currency(self, currency=''):
+        raise NotImplementedError
+
     def get_account_id(self) -> int:
         raise NotImplementedError
 
@@ -113,20 +116,31 @@ class BaseUser:
     def cancel_order(self, order_id):
         raise NotImplementedError
 
-    @retry(tries=5, delay=0.05, logger=logger)
     def get_amount(self, currency: str, available=False, check=True):
-        if currency in self.balance:
-            pass
-        elif currency.upper() in self.balance:
-            currency = currency.upper()
-        else:
-            return 0
+        @retry(tries=5, delay=0.05, logger=logger)
+        def _get_amount(_currency):
+            if _currency in self.balance:
+                pass
+            elif _currency.upper() in self.balance:
+                _currency = _currency.upper()
+            else:
+                return 0
 
-        if available:
-            return self.available_balance[currency]
-        if check:
-            assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
-        return self.balance[currency]
+            if available:
+                return self.available_balance[_currency]
+            if check:
+                assert self.balance[_currency] - self.available_balance[_currency] < 1e-8, 'unavailable'
+            return self.balance[_currency]
+
+        try:
+            return _get_amount(currency)
+        except Exception as e:
+            if isinstance(e, AssertionError):
+                self.update_currency(currency)
+                return _get_amount(currency)
+            else:
+                raise e
+
 
     def start(self, **kwargs):
         raise NotImplementedError

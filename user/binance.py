@@ -131,17 +131,32 @@ class BinanceUser(BaseUser):
         self.listen_key.check(self)
         # self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
 
-        for coin_info in self.api.coin_info():
-            currency = coin_info['coin']
-            self.available_balance[currency] = float(coin_info['free'])
-            self.balance[currency] = float(coin_info['freeze']) + float(coin_info['locked']) + self.available_balance[currency]
-            self.balance_update_time[currency] = 0
+        self.update_currency()
 
         usdt = self.balance['USDT']
         if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
             self.buy_amount = max(math.floor(usdt / float(self.buy_amount[1:])), 5)
         else:
             self.buy_amount = float(self.buy_amount)
+
+    def update_currency(self, currency=''):
+        def _update_currency(_balance):
+            _currency = _balance['coin']
+            self.available_balance[_currency] = float(_balance['free'])
+            self.balance[_currency] = float(_balance['freeze']) + float(_balance['locked']) + self.available_balance[_currency]
+            self.balance_update_time[_currency] = now
+
+        all_coin_info = self.api.coin_info()
+        now = int(time.time())
+
+        if currency:
+            for coin_info in all_coin_info:
+                if coin_info['coin'] == currency:
+                    _update_currency(coin_info)
+                    break
+        else:
+            for coin_info in all_coin_info:
+                _update_currency(coin_info)
 
     def user_data_callback(self, update):
         try:
@@ -160,10 +175,13 @@ class BinanceUser(BaseUser):
 
         for sub_update in update['B']:
             currency = sub_update['a']
-            if currency not in self.balance or change_time > self.balance_update_time[currency]:
+            if (currency not in self.balance
+                or change_time > self.balance_update_time[currency]
+            ):
                 self.available_balance[currency] = float(sub_update['f'])
                 self.balance[currency] = float(sub_update['f'])+float(sub_update['l'])
                 self.balance_update_time[currency] = change_time
+                logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
 
     def trade_callback(self, update):
         @retry(tries=3, delay=0.01)

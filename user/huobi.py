@@ -3,6 +3,7 @@ import math
 import re
 
 from gevent import monkey
+from huobi.model.account import balance
 monkey.patch_all()
 
 from utils import logger, datetime
@@ -104,6 +105,32 @@ class HuobiUser(BaseUser):
         else:
             self.buy_amount = float(self.buy_amount)
 
+    def update_currency(self, currency=''):
+        def _update_currency(_balance):
+            _currency = _balance.currency
+            self.balance_update_time[_currency] = now
+            if _balance.type == 'frozen':
+                self.balance[_currency] = self.balance.get(_currency, 0) + float(_balance.balance)
+            elif _balance.type == 'trade':
+                self.available_balance[_currency] = float(_balance.balance)
+                self.balance[_currency] = self.balance.get(_currency, 0) + float(_balance.balance)
+
+        balance = self.account_client.get_balance(self.account_id)
+        now = int(time.time())
+
+        if currency:
+            self.balance[currency] = self.available_balance[currency] = 0
+            for each in balance:
+                if each.currency == currency:
+                    _update_currency(each)
+        else:
+            self.balance.clear()
+            self.balance_update_time.clear()
+            self.available_balance.clear()
+
+            for each in balance:
+                _update_currency(each)
+
     def get_account_id(self) -> int:
         return next(filter(
             lambda account: account.type=='spot' and account.state =='working',
@@ -124,16 +151,18 @@ class HuobiUser(BaseUser):
 
     def balance_callback(self, event: AccountUpdateEvent):
         update: AccountUpdate = event.data
-
+        currency = update.currency
         if not update.changeTime:
             update.changeTime = 0
 
-        if (update.currency not in self.balance_update_time
+        if (currency not in self.balance_update_time
+            or update.changeTime == 0
             or update.changeTime > self.balance_update_time[update.currency]
         ):
-            self.balance[update.currency] = float(update.balance)
-            self.available_balance[update.currency] = float(update.available)
-            self.balance_update_time[update.currency] = int(update.changeTime) / 1000
+            self.balance[currency] = float(update.balance)
+            self.available_balance[currency] = float(update.available)
+            self.balance_update_time[currency] = int(update.changeTime) / 1000
+            logger.info(f'{currency} update, available {self.available_balance[currency]}, total {self.balance[currency]}')
 
     def trade_callback(self, event: OrderUpdateEvent):
         @retry(tries=3, delay=0.01)

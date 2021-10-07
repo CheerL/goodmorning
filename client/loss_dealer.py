@@ -208,12 +208,22 @@ class LossDealerClient(BaseDealerClient):
             target.update_price(tickers)
             self.check_target_price(target)
     
-    @retry(tries=10, delay=0.05)
     def get_sell_amount(self, target):
-        available_amount = self.user.get_amount(target.base_currency, True, False)
-        assert_word = f'{target.base_currency} not enough, want {target.own_amount} but only have {available_amount}'
-        assert available_amount > 0.9 * target.own_amount, assert_word
-        return min(target.own_amount, available_amount)
+        @retry(tries=10, delay=0.05)
+        def _get_sell_amount():
+            available_amount = self.user.get_amount(target.base_currency, True, False)
+            assert_word = f'{target.base_currency} not enough, want {target.own_amount} but only have {available_amount}'
+            assert available_amount > 0.9 * target.own_amount, assert_word
+            return min(target.own_amount, available_amount)
+
+        try:
+            return _get_sell_amount()
+        except Exception as e:
+            if isinstance(e, AssertionError):
+                self.user.update_currency(target.base_currency)
+                return _get_sell_amount()
+            else:
+                raise e
 
     def buy_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True):
         @retry(tries=5, delay=0.05)
