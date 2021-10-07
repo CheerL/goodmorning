@@ -12,7 +12,7 @@ EXCHANGE = user_config.get('setting', 'Exchange')
 def main(user):
     user.start()
     client = Client.init_dealer(user)
-    user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=0)
+    user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
     user.scheduler.add_job(client.update_targets, 'cron', hour=0, minute=0, second=10)
     user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=0)
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)

@@ -135,20 +135,19 @@ class LossDealerClient(BaseDealerClient):
         if len(klines) <= MIN_BEFORE_DAYS:
             return False
 
-        kline = klines[0]
-        rate = get_rate(kline.close, kline.open)
-        if rate >= 0:
-            return False
-
-        cont_loss_list = [rate]
-
-        for line in klines[1:]:
-            line_rate = get_rate(line.close, line.open)
-            if line_rate < 0:
-                cont_loss_list.append(line_rate)
+        cont_loss_list = []
+        for kline in klines:
+            rate = get_rate(kline.close, kline.open)
+            if rate < 0:
+                cont_loss_list.append(rate)
             else:
                 break
+        
+        if not cont_loss_list:
+            return False
 
+        kline = klines[0]
+        rate = cont_loss_list[0]
         cont_loss = sum(cont_loss_list)
         max_loss = min(cont_loss_list)
         if (
@@ -168,7 +167,7 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market_client.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
+                klines = self.market_client.get_candlestick(symbol, '1day', limit=min_before_days+end+1)[end:]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
