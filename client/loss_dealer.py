@@ -423,7 +423,7 @@ class LossDealerClient(BaseDealerClient):
         symbol = order.symbol
 
         try:
-            detail = self.user.get_order(order_id)
+            detail = self.user.get_order(symbol, order_id)
         except Exception as e:
             if 'record invalid' not in str(e):
                 raise e

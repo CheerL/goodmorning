@@ -48,6 +48,9 @@ class OrderSummary:
         self.cancel_callback = None
         self.cancel_callback_args = []
 
+    def __repr__(self) -> str:
+        return f'<LossTarget symbol={self.symbol} label={self.label} id={self.order_id} direction={self.direction} price={self.aver_price} vol={self.vol} remain={self.remain}>'
+
     def report(self):
         logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 

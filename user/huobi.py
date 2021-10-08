@@ -137,7 +137,7 @@ class HuobiUser(BaseUser):
             self.account_client.get_accounts()
         )).id
 
-    def get_order(self, order_id):
+    def get_order(self, symbol, order_id):
         detail = self.trade_client.get_order(order_id)
         detail.filled_amount = float(detail.filled_amount)
         detail.filled_cash_amount = float(detail.filled_cash_amount)

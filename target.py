@@ -108,7 +108,7 @@ class LossTarget(BaseTarget):
         self.set_init_price(close)
 
     def __repr__(self) -> str:
-        return f'<LossTarget symbol={self.symbol} date={self.date} close={self.close} high_mark={self.high_mark} low_mark={self.low_mark}>'
+        return f'<LossTarget symbol={self.symbol} date={self.date} close={self.close} high_mark={self.high_mark} low_mark={self.low_mark} own_amount={self.own_amount} buy_price={self.buy_price}>'
 
     def set_info(self, info, fee_rate):
         super().set_info(info)

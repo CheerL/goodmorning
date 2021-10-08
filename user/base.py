@@ -110,7 +110,7 @@ class BaseUser:
     def get_account_id(self) -> int:
         raise NotImplementedError
 
-    def get_order(self, order_id):
+    def get_order(self, symbol, order_id):
         raise NotImplementedError
 
     def cancel_order(self, order_id):

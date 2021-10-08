@@ -13,7 +13,6 @@ import re
 import time
 import math
 
-
 class BinanceMarketClient(BaseMarketClient):
     exclude_list = []
 
@@ -116,8 +115,7 @@ class BinanceUser(BaseUser):
     def get_account_id(self) -> int:
         return -1
 
-    def get_order(self, order_id):
-        symbol = self.orders[order_id].symbol
+    def get_order(self, symbol, order_id):
         raw_order = self.api.get_order(symbol, orderId=order_id)
         return OrderDetail(raw_order)
 
