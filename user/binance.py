@@ -185,7 +185,7 @@ class BinanceUser(BaseUser):
         @retry(tries=3, delay=0.01)
         def _warpper(update):
             symbol = update['s']
-            direction = update['S']
+            direction = update['S'].lower()
             etype = update['x']
             order_id = update['i']
 
