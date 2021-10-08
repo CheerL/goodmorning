@@ -8,6 +8,8 @@ BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 HIGH_RATE = config.getfloat('loss', 'HIGH_RATE')
 LOW_RATE = config.getfloat('loss', 'LOW_RATE')
 SELL_RATE = config.getfloat('loss', 'SELL_RATE')
+WITHDRAW_RATE = config.getfloat('loss', 'WITHDRAW_RATE')
+SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 AVER_INTERVAL_LENGTH = config.getfloat('loss', 'AVER_INTERVAL_LENGTH')
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 AVER_NUM = int(AVER_INTERVAL_LENGTH // PRICE_INTERVAL)
@@ -105,7 +107,7 @@ class LossTarget(BaseTarget):
         self.low_mark = False
         self.low_selling = False
 
-        self.set_init_price(close)
+        self.set_mark_price(close)
 
     def __repr__(self) -> str:
         return f'<LossTarget symbol={self.symbol} date={self.date} close={self.close} high_mark={self.high_mark} low_mark={self.low_mark} own_amount={self.own_amount} buy_price={self.buy_price}>'
@@ -114,11 +116,16 @@ class LossTarget(BaseTarget):
         super().set_info(info)
         self.fee_rate = fee_rate
 
-    def set_init_price(self, price, high_rate=HIGH_RATE, low_rate=LOW_RATE):
+    def set_mark_price(self, price,
+        high_rate=HIGH_RATE, low_rate=LOW_RATE,
+        low_back_rate=WITHDRAW_RATE, sell_rate=SELL_RATE
+    ):
         self.init_price = price
         self.high_mark_price = price * (1+high_rate)
         self.high_mark_back_price = price * (1+high_rate/2)
         self.low_mark_price = max(price * (1+low_rate), (self.open+price)/2)
+        self.low_mark_back_price = price * (1+low_back_rate)
+        self.long_sell_price = price * (1+sell_rate)
 
     def set_buy(self, vol, amount):
         if vol <= 0 or amount <= 0:
@@ -155,3 +162,29 @@ class LossTarget(BaseTarget):
 
         # if self.recent_price:
         #     self.price = sum(self.recent_price) / len(self.recent_price)
+
+    def high_check(self):
+        if (
+            self.high_mark and self.own and not self.high_selling and
+            self.price <= self.high_mark_back_price*(1+2*SELL_UP_RATE) 
+        ):
+            self.high_selling = True
+            return True
+
+        elif not self.high_mark and self.price >= self.high_mark_price:
+            self.high_mark = True
+
+        return False
+
+    def low_check(self):
+        if (
+            self.low_mark and self.own and not self.low_selling and
+            self.price <= self.low_mark_back_price*(1+2*SELL_UP_RATE) 
+        ):
+            self.low_selling = True
+            return True
+
+        elif not self.low_mark and self.price >= self.low_mark_price:
+            self.low_mark = True
+
+        return False

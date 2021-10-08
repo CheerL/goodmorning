@@ -94,7 +94,6 @@ class BinanceUser(BaseUser):
         self.scheduler = Scheduler(job_defaults={'max_instances': 5}, timezone=datetime.Tz.get_tz())
         self.scheduler.add_job(self.listen_key.check, 'interval', seconds=3, args=[self])
         self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
-        
 
     @classmethod
     def init_users(cls, num=-1):

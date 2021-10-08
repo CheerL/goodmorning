@@ -16,8 +16,6 @@ MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
-SELL_RATE = config.getfloat('loss', 'SELL_RATE')
-WITHDRAW_RATE = config.getfloat('loss', 'WITHDRAW_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 MIN_NUM = config.getint('loss', 'MIN_NUM')
 MAX_NUM = config.getint('loss', 'MAX_NUM')
@@ -122,7 +120,7 @@ class LossDealerClient(BaseDealerClient):
 
                 self.sell_target(
                     target,
-                    price=target.buy_price * (1 + SELL_RATE),
+                    price=target.long_sell_price,
                     amount=amount,
                     selling_level=1,
                     limit=amount * target.now_price > target.min_order_value
@@ -131,22 +129,17 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Finish loading data')
 
     def check_target_price(self, target: Target):
-        if target.high_mark:
-            if target.own and target.price <= target.high_mark_back_price * (1+SELL_UP_RATE) and not target.high_selling:
-                target.high_selling = True
-                self.cancel_and_sell_limit_target(target, target.high_mark_back_price, selling_level=2, force=True)
-                return
-        elif target.price >= target.high_mark_price:
-            target.high_mark = True
+        if target.high_check():
+            self.cancel_and_sell_limit_target(
+                target, target.high_mark_back_price,
+                selling_level=2, force=True
+            )
 
-        if target.low_mark:
-            withdraw_price = target.buy_price * (1 + WITHDRAW_RATE)
-            if target.own and target.price <= withdraw_price* (1 + SELL_UP_RATE) and not target.low_selling:
-                target.low_selling = True
-                self.cancel_and_sell_limit_target(target, withdraw_price, selling_level=2, force=True)
-                return
-        elif target.price >= target.low_mark_price:
-            target.low_mark = True
+        elif target.low_check():
+            self.cancel_and_sell_limit_target(
+                target, target.low_mark_back_price,
+                selling_level=2, force=True
+            )
 
     def filter_targets(self, targets):
         targets_num = len(targets)
@@ -629,15 +622,13 @@ class LossDealerClient(BaseDealerClient):
                 target.own = False
                 continue
 
-            withdraw_price = target.buy_price * (1 + WITHDRAW_RATE)
-            market_price = target.now_price * (1 - SELL_UP_RATE)
-            sell_price = market_price if target.low_mark else withdraw_price
+            market_price = target.now_price * (1-SELL_UP_RATE)
+            sell_price = market_price if target.low_mark else target.low_mark_back_price
             self.cancel_and_sell_limit_target(target, sell_price, 4)
 
-            long_sell_price = target.buy_price * (1 + SELL_RATE)
             Timer(
                 60, self.cancel_and_sell_limit_target,
-                args=[target, long_sell_price, 5]
+                args=[target, target.long_sell_price, 5]
             ).start()
 
     def buy_targets(self, end=0):
@@ -671,6 +662,6 @@ class LossDealerClient(BaseDealerClient):
         targets, _ = self.find_targets(symbols=symbols, end=end)
         for symbol, target in targets.items():
             now_target = self.targets[date][symbol]
-            now_target.set_init_price(target.init_price)
+            now_target.set_mark_price(target.init_price)
             self.cancel_and_buy_limit_target(now_target, target.init_price)
             Timer(3600, cancel, args=[now_target]).start()
