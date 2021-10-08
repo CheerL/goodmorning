@@ -195,7 +195,7 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market_client.get_candlestick(symbol, '1day', limit=min_before_days+end+1)[end:]
+                klines = self.market_client.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e

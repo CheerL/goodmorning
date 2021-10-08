@@ -56,10 +56,10 @@ class HuobiMarketClient(MarketClient, BaseMarketClient):
             ]
         }
 
-    def get_candlestick(self, symbol, period, size=200):
+    def get_candlestick(self, symbol, period, limit=200):
         if period == '1hour':
             period = '60min'
-        return super().get_candlestick(symbol, period, size=size)
+        return super().get_candlestick(symbol, period, size=limit)
 
     def get_market_tickers(self, **kwargs) -> list:
         return super().get_market_tickers()
