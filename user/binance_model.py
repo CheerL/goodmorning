@@ -58,6 +58,8 @@ class Symbol:
             elif each['filterType'] == 'MIN_NOTIONAL':
                 self.min_order_value = float(each['minNotional'])
 
+        min_amount_step = round(0.1**self.amount_precision, self.amount_precision)
+        self.sell_market_min_order_amt = max(self.sell_market_min_order_amt, min_amount_step)
 
 class Candlestick:
     def __init__(self, kline):
