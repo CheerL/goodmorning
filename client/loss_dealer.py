@@ -276,6 +276,10 @@ class LossDealerClient(BaseDealerClient):
         if not vol:
             vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
 
+        if vol < target.min_order_value:
+            logger.error(f'At least buy {target.min_order_value} but now {vol}')
+            return
+
         if not price:
             price = target.now_price
 
@@ -314,8 +318,14 @@ class LossDealerClient(BaseDealerClient):
         target.selling = selling_level
         sell_amount = sell_amount or self.get_sell_amount(target)
         if limit:
+            if sell_amount * price < target.min_order_value:
+                logger.error(f'At least sell {target.min_order_value / price} but now {sell_amount}')
+                return
             summary = self.user.sell_limit(target, sell_amount, price)
         else:
+            if sell_amount < target.sell_market_min_order_amt:
+                logger.error(f'At least market sell {target.sell_market_min_order_amt} but now {sell_amount}')
+                return
             summary = self.user.sell(target, sell_amount)
 
         if summary != None:
@@ -338,13 +348,12 @@ class LossDealerClient(BaseDealerClient):
                     target.set_buy(summary.vol, summary.amount)
 
             sell_amount = self.get_sell_amount(target)
-            if sell_amount > target.sell_market_min_order_amt:
-                self.sell_target(
-                    target, price, sell_amount, selling_level,
-                    filled_callback=filled_callback,
-                    cancel_callback=cancel_callback,
-                    limit=sell_amount * price > target.min_order_value
-                )
+            self.sell_target(
+                target, price, sell_amount, selling_level,
+                filled_callback=filled_callback,
+                cancel_callback=cancel_callback,
+                limit=sell_amount * price > target.min_order_value
+            )
 
         if not force and direction=='sell' and selling_level <= target.selling:
             return
@@ -379,6 +388,9 @@ class LossDealerClient(BaseDealerClient):
                 target.set_buy(summary.vol, summary.amount)
 
             vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
+            if vol < target.min_order_value:
+                return
+
             self.buy_target(
                 target, price, vol, limit_rate,
                 filled_callback=filled_callback,
