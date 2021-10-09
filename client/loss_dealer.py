@@ -121,7 +121,7 @@ class LossDealerClient(BaseDealerClient):
                 self.sell_target(
                     target,
                     price=target.long_sell_price,
-                    amount=amount,
+                    sell_amount=amount,
                     selling_level=1,
                     limit=amount * target.now_price > target.min_order_value
                 )
