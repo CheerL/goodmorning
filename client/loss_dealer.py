@@ -35,6 +35,13 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Start loss strategy.')
 
     def resume(self):
+        def callback(target, summary):
+            if summary.direction == 'sell':
+                target.selling = 0
+                target.set_sell(summary.amount)
+            else:
+                target.set_buy(summary.vol, summary.amount)
+
         now = time.time()
         self.date = datetime.ts2date(now - 86400)
         self.targets[self.date] = {}
@@ -78,8 +85,12 @@ class LossDealerClient(BaseDealerClient):
 
                 target = self.targets[order.date][order.symbol]
                 summary = self.check_order(order, target)
-                if summary and summary.status in [1, 2] and not target.selling:
-                    target.selling = 2
+                if summary and summary.status in [1, 2]:
+                    summary.add_filled_callback(callback, (target, summary))
+                    summary.add_cancel_callback(callback, (target, summary))
+                    if summary.direction == 'sell' and not target.selling:
+                        target.selling = 2
+
                 time.sleep(0.05)
             except Exception as e:
                 logger.error(e)
@@ -514,12 +525,11 @@ class LossDealerClient(BaseDealerClient):
 
         for order in orders:
             order_id = int(order.order_id)
-            self.check_order(order, self.targets[order.date][order.symbol])
+            summary = self.check_order(order, self.targets[order.date][order.symbol])
 
             if order_id not in self.user.orders:
                 continue
 
-            summary = self.user.orders[order_id]
             if summary.amount != order.amount or summary.vol != order.vol:
                 amount = summary.amount - order.amount
                 vol = summary.vol - order.vol
