@@ -103,7 +103,7 @@ class LossDealerClient(BaseDealerClient):
                 if summary.label == date
             ]
             for symbol, target in targets.copy().items():
-                if symbol not in date_symbols or target.own_amount < target.sell_market_min_order_amt:
+                if symbol not in date_symbols: #or target.own_amount < target.sell_market_min_order_amt:
                     del self.targets[date][symbol]
         
         for symbol, target in self.targets[self.date].items():
