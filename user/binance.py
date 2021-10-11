@@ -118,8 +118,7 @@ class BinanceUser(BaseUser):
         raw_order = self.api.get_order(symbol, orderId=order_id)
         return OrderDetail(raw_order)
 
-    def cancel_order(self, order_id):
-        symbol = self.orders[order_id].symbol
+    def cancel_order(self, symbol, order_id):
         self.api.cancel_order(symbol, orderId=order_id)
 
     def start(self, **kwargs):

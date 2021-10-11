@@ -50,7 +50,9 @@ input_checker.reg_ex = "[ _`~!@#$%^&()+=|{}':;',\\[\\].<>/?~！@#￥%……&（�
 
 
 def get_rate(a, b, k=5):
-    if b:
+    if b and k==-1:
+        return a/b-1
+    elif b:
         return round((a/b)-1, k)
     else:
         return 0

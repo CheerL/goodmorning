@@ -145,8 +145,7 @@ class HuobiUser(BaseUser):
         detail.amount = float(detail.amount)
         return detail
 
-    def cancel_order(self, order_id):
-        symbol = self.orders[order_id].symbol
+    def cancel_order(self, symbol, order_id):
         self.trade_client.cancel_order(symbol, order_id)
 
     def balance_callback(self, event: AccountUpdateEvent):

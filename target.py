@@ -63,8 +63,7 @@ class BaseTarget:
             checked_amount = round(amount - 0.1 ** self.amount_precision, self.amount_precision)
             if checked_amount<= 0:
                 return 0
-        else:
-            return checked_amount
+        return checked_amount
 
     def check_price(self, price):
         return round(price, self.price_precision)

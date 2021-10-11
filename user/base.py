@@ -113,7 +113,7 @@ class BaseUser:
     def get_order(self, symbol, order_id):
         raise NotImplementedError
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, symbol, order_id):
         raise NotImplementedError
 
     def get_amount(self, currency: str, available=False, check=True):

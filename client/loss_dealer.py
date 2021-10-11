@@ -673,7 +673,7 @@ class LossDealerClient(BaseDealerClient):
                     and summary.label == target.date and summary.status in [1, 2]
                 ):
                     try:
-                        self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                        self.user.cancel_order(summary.symbol, summary.order_id)
                         logger.info(f'Cancel open buy order for {target.symbol}')
                     except Exception as e:
                         logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
