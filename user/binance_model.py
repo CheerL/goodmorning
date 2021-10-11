@@ -44,6 +44,7 @@ class Symbol:
         self.quote_currency = info['quoteAsset']
         self.symbol = info['symbol']
         self.state = info['status']
+        self.sell_market_min_order_amt = 0.0
 
         for each in info['filters']:
             if each['filterType'] == 'PRICE_FILTER':
