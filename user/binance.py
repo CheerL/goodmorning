@@ -92,13 +92,12 @@ class BinanceUser(BaseUser):
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
         self.scheduler = Scheduler(job_defaults={'max_instances': 5}, timezone=datetime.Tz.get_tz())
-        self.scheduler.add_job(self.listen_key.check, 'interval', seconds=3, args=[self])
-        self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
+        
 
     @classmethod
     def init_users(cls, num=-1):
         users = super().init_users(num=num)
-        ACCOUNT_ID = user_config.get('setting', f'BinanceID')
+        ACCOUNT_ID = user_config.get('setting', 'BinanceID')
         TEST = user_config.getboolean('setting', 'Test')
 
         ids = [int(id.strip()) for id in ACCOUNT_ID.split(',')]
@@ -124,9 +123,9 @@ class BinanceUser(BaseUser):
     def start(self, **kwargs):
         self.scheduler.start()
         self.websocket.start()
+        self.scheduler.add_job(self.listen_key.check, 'interval', seconds=3, args=[self])
+        self.scheduler.add_job(self.api.ping, 'interval', seconds=5)
         self.listen_key.check(self)
-        # self.websocket.user_data(self.listen_key.key, 1, self.user_data_callback)
-
         self.update_currency()
 
         usdt = self.balance['USDT']

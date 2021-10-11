@@ -102,11 +102,12 @@ def run_process_pool(req_list, is_lock=True, limit_num=8):
         if_debug    debug模式开关, bool, 默认为False, 为True时会显示运行时间
         limit_num   最大进程数, int, 默认为8
         '''
-    queue = deque(req_list)
     pool = multiprocessing.Pool(limit_num)
-    while len(queue):
-        para = queue.popleft()
-        pool.apply_async(para[0], args=para[1])
+    # queue = deque(req_list)
+    # while len(queue):
+    #     para = queue.popleft()
+    for func, params in req_list:
+        pool.apply_async(func, args=params)
     if is_lock:
         pool.close()
         pool.join()

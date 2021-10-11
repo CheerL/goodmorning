@@ -3,9 +3,8 @@ import time
 class ListenKey:
     def __init__(self, api):
         self.api = api
-        self.key = self.api.new_listen_key()['listenKey']
-        self.update_time = time.time()
-        self.create_time = self.update_time
+        self.key = ''
+        self.create_time = self.update_time = time.time()
 
     def update(self):
         self.api.renew_listen_key(self.key)
