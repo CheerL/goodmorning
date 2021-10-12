@@ -4,6 +4,7 @@ from back_trace.func import back_trace, get_data, ROOT
 from user.binance import BinanceUser
 from utils.parallel import run_process_pool, run_thread_pool, run_process
 from itertools import product
+import numpy as np
 # from utils.profile import do_cprofile
 
 if __name__ == '__main__':
@@ -16,9 +17,11 @@ if __name__ == '__main__':
         min_num,
         max_num,
         high_rate,
-        mark_rate,
-        back_rate,
+        low_rate,
+        low_back_rate,
+        clear_rate,
         final_rate,
+        stop_loss_rate,
         min_cont_rate,
         break_cont_rate,
         write=True,
@@ -30,25 +33,30 @@ if __name__ == '__main__':
         min_price, max_price = price_range
         Global.add_num()
         if (
-            back_rate >= mark_rate
-            # or 0.3 * mark_rate >= back_rate
+            low_back_rate >= low_rate
+            or clear_rate >= low_rate
+            or stop_loss_rate >= clear_rate
             or break_cont_rate >= min_cont_rate
-            or mark_rate >= high_rate
+            or low_rate >= high_rate
             or min_price >= max_price
+            or min_buy_vol >= max_buy_vol
+            or min_num >= max_num
         ):
             return
 
         def sub_worker(end, cont_loss_list, base_klines_dict):
             total_money, profit_rate, max_back_rate = back_trace(
-                cont_loss_list, base_klines_dict, u.min_usdt_amount, u.fee_rate, days, 
+                cont_loss_list, base_klines_dict,u.min_usdt_amount, u.fee_rate, days, 
                 end=end,
                 max_hold_days=max_hold_days,
                 min_num=min_num,
                 max_num=max_num,
                 high_rate=high_rate,
-                mark_rate=mark_rate,
-                back_rate=back_rate,
+                low_rate=low_rate,
+                low_back_rate=low_back_rate,
+                clear_rate=clear_rate,
                 final_rate=final_rate,
+                stop_loss_rate=stop_loss_rate,
                 min_cont_rate=min_cont_rate,
                 break_cont_rate=break_cont_rate,
                 min_buy_vol=min_buy_vol,
@@ -57,8 +65,7 @@ if __name__ == '__main__':
                 max_price=max_price,
                 min_cont_days=1,
                 write=sub_write,
-                detailed_check=detailed_check,
-                detailed_interval=interval
+                detailed_interval=interval,
             )
             result.append([end, total_money, profit_rate, max_back_rate])
 
@@ -89,9 +96,11 @@ if __name__ == '__main__':
                     min_num,
                     max_num,
                     high_rate,
-                    mark_rate,
-                    back_rate,
+                    low_rate,
+                    low_back_rate,
+                    clear_rate,
                     final_rate,
+                    stop_loss_rate,
                     min_cont_rate,
                     break_cont_rate,
                     mean_total_money,
@@ -101,7 +110,7 @@ if __name__ == '__main__':
 
     days = 365
     load = True
-    param_search = False
+    param_search = True
     detailed_check = True
     interval = '1min'
     # end_list = range(5, 200, 20)
@@ -114,17 +123,19 @@ if __name__ == '__main__':
 
     if param_search:
         price_range_list = [(0, 1)]
-        max_hold_days_list = [2, 3, 4]
-        min_buy_vol_list = [3000000, 4000000, 5000000, 6000000, 7000000, 8000000]
-        max_buy_vol_list = [10000000000]
-        min_num_list = [2, 3, 4, 5]
-        max_num_list = [10, 20, 30]
-        high_rate_list = [0.1, 0.15, 0.2, 0.25, 0.3]
-        mark_rate_list = [0.04, 0.06, 0.08]
-        back_rate_list = [0.01, 0.03, 0.05, 0.07]
-        final_rate_list = [0.02, 0.04, 0.06, 0.08, 0.1]
-        min_cont_rate_list = [-0.1, -0.15, -0.2, 0.25]
-        break_cont_rate_list = [-0.2, -0.25, -0.3, -0.35, -0.4]
+        max_hold_days_list = [2]
+        min_buy_vol_list = [5000000]
+        max_buy_vol_list = [1e10]
+        min_num_list = [2]
+        max_num_list = [10]
+        high_rate_list = [0.25]
+        low_rate_list = [0.05]
+        low_back_rate_list = [0.01]
+        clear_rate_list = [-0.01]
+        final_rate_list = [0.1]
+        stop_loss_rate_list = np.arange(0,-1,-0.01)
+        min_cont_rate_list = [-0.15]
+        break_cont_rate_list = [-0.3]
         # price_range_list = [(0, 1)]
         # max_hold_days_list = [2]
         # min_buy_vol_list = [3000000, 4000000, 5000000, 6000000, 7000000, 8000000]
@@ -138,7 +149,7 @@ if __name__ == '__main__':
         # min_cont_rate_list = [-0.1]
         # break_cont_rate_list = [-0.2]
         with open(best_params_path, 'w') as f:
-            f.write('最低买入价,最高买入价,最低买入交易量,最高买入交易量,最大持有天数,最少仓数,最多仓数,高标记,低标记,回撤单,回本单,连续跌幅,突破连续跌幅,最终资产,收益率,最大回撤\n')
+            f.write('最低买入价,最高买入价,最低买入交易量,最高买入交易量,最大持有天数,最少仓数,最多仓数,高标记,低标记,回撤单,清仓单,回本单,止损单,连续跌幅,突破连续跌幅,最终资产,收益率,最大回撤\n')
 
         tasks = [(sub_back_trace, each,) for each in product(
             price_range_list,
@@ -148,16 +159,18 @@ if __name__ == '__main__':
             min_num_list,
             max_num_list,
             high_rate_list,
-            mark_rate_list,
-            back_rate_list,
+            low_rate_list,
+            low_back_rate_list,
+            clear_rate_list,
             final_rate_list,
+            stop_loss_rate_list,
             min_cont_rate_list,
             break_cont_rate_list
         )]
         tasks_num = len(tasks)
-        run_process_pool(tasks, is_lock=False, limit_num=20)
+        run_process_pool(tasks, is_lock=False, limit_num=4)
 
-        while True:
+        while Global.num.value < tasks_num:
             Global.show(tasks_num)
             time.sleep(10)
 
@@ -166,13 +179,15 @@ if __name__ == '__main__':
             price_range=(0, 1),
             max_hold_days=2,
             min_buy_vol=5000000,
-            max_buy_vol=1000000000,
+            max_buy_vol=10000000000,
             min_num=2,
             max_num=10,
-            high_rate=0.2,
-            mark_rate=0.06,
-            back_rate=0.05,
-            final_rate=0.08,
+            high_rate=0.25,
+            low_rate=0.05,
+            low_back_rate=0.01,
+            clear_rate=-0.01,
+            final_rate=0.1,
+            stop_loss_rate=-0.4,
             min_cont_rate=-0.15,
             break_cont_rate=-0.3,
             write=False,

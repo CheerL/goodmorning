@@ -629,8 +629,8 @@ class LossDealerClient(BaseDealerClient):
             target.symbol for target in clear_targets.values() if target.own
         ])
         tickers = self.market_client.get_market_tickers()
+        
         logger.info(f'Clear day {clear_date}, targets are {clear_symbols}')
-
         for ticker in tickers:
             symbol = ticker.symbol
             if symbol in clear_targets:
@@ -644,8 +644,9 @@ class LossDealerClient(BaseDealerClient):
                 target.own = False
                 continue
 
-            market_price = target.now_price * (1-SELL_UP_RATE)
-            sell_price = market_price if target.low_mark else target.low_mark_back_price
+            market_price = target.now_price * (1-1.5*SELL_UP_RATE)
+            # sell_price = market_price if target.low_mark else target.low_mark_back_price
+            sell_price = max(target.clear_price, market_price)
             self.cancel_and_sell_limit_target(target, sell_price, 4)
 
             Timer(
