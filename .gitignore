@@ -1,5 +1,6 @@
 __pycache__
-back_trace/*
+back_trace/npy
+back_trace/csv
 .vscode
 log/*
 *.ini
