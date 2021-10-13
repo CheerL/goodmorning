@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     days = 365
     load = True
-    param_search = True
+    param_search = False
     detailed_check = True
     interval = '1min'
     # end_list = range(5, 200, 20)
@@ -205,17 +205,17 @@ if __name__ == '__main__':
             max_hold_days=2,
             min_buy_vol=5000000,
             max_buy_vol=10000000000,
-            min_num=2,
+            min_num=3,
             max_num=10,
             high_rate=0.25,
-            low_rate=0.07,
-            low_back_rate=0.01,
+            low_rate=0.06,
+            low_back_rate=0.02,
             clear_rate=-0.01,
-            final_rate=0.1,
+            final_rate=0.08,
             stop_loss_rate=-1,
             min_cont_rate=-0.15,
             break_cont_rate=-0.3,
-            up_cont_rate=-0.2,
+            up_cont_rate=-0.11,
             write=False,
             sub_write=True,
             show=True,
