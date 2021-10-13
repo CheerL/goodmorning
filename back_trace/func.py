@@ -64,6 +64,7 @@ def back_trace(
         min_cont_days = 2,
         min_cont_rate = -0.15,
         break_cont_rate = -0.2,
+        up_cont_rate  = -0.2,
         init_money = 2000,
         write=False,
         detailed_interval='1min'
@@ -80,9 +81,11 @@ def back_trace(
         (min_price <= data['close']) & (data['close'] <= max_price) &
         # (0 <= cont_loss.kline.close <= 1 or 10 <= cont_loss.kline.close <= 1000) and
         (data['low2']/data['close']-1 <= -0.002) &
-        # (data['close'] < data['boll']) &
         (
-            # ((data['cont_loss_days']==1) & (data['low']>data['boll']) & (data['cont_loss_rate'] <= min_cont_rate-0.05)) |
+            ((data['cont_loss_days']==1) &
+                (data['close']>data['boll']) &
+                (data['cont_loss_rate'] <= up_cont_rate)
+            ) |
             (data['cont_loss_rate'] <= break_cont_rate) |
             ((data['cont_loss_rate'] <= min_cont_rate) & (data['is_max_loss']==1))
         )

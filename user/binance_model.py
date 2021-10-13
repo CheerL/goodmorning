@@ -4,14 +4,15 @@ class ListenKey:
     def __init__(self, api):
         self.api = api
         self.key = ''
-        self.create_time = self.update_time = time.time()
+        self.create_time = self.update_time = 0
 
     def update(self):
         self.api.renew_listen_key(self.key)
         self.update_time = time.time()
 
     def recreate(self):
-        self.api.close_listen_key(self.key)
+        if self.key:
+            self.api.close_listen_key(self.key)
         self.key = self.api.new_listen_key()['listenKey']
         self.update_time = time.time()
         self.create_time = self.update_time
