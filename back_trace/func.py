@@ -344,7 +344,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
 
             klines_dict.load_from_raw(symbol, klines)
 
-        days = min((end_ts - max_ts) // 86400, 1000)
+        days = min(int((end_ts - max_ts) // 86400), 1000)
         market = Global.user.market_client
         symbols = market.all_symbol_info.keys()
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)

@@ -14,6 +14,7 @@ TEST = user_config.getboolean('setting', 'TEST')
 
 MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
+UP_LOSS_RATE = config.getfloat('loss', 'UP_LOSS_RATE')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
@@ -189,8 +190,13 @@ class LossDealerClient(BaseDealerClient):
         rate = cont_loss_list[0]
         cont_loss = sum(cont_loss_list)
         max_loss = min(cont_loss_list)
+        boll = sum([kline.close for kline in klines[:20]]) / 20
         if (
-            (rate == max_loss and cont_loss <= MIN_LOSS_RATE or cont_loss <= BREAK_LOSS_RATE)
+            (
+                (len(cont_loss_list)==1 and cont_loss <= UP_LOSS_RATE and kline.close > boll) or
+                (rate == max_loss and cont_loss <= MIN_LOSS_RATE) or 
+                cont_loss <= BREAK_LOSS_RATE
+            )
             and MIN_VOL <= kline.vol <= MAX_VOL and MIN_PRICE <= kline.close <= MAX_PRICE
         ):
             return True
@@ -619,7 +625,7 @@ class LossDealerClient(BaseDealerClient):
     def sell_targets(self, date=None):
         logger.info('Start to sell')
         date = date or self.date
-        clear_date = datetime.ts2date(datetime.date2ts(date) - MAX_DAY * 86400)
+        clear_date = datetime.ts2date(datetime.date2ts(date) - (MAX_DAY-1) * 86400)
         clear_targets = {
             symbol: target for symbol, target in
             self.targets.get(clear_date, {}).items()
