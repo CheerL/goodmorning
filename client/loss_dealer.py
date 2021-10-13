@@ -623,42 +623,59 @@ class LossDealerClient(BaseDealerClient):
 
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
+        def sell_today_targets(level=4):
+            for target in self.targets.get(date, {}).values():
+                if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                    target.own = False
+                    continue
+
+                market_price = target.now_price * (1-1.5*SELL_UP_RATE)
+                sell_price = max(target.clear_price, market_price)
+                self.cancel_and_sell_limit_target(target, sell_price, level)
+
+        def long_sell_today_targets(level=5):
+            for target in self.targets.get(date, {}).values():
+                if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                    target.own = False
+                    continue
+
+                self.cancel_and_sell_limit_target(target, target.long_sell_price, level)
+
+        def clear_old_targets(level=6):
+            tickers = self.market_client.get_market_tickers()
+            for ticker in tickers:
+                symbol = ticker.symbol
+                for target in clear_targets.get(symbol, []):
+                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                        target.own = False
+
+                    market_price = ticker.close*(1-SELL_UP_RATE)
+                    self.cancel_and_sell_limit_target(target, market_price, level)
+
         logger.info('Start to sell')
         date = date or self.date
         clear_date = datetime.ts2date(datetime.date2ts(date) - (MAX_DAY-1) * 86400)
-        clear_targets = {
-            symbol: target for symbol, target in
-            self.targets.get(clear_date, {}).items()
-            if target.own and target.own_amount > target.sell_market_min_order_amt
-        }
-        clear_symbols = ",".join([
-            target.symbol for target in clear_targets.values() if target.own
-        ])
-        tickers = self.market_client.get_market_tickers()
-        
+        clear_targets = {}
+        for day, targets in self.targets.items():
+            for symbol, target in targets.items():
+                if (
+                    day <= clear_date and target.own and 
+                    target.own_amount > target.sell_market_min_order_amt
+                ):
+                    clear_targets.setdefault(symbol, []).append(target)
+
+        clear_symbols = ",".join(clear_targets.keys())
         logger.info(f'Clear day {clear_date}, targets are {clear_symbols}')
-        for ticker in tickers:
-            symbol = ticker.symbol
-            if symbol in clear_targets:
-                target = clear_targets[symbol]
-                market_price = ticker.close*(1-SELL_UP_RATE)
-                self.cancel_and_sell_limit_target(target, market_price, 6)
+        Timer(0, clear_old_targets, args=[6]).start()
+        Timer(15, clear_old_targets, args=[6.1]).start()
+        Timer(30, clear_old_targets, args=[6.2]).start()
 
-        logger.info(f'Sell targets of last day {date}')
-        for target in self.targets.get(date, {}).values():
-            if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                target.own = False
-                continue
+        logger.info(f'Sell targets of yesterday {date}')
+        Timer(0, sell_today_targets, args=[4]).start()
+        Timer(15, sell_today_targets, args=[4.1]).start()
+        Timer(30, sell_today_targets, args=[4.2]).start()
 
-            market_price = target.now_price * (1-1.5*SELL_UP_RATE)
-            # sell_price = market_price if target.low_mark else target.low_mark_back_price
-            sell_price = max(target.clear_price, market_price)
-            self.cancel_and_sell_limit_target(target, sell_price, 4)
-
-            Timer(
-                60, self.cancel_and_sell_limit_target,
-                args=[target, target.long_sell_price, 5]
-            ).start()
+        Timer(120, long_sell_today_targets, args=[5]).start()
 
     def buy_targets(self, end=0):
         logger.info('Start to find new targets')
