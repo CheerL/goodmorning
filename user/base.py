@@ -77,7 +77,7 @@ class BaseUser:
         self.sell_id = []
         self.username = wx_name(self.wxuid[0])
         self.buy_amount = buy_amount
-        self.market_client = self.MarketClient()
+        self.market = self.MarketClient()
         self.scheduler = None
         logger.info(f'Run {self.user_type}.')
 

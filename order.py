@@ -149,7 +149,7 @@ class OrderSummary:
             if self.status in [OrderSummaryStatus.FAILED, OrderSummaryStatus.EMPTY]:
                 client.after_buy(self.symbol, 0)
             elif self.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
-                client.user.trade_client.cancel_order(self.symbol, self.order_id)
+                client.user.cancel_order(self.symbol, self.order_id)
         
         Timer(wait, wrapper).start()
 

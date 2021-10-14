@@ -17,7 +17,7 @@ IOC_INTERVAL = config.getfloat('time', 'IOC_INTERVAL')
 class MorningWatcherClient(ControlledClient):
     def __init__(self, user, url=WS_URL):
         super().__init__(url=url)
-        self.market_client = user.market_client
+        self.market = user.market
         self.client_type = 'watcher'
         self.high_stop_profit = True
         self.task : list[str] = []
@@ -33,9 +33,9 @@ class MorningWatcherClient(ControlledClient):
             return
 
         self.publish(topic=Topic.BUY_SIGNAL, symbol=symbol, price=price, init_price=init_price, now=trade_time)
-        self.market_client.symbols_info[symbol].init_price = init_price
+        self.market.symbols_info[symbol].init_price = init_price
         target = Target(symbol, price, now, self.high_stop_profit)
-        target.set_info(self.market_client.symbols_info[symbol])
+        target.set_info(self.market.symbols_info[symbol])
         self.targets[symbol] = target
         logger.info(f'Buy. {symbol} with price {price}USDT at {trade_time}. recieved at {now}')
         self.redis_conn.write_target(symbol)
@@ -71,15 +71,15 @@ class MorningWatcherClient(ControlledClient):
 
 
 class MorningWatcherMasterClient(MorningWatcherClient):
-    def __init__(self, market_client: MarketClient, url=WS_URL):
-        super().__init__(market_client=market_client, url=url)
+    def __init__(self, market: MarketClient, url=WS_URL):
+        super().__init__(market=market, url=url)
         self.client_info = {
             'watcher': 0,
             'dealer': 0
         }
-        vols = self.market_client.get_vol()
+        vols = self.market.get_vol()
         self.symbols : list[str] = sorted(
-            self.market_client.symbols_info.keys(),
+            self.market.symbols_info.keys(),
             key=lambda symbol: vols[symbol],
             reverse=True
         )

@@ -24,7 +24,7 @@ HIGH_STOP_PROFIT_HOLD_TIME = config.getfloat('time', 'HIGH_STOP_PROFIT_HOLD_TIME
 class MorningDealerClient(ControlledClient, BaseDealerClient):
     def __init__(self, user: User, url=WS_URL):
         super().__init__(url=url)
-        self.market_client = user.market_client
+        self.market = user.market
         self.targets = {}
         self.user = user
         self.client_type = 'dealer'
@@ -250,9 +250,9 @@ class MorningDealerClient(ControlledClient, BaseDealerClient):
             return
 
         receive_time = time.time()
-        self.market_client.symbols_info[symbol].init_price = init_price
+        self.market.symbols_info[symbol].init_price = init_price
         target = Target(symbol, price, now, self.high_stop_profit)
-        target.set_info(self.market_client.symbols_info[symbol])
+        target.set_info(self.market.symbols_info[symbol])
         self.targets[symbol] = target
 
         self.user.buy_limit_and_sell(target, self)

@@ -27,6 +27,68 @@ class Global:
         print(f'{cls.num.value}/{num}, {cls.num.value/num:.3%}')
         # print(f'{cls.num}/{num}, {cls.num/num:.3%}')
 
+
+class Param:
+    orders = [
+        'min_price',
+        'max_price',
+        'max_hold_days',
+        'min_buy_vol',
+        'max_buy_vol',
+        'min_num',
+        'max_num',
+        'high_rate',
+        'high_back_rate',
+        'low_rate',
+        'low_back_rate',
+        'clear_rate',
+        'final_rate',
+        'stop_loss_rate',
+        'min_cont_rate',
+        'break_cont_rate',
+        'up_cont_rate'
+    ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.min_price=0
+        self.max_price=1
+        self.max_hold_days=2
+        self.min_buy_vol=5000000
+        self.max_buy_vol=10000000000
+        self.min_num=3
+        self.max_num=10
+        self.high_rate=0.25
+        self.high_back_rate=0.5
+        self.low_rate=0.06
+        self.low_back_rate=0.02
+        self.clear_rate=-0.01
+        self.final_rate=0.08
+        self.stop_loss_rate=-1
+        self.min_cont_rate=-0.15
+        self.break_cont_rate=-0.3
+        self.up_cont_rate=-0.11
+
+        for i, value in enumerate(args):
+            self.__setattr__(self.orders[i], value)
+
+        for key, value in kwargs.items():
+            self.__setattr__(key, value)
+
+    def check(self):
+        return (
+            self.low_back_rate < self.low_rate
+            and self.clear_rate < self.low_rate
+            and self.stop_loss_rate < self.clear_rate
+            and self.break_cont_rate < self.min_cont_rate
+            and self.low_rate < self.high_rate
+            and self.min_price < self.max_price
+            and self.min_buy_vol < self.max_buy_vol
+            and self.min_num < self.max_num
+        )
+
+    def to_csv(self):
+        return ','.join([str(self.__getattribute__(key)) for key in self.orders])
+
 class Record:
     def __init__(self, symbol, buy_price, buy_time, buy_vol, fee_rate = 0.001):
         self.fee_rate = fee_rate

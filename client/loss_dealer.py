@@ -52,7 +52,7 @@ class LossDealerClient(BaseDealerClient):
             TargetSQL.date >= start_date,
             TargetSQL.exchange == self.user.user_type
         ])
-        infos = self.market_client.all_symbol_info
+        infos = self.market.all_symbol_info
 
         for target in targets:
             date_target_dict = self.targets.setdefault(target.date, {})
@@ -60,7 +60,7 @@ class LossDealerClient(BaseDealerClient):
                 target.symbol, target.date, target.open, target.close, target.vol
             )
             loss_target.set_info(infos[target.symbol], self.user.fee_rate)
-            loss_target.price = loss_target.now_price = self.market_client.mark_price[target.symbol]
+            loss_target.price = loss_target.now_price = self.market.mark_price[target.symbol]
             date_target_dict[target.symbol] = loss_target
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
@@ -71,7 +71,7 @@ class LossDealerClient(BaseDealerClient):
         for order in orders:
             try:
                 if order.symbol not in self.targets.setdefault(order.date, {}):
-                    klines = self.market_client.get_candlestick(order.symbol, '1day', 10)
+                    klines = self.market.get_candlestick(order.symbol, '1day', 10)
                     ts = datetime.date2ts(order.date)
                     for kline in klines:
                         if kline.id == ts:
@@ -81,7 +81,7 @@ class LossDealerClient(BaseDealerClient):
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
                     loss_target.set_info(infos[order.symbol], self.user.fee_rate)
-                    loss_target.price = loss_target.now_price = self.market_client.mark_price[target.symbol]
+                    loss_target.price = loss_target.now_price = self.market.mark_price[target.symbol]
                     self.targets[order.date][order.symbol] = loss_target
 
                 target = self.targets[order.date][order.symbol]
@@ -108,7 +108,7 @@ class LossDealerClient(BaseDealerClient):
                     del self.targets[date][symbol]
         
         for symbol, target in self.targets[self.date].items():
-            [ticker] = self.market_client.get_candlestick(symbol, '1day', 1)
+            [ticker] = self.market.get_candlestick(symbol, '1day', 1)
             if ticker.high >= target.high_mark_price:
                 target.high_mark = target.low_mark = True
                 if target.selling > 0:
@@ -203,7 +203,7 @@ class LossDealerClient(BaseDealerClient):
         return False
 
     def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS):
-        infos = self.market_client.get_all_symbols_info()
+        infos = self.market.get_all_symbols_info()
         if not symbols:
             symbols = infos.keys()
         targets = {}
@@ -212,7 +212,7 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market_client.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
+                klines = self.market.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
@@ -244,7 +244,7 @@ class LossDealerClient(BaseDealerClient):
             return
 
         try:
-            tickers = self.market_client.get_market_tickers()
+            tickers = self.market.get_market_tickers()
         except Exception as e:
             logger.error(e)
             return
@@ -386,7 +386,7 @@ class LossDealerClient(BaseDealerClient):
             ):
                 try:
                     summary.add_cancel_callback(cancel_and_sell_callback, [summary])
-                    self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                    self.user.cancel_order(summary.symbol, summary.order_id)
                     logger.info(f'Cancel open sell order for {symbol}')
                     is_canceled = True
                 except Exception as e:
@@ -425,7 +425,7 @@ class LossDealerClient(BaseDealerClient):
             ):
                 try:
                     summary.add_cancel_callback(cancel_and_buy_callback, [summary])
-                    self.user.trade_client.cancel_order(summary.symbol, summary.order_id)
+                    self.user.cancel_order(summary.symbol, summary.order_id)
                     logger.info(f'Cancel open buy order for {symbol}')
                     is_canceled = True
                 except Exception as e:
@@ -584,7 +584,7 @@ class LossDealerClient(BaseDealerClient):
                     target_info[symbol]['amount'] += amount
                     target_info[symbol]['buy_vol'] += target.buy_vol
 
-        tickers = self.market_client.get_market_tickers()
+        tickers = self.market.get_market_tickers()
         for ticker in tickers:
             if ticker.symbol in target_info:
                 info = target_info[ticker.symbol]
@@ -642,7 +642,7 @@ class LossDealerClient(BaseDealerClient):
                 self.cancel_and_sell_limit_target(target, target.long_sell_price, level)
 
         def clear_old_targets(level=6):
-            tickers = self.market_client.get_market_tickers()
+            tickers = self.market.get_market_tickers()
             for ticker in tickers:
                 symbol = ticker.symbol
                 for target in clear_targets.get(symbol, []):

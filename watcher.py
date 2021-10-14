@@ -128,11 +128,11 @@ def error_callback(symbol):
     return warpper
 
 def update_symbols(client: WatcherClient, watch_dog: WatchDog):
-    new_symbols, _ = client.user.market_client.update_symbols_info()
+    new_symbols, _ = client.user.market.update_symbols_info()
     if new_symbols:
         logger.info(f'Find new symbols: {", ".join(new_symbols)}')
         for i, symbol in enumerate(new_symbols):
-            client.user.market_client.sub_trade_detail(
+            client.user.market.sub_trade_detail(
                 symbol, trade_detail_callback(symbol, client), error_callback(symbol)
             )
             watch_dog.after_connection_created(symbol)
@@ -141,8 +141,8 @@ def update_symbols(client: WatcherClient, watch_dog: WatchDog):
 
 @retry(tries=5, delay=1, logger=logger)
 def init_watcher(Client=WatcherClient) -> WatcherClient:
-    market_client = MarketClient()
-    client = Client(market_client)
+    market = MarketClient()
+    client = Client(market)
     client.start()
     return client
 
@@ -187,7 +187,7 @@ def main():
         logger.info(f'Watcher task are: {", ".join(client.task)}')
 
         for i, symbol in enumerate(client.task):
-            client.market_client.sub_trade_detail(
+            client.market.sub_trade_detail(
                 symbol, trade_detail_callback(symbol, client, redis=is_redis), error_callback
             )
             watch_dog.after_connection_created(symbol)

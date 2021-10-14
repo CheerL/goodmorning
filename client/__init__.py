@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 class BaseDealerClient:
     def __init__(self, user: User, *args, **kwargs):
-        self.market_client = user.market_client
+        self.market = user.market
         self.targets = {}
         self.user = user
         self.client_type = 'base dealer'

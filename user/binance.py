@@ -87,8 +87,8 @@ class BinanceUser(BaseUser):
         datetime.Tz.tz_num = 0
         self.api = Spot(key=access_key, secret=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
-        self.market_client.api = self.api
-        self.market_client.update_symbols_info()
+        self.market.api = self.api
+        self.market.update_symbols_info()
         self.listen_key = ListenKey(self.api)
         self.websocket = SpotWebsocketClient()
         self.scheduler = Scheduler(job_defaults={'max_instances': 5}, timezone=datetime.Tz.get_tz())
