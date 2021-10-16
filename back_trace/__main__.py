@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     days = 365
     load = True
-    param_search = False
+    param_search = True
     detailed_check = True
     interval = '1min'
     # end_list = range(5, 200, 20)
@@ -66,38 +66,40 @@ if __name__ == '__main__':
     cont_loss_list, klines_dict = get_data(days=days, end=1, filter_=False)
 
     if param_search:
-        # price_range_list = [(0, 1)]
-        # max_hold_days_list = [2, 3, 4]
-        # min_buy_vol_list = [5000000]
-        # max_buy_vol_list = [1e10]
-        # min_num_list = [2, 3, 4]
-        # max_num_list = [10, 20, 30]
-        # high_rate_list = np.arange(0.15, 0.35, 0.025)
-        # low_rate_list = np.arange(0.03, 0.09, 0.01)
-        # low_back_rate_list = np.arange(0.005, 0.05, 0.005)
-        # clear_rate_list = [-0.01]
-        # final_rate_list = np.arange(0.02, 0.1, 0.02)
-        # stop_loss_rate_list = [-1]
-        # min_cont_rate_list = np.arange(-0.1, -0.3, -0.05)
-        # break_cont_rate_list = np.arange(-0.15, -0.4, -0.05)
-        # up_cont_rate_list = np.arange(-0.1, -0.4, -0.05)
-        min_price_list = [0]
-        max_price_list = [1]
-        max_hold_days_list = [2]
+        min_price_list = [10]
+        max_price_list = [1000]
+        max_hold_days_list = np.arange(2, 14, 2)
         min_buy_vol_list = [5000000]
         max_buy_vol_list = [1e10]
-        min_num_list = [2]
+        min_num_list = [3]
         max_num_list = [10]
-        high_rate_list = [0.1]
-        high_back_rate_list = np.arange(0, 1, 0.01)
-        low_rate_list = [0.07]
-        low_back_rate_list = [0.02]
+        high_rate_list = np.arange(0.10, 0.35, 0.05)
+        high_back_rate_list = [0.5]
+        low_rate_list = np.arange(0.02, 0.09, 0.01)
+        low_back_rate_list = np.arange(0.01, 0.07, 0.01)
         clear_rate_list = [-0.01]
-        final_rate_list = [0.08]
+        final_rate_list = np.arange(0, 0.1, 0.02)
         stop_loss_rate_list = [-1]
-        min_cont_rate_list = [-0.15]
-        break_cont_rate_list = [-0.3]
-        up_cont_rate_list = [-0.11]
+        min_cont_rate_list = np.arange(-0.05, -0.3, -0.05)
+        break_cont_rate_list = np.arange(-0.2, -0.4, -0.05)
+        up_cont_rate_list = np.arange(-0.05, -0.4, -0.05)
+        # min_price_list = [0]
+        # max_price_list = [1]
+        # max_hold_days_list = [2]
+        # min_buy_vol_list = [5000000]
+        # max_buy_vol_list = [1e10]
+        # min_num_list = [2]
+        # max_num_list = [10]
+        # high_rate_list = [0.1]
+        # high_back_rate_list = np.arange(0, 1, 0.01)
+        # low_rate_list = [0.07]
+        # low_back_rate_list = [0.02]
+        # clear_rate_list = [-0.01]
+        # final_rate_list = [0.08]
+        # stop_loss_rate_list = [-1]
+        # min_cont_rate_list = [-0.15]
+        # break_cont_rate_list = [-0.3]
+        # up_cont_rate_list = [-0.11]
 
         params_list = [
             min_price_list,
@@ -126,7 +128,7 @@ if __name__ == '__main__':
         tasks = ((sub_back_trace, [Param(*each)],) for each in product(*params_list))
         tasks_num = np.prod([len(each) for each in params_list])
         # print(tasks_num, np.prod(tasks_num))
-        run_thread_pool(tasks, is_lock=False, limit_num=4)
+        run_process_pool(tasks, is_lock=False, limit_num=40)
 
         while Global.num.value < tasks_num:
             Global.show(tasks_num)
@@ -134,15 +136,15 @@ if __name__ == '__main__':
 
     else:
         param = Param(
-            min_price=0,
-            max_price=1,
+            min_price=10,
+            max_price=1000,
             max_hold_days=2,
             min_buy_vol=5000000,
             max_buy_vol=1e10,
-            min_num=2,
-            max_num=10,
+            min_num=3,
+            max_num=30,
             high_rate=0.1,
-            high_back_rate=0.59,
+            high_back_rate=0.6,
             low_rate=0.07,
             low_back_rate=0.02,
             clear_rate=-0.01,

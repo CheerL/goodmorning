@@ -33,6 +33,7 @@ class LossDealerClient(BaseDealerClient):
         self.targets: dict[str, dict[str, Target]] = {}
         self.date = datetime.ts2date()
         self.client_type = 'loss_dealer'
+        self.last_report_ts = 0
         logger.info('Start loss strategy.')
 
     def resume(self):
@@ -514,6 +515,9 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force):
         now = time.time()
+        if now - self.last_report_ts < 60:
+            return
+
         start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
@@ -531,7 +535,8 @@ class LossDealerClient(BaseDealerClient):
 
         for order in orders:
             order_id = int(order.order_id)
-            summary = self.check_order(order, self.targets[order.date][order.symbol])
+            target = self.targets[order.date][order.symbol]
+            summary = self.check_order(order, target)
 
             if order_id not in self.user.orders:
                 continue
@@ -543,9 +548,13 @@ class LossDealerClient(BaseDealerClient):
                 # fee = vol * 0.02
                 symbol = summary.symbol
                 tm = datetime.ts2time(summary.ts)
+                profit_rate = summary.aver_price  / target.buy_price * (1+summary.fee_rate)**2 - 1
+                profit = summary.amount * target.buy_price * profit_rate
                 report_info[f'new_{order.direction}'].append((
-                    tm, symbol, amount, vol, price
+                    tm, symbol, amount, vol, price, profit, profit_rate, target.buy_price
                 ))
+                
+                
                 update_load = {
                     'amount': summary.amount,
                     'vol': summary.vol,
@@ -603,21 +612,25 @@ class LossDealerClient(BaseDealerClient):
                 symbol, amount, buy_price, price, profit, percent, date
             ))
 
+        if not report_info['holding']:
+            return
+
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
 
         wx_loss_report(self.user.user_type, self.user.wxuid, self.user.username, report_info, usdt, day_profit, month_profit, all_profit)
+        self.last_report_ts = now
 
         logger.info('Summary')
         for each in report_info['new_buy']:
             logger.info(f'New buy: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U')
         for each in report_info['new_sell']:
-            logger.info(f'New sell: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U')
+            logger.info(f'New sell: {each[0]}, {each[1]}, amount {each[2]:.4f}, vol {each[3]:.3f}U, price {each[4]:.6g}U, buy price {each[7]:.6g}U, profit {each[5]:.3f}U, {each[6]:.2%}')
         for each in report_info['opening']:
             logger.info(f'Opening order: {each[0]}, {each[1]}, {each[4]}, left amount {each[2]:.4f}, price {each[3]:.6g}U')
         for each in report_info['holding']:
-            logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%} |')
+            logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%}')
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
 

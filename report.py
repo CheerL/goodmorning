@@ -112,10 +112,10 @@ def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, mo
 
 ### 新卖出
 
-| 币种 | 时间 | 价格 | 成交量 | 成交额 |
-| ---- | ---- | ---- | ---- | ---- |
+| 币种 | 时间 | 价格 | 买入价 | 成交量 | 成交额 | 收益 | 收益率 |
+| ---- | ---- | ---- | ---- | ---- | ---- |  ---- | ---- |
 ''' + '\n'.join([
-    f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[2]:.4f} | {each[3]:.3f} |'
+    f'| {each[1]} | {each[0]} | {each[4]:.6g} | {each[7]:.6g} | {each[2]:.4f} | {each[3]:.3f} | {each[5]:.3f} | {each[6]:.2%} |'
     for each in report_info['new_sell']
 ]) if report_info['new_sell'] else '') + (
 '''

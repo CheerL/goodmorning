@@ -55,20 +55,17 @@ def back_trace(
     data = data[
         (param.min_buy_vol <= data['vol']) & (data['vol'] <= param.max_buy_vol) &
         (param.min_price <= data['close']) & (data['close'] <= param.max_price) &
-        # (0 <= cont_loss.kline.close <= 1 or 10 <= cont_loss.kline.close <= 1000) and
         (data['low2']/data['close']-1 <= -0.002) &
         (
             (
                 (data['cont_loss_days']==1) &
                 (data['close']>data['boll']) &
                 (data['cont_loss_rate'] <= param.up_cont_rate)
-            ) |
-            (
+            ) | (
                 # (data['close'] <= data['boll']) &
                 (data['cont_loss_rate'] <= param.min_cont_rate) &
                 (data['is_max_loss']==1)
-            ) |
-            (
+            ) | (
                 # (data['close'] <= data['boll']) &
                 (data['cont_loss_rate'] <= param.break_cont_rate)
             )
