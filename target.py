@@ -111,6 +111,8 @@ class LossTarget(BaseTarget):
         self.low_mark = False
         self.low_selling = False
 
+        self.boll = 0
+
         self.set_mark_price(close)
 
     def __repr__(self) -> str:

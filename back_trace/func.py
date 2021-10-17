@@ -92,6 +92,8 @@ def back_trace(
         money += total_sell_vol
 
         targets = np.sort(data[data['date']==date.encode()], order='vol')[::-1]
+        up_targets = targets[targets['close']>targets['boll']]
+        low_targets = targets[targets['close']<=targets['boll']]
         targets_num = len(targets)
         if targets_num:
             buy_num = min(max(targets_num, param.min_num), param.max_num)
@@ -104,7 +106,7 @@ def back_trace(
                 buy_vol -= 0.001
 
             total_buy_vol = 0
-            for cont_loss in targets[:buy_num]:
+            for cont_loss in np.concatenate([low_targets, up_targets])[:buy_num]:
                 if not cont_loss['id2']:
                     continue
 
@@ -258,7 +260,8 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
         clear_price = close * (1 + param.clear_rate)
         final_price = close * (1 + param.final_rate)
         stop_loss_price = close * (1 + param.stop_loss_rate)
-
+        # sell_price = cont_loss['close2']
+        # sell_time = cont_loss['id2']+86340
         if cont_loss['high2'] < low_price and cont_loss['low2'] > 0:
             if cont_loss['close2'] >= clear_price:
                 sell_price = cont_loss['close2']

@@ -168,7 +168,7 @@ class LossDealerClient(BaseDealerClient):
 
         targets = {
             target.symbol: target for target in
-            sorted(targets.values(), key=lambda x: -x.vol)[:buy_num]
+            sorted(targets.values(), key=lambda x: (x.close > x.boll, -x.vol))[:buy_num]
         }
         return targets
 
@@ -221,6 +221,7 @@ class LossDealerClient(BaseDealerClient):
             if self.is_buy(klines):
                 kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
+                target.boll = sum([kline.close for kline in klines[:20]]) / 20
                 if now - kline.id > 86400:
                     TargetSQL.add_target(
                         symbol=symbol,
