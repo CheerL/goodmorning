@@ -20,9 +20,8 @@ def main(user):
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
-    client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=5, kwargs={'force': True})
-
-
+    client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
+    client.report(False)
     # print(user.orders)
     # print(client.targets)
     # for summary in client.user.orders.copy().values():

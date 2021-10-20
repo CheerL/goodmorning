@@ -6,6 +6,7 @@ log/*
 *.ini
 *.db
 test*
+network/*
 node/.crossbar/*
 !node/.crossbar/config.json
 !.gitkeep

@@ -33,7 +33,6 @@ class LossDealerClient(BaseDealerClient):
         self.targets: dict[str, dict[str, Target]] = {}
         self.date = datetime.ts2date()
         self.client_type = 'loss_dealer'
-        self.last_report_ts = 0
         logger.info('Start loss strategy.')
 
     def resume(self):
@@ -516,9 +515,6 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force):
         now = time.time()
-        if now - self.last_report_ts < 60:
-            return
-
         start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
 
         orders: list[OrderSQL] = OrderSQL.get_orders([
@@ -621,7 +617,6 @@ class LossDealerClient(BaseDealerClient):
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
 
         wx_loss_report(self.user.user_type, self.user.wxuid, self.user.username, report_info, usdt, day_profit, month_profit, all_profit)
-        self.last_report_ts = now
 
         logger.info('Summary')
         for each in report_info['new_buy']:
