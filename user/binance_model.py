@@ -1,4 +1,5 @@
 import time
+import math
 
 class ListenKey:
     def __init__(self, api):
@@ -48,11 +49,11 @@ class Symbol:
 
         for each in info['filters']:
             if each['filterType'] == 'PRICE_FILTER':
-                self.value_precision = self.price_precision = len(str(int(1/float(each['tickSize'])))) - 1
+                self.value_precision = self.price_precision = round(-math.log10(float(each['tickSize'])))
             elif each['filterType'] == 'LOT_SIZE':
                 self.limit_order_min_order_amt = self.min_order_amt = float(each['minQty'])
                 self.limit_order_max_order_amt = self.max_order_amt = float(each['maxQty'])
-                self.amount_precision = len(str(int(1/float(each['stepSize'])))) - 1
+                self.amount_precision = round(-math.log10(float(each['stepSize'])))
             elif each['filterType'] == 'MARKET_LOT_SIZE':
                 self.sell_market_min_order_amt = float(each['minQty'])
                 self.sell_market_max_order_amt = float(each['maxQty'])
