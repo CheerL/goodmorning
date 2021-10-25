@@ -7,4 +7,6 @@ test*
 node/.crossbar/*
 !node/.crossbar/config.json
 !.gitkeep
-!config/config.ini
+!config/config.inia
+network/*
+back_trace/*
