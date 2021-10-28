@@ -81,8 +81,19 @@ class LossDealerClient(BaseDealerClient):
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
                     loss_target.set_info(infos[order.symbol], self.user.fee_rate)
-                    loss_target.price = loss_target.now_price = self.market.mark_price[target.symbol]
+                    loss_target.price = loss_target.now_price = self.market.mark_price[loss_target.symbol]
                     self.targets[order.date][order.symbol] = loss_target
+                    if now - kline.id > 86400:
+                        TargetSQL.add_target(
+                            symbol=loss_target.symbol,
+                            exchange=self.user.user_type,
+                            date=loss_target.date,
+                            high=kline.high,
+                            low=kline.low,
+                            open=kline.open,
+                            close=kline.close,
+                            vol=kline.vol
+                        )
 
                 target = self.targets[order.date][order.symbol]
                 summary = self.check_order(order, target)
