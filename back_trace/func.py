@@ -14,6 +14,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_boll(i, close, n=20, m=2):
     price = close[i-n+1:i+1]
+    if not price.size:
+        return 0, 0, 0
+
     sma = price.mean()
     std = price.std()
     return sma, sma+m*std, sma-m*std
@@ -303,6 +306,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
     end_date = datetime.ts2date(now-end*86400)
     start_ts = datetime.date2ts(start_date)
     end_ts = datetime.date2ts(end_date)
+    print(start_date, end_date)
 
     cont_loss_list_path = f'{ROOT}/back_trace/npy/cont_list.npy'
     klines_dict_path = f'{ROOT}/back_trace/npy/base_klines_dict.npy'
@@ -317,6 +321,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         klines_dict = BaseKlineDict()
         max_ts = 0
 
+    print(max_ts, end_ts)
     if max_ts < end_ts:
         def worker(symbol):
             try:
@@ -346,6 +351,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         max_ts = 0
         min_ts = now
 
+    print(max_ts, end_ts)
     if max_ts < end_ts or min_ts > start_ts:
         cont_loss_list = ContLossList()
         for symbol in np.unique(klines_dict.data['symbol']):

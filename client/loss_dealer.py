@@ -25,11 +25,13 @@ MAX_VOL = config.getfloat('loss', 'MAX_VOL')
 MIN_PRICE = config.getfloat('loss', 'MIN_PRICE')
 MAX_PRICE = config.getfloat('loss', 'MAX_PRICE')
 MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
+SPECIAL_SYMBOLS = config.get('loss', 'SPECIAL_SYMBOLS')
 
 
 class LossDealerClient(BaseDealerClient):
     def __init__(self, user: User):
         super().__init__(user=user)
+        self.special_symbols = SPECIAL_SYMBOLS.split(',')
         self.targets: dict[str, dict[str, Target]] = {}
         self.date = datetime.ts2date()
         self.client_type = 'loss_dealer'
@@ -182,8 +184,8 @@ class LossDealerClient(BaseDealerClient):
         }
         return targets
 
-    def is_buy(self, klines):
-        if len(klines) <= MIN_BEFORE_DAYS:
+    def is_buy(self, klines, symbol=''):
+        if len(klines) <= MIN_BEFORE_DAYS and symbol not in self.special_symbols:
             return False
 
         cont_loss_list = []
@@ -228,11 +230,11 @@ class LossDealerClient(BaseDealerClient):
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if self.is_buy(klines):
+            if self.is_buy(klines, symbol):
                 kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 target.boll = sum([kline.close for kline in klines[:20]]) / 20
-                if now - kline.id > 86400:
+                if now - kline.id > 86400 and not TEST:
                     TargetSQL.add_target(
                         symbol=symbol,
                         exchange=self.user.user_type,

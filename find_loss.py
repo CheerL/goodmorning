@@ -21,13 +21,8 @@ def main(user):
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
     client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
-    client.report(False)
-    # print(user.orders)
-    # print(client.targets)
-    # for summary in client.user.orders.copy().values():
-    #     print(summary.order_id, summary.symbol, summary.label, summary.vol, summary.aver_price, summary.status)
-    # for target in client.targets.get(client.date, {}).values():
-    #     print(target.symbol, target.date, target.own_amount, target.buy_price, target.buy_price * target.own_amount)
+    # client.report(False)
+    # print(client.find_targets(end=1))
     client.wait_state(10)
 
     kill_all_threads()

@@ -36,7 +36,8 @@ if __name__ == '__main__':
         for end in end_list:
             loss_list, _ = get_data(
                 days, end, load,
-                klines_dict=klines_dict, cont_loss_list=cont_loss_list
+                min_before=min_before,
+                klines_dict=klines_dict,
             )
             sub_worker(end, loss_list, klines_dict)
 
@@ -52,18 +53,19 @@ if __name__ == '__main__':
             with open(best_params_path, 'a+') as f:
                 f.write(f'{param.to_csv()},{mean_total_money},{mean_profit_rate},{mean_back_rate}\n')
 
-    days = 365
+    days = 750
+    min_before = 180
     load = True
     param_search = False
     detailed_check = True
     interval = '1min'
     # end_list = range(5, 200, 20)
-    end_list = [6]
+    end_list = [500]
 
     [u] = BinanceUser.init_users()
     Global.user = u
     best_params_path = f'{ROOT}/back_trace/csv/params_new2.csv'
-    cont_loss_list, klines_dict = get_data(days=days, end=1, filter_=False)
+    cont_loss_list, klines_dict = get_data(days=days, end=5, min_before=min_before, filter_=False)
 
     if param_search:
         min_price_list = [10]
@@ -140,7 +142,7 @@ if __name__ == '__main__':
             max_price=1,
             max_hold_days=2,
             min_buy_vol=5000000,
-            max_buy_vol=1e10,
+            max_buy_vol=1e11,
             min_num=3,
             max_num=10,
             high_rate=0.25,
