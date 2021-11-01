@@ -558,7 +558,7 @@ class LossDealerClient(BaseDealerClient):
                 # fee = vol * 0.02
                 symbol = summary.symbol
                 tm = datetime.ts2time(summary.ts)
-                profit_rate = summary.aver_price  / target.buy_price * (1+summary.fee_rate)**2 - 1
+                profit_rate = summary.aver_price  / target.buy_price * (1-summary.fee_rate)**2 - 1
                 profit = summary.amount * target.buy_price * profit_rate
                 report_info[f'new_{order.direction}'].append((
                     tm, symbol, amount, vol, price, profit, profit_rate, target.buy_price
