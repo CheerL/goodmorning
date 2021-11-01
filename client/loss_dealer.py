@@ -166,22 +166,27 @@ class LossDealerClient(BaseDealerClient):
                 selling_level=2, force=True
             )
 
-    def filter_targets(self, targets):
+    def filter_targets(self, targets, symbols=[]):
+        symbols_num = len(symbols)
         targets_num = len(targets)
         usdt_amount = self.user.get_amount('usdt', available=True, check=False)
-        buy_num = max(min(targets_num, MAX_NUM), MIN_NUM)
+        buy_num = max(min(targets_num-symbols_num, MAX_NUM-symbols_num), MIN_NUM-symbols_num)
         buy_amount = usdt_amount // buy_num
         if buy_amount < self.user.min_usdt_amount:
             buy_amount = self.user.min_usdt_amount
             buy_num = int(usdt_amount // buy_amount)
 
-        if not TEST:
-            self.user.buy_amount = buy_amount
+        new_targets_list = [target for symbol, target in targets.items() if symbol not in symbols]
+        old_targets_list = [target for symbol, target in targets.items() if symbol in symbols]
+        
+        for target in new_targets_list:
+            target.init_buy_amount = self.user.buy_amount if TEST else buy_amount
 
         targets = {
             target.symbol: target for target in
-            sorted(targets.values(), key=lambda x: (x.close > x.boll, -x.vol))[:buy_num]
+            old_targets_list + sorted(new_targets_list, key=lambda x: (x.close > x.boll, -x.vol))[:buy_num]
         }
+
         return targets
 
     def is_buy(self, klines, symbol=''):
@@ -217,7 +222,8 @@ class LossDealerClient(BaseDealerClient):
 
     def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS):
         infos = self.market.get_all_symbols_info()
-        if not symbols:
+        ori_symbols = symbols
+        if len(symbols) < MIN_NUM:
             symbols = infos.keys()
         targets = {}
         now = time.time()
@@ -230,7 +236,7 @@ class LossDealerClient(BaseDealerClient):
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if self.is_buy(klines, symbol):
+            if symbol in ori_symbols or self.is_buy(klines, symbol):
                 kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 target.boll = sum([kline.close for kline in klines[:20]]) / 20
@@ -305,7 +311,7 @@ class LossDealerClient(BaseDealerClient):
         cancel_callback = cancel_callback or _cancel_callback
 
         if not vol:
-            vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
+            vol = float(target.init_buy_amount) - target.own_amount * target.buy_price
 
         if vol < target.min_order_value:
             logger.error(f'At least buy {target.min_order_value} but now {vol}')
@@ -418,7 +424,7 @@ class LossDealerClient(BaseDealerClient):
             if summary:
                 target.set_buy(summary.vol, summary.amount)
 
-            vol = float(self.user.buy_amount) - target.own_amount * target.buy_price
+            vol = float(target.init_buy_amount) - target.own_amount * target.buy_price
             if vol < target.min_order_value:
                 return
 
@@ -728,8 +734,9 @@ class LossDealerClient(BaseDealerClient):
         date = datetime.ts2date(time.time()-end*86400)
         symbols = self.targets[date].keys()
         targets, _ = self.find_targets(symbols=symbols, end=end)
+        targets = self.filter_targets(targets, symbols)
         for symbol, target in targets.items():
-            now_target = self.targets[date][symbol]
+            now_target = self.targets[date].setdefault(symbol, target)
             now_target.set_mark_price(target.init_price)
             self.cancel_and_buy_limit_target(now_target, target.init_price)
-            Timer(3600, cancel, args=[now_target]).start()
+            Timer(1800, cancel, args=[now_target]).start()

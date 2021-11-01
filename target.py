@@ -96,6 +96,7 @@ class LossTarget(BaseTarget):
         self.vol = vol
         self.date = date
         self.now_price = close
+        self.init_buy_amount = 0
         self.buy_vol = 0
         self.selling = 0
         self.ticker_id = 0
