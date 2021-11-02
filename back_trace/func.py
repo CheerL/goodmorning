@@ -83,6 +83,7 @@ def back_trace(
 
     init_date = datetime.ts2date(time.time() - (days+end-1) * 86400)
     init_ts = int(datetime.date2ts(init_date))
+
     for i in range(days+end+1):
         ts = init_ts + i * 86400
         date = datetime.ts2date(ts)
@@ -98,8 +99,9 @@ def back_trace(
         up_targets = targets[targets['close']>targets['boll']]
         low_targets = targets[targets['close']<=targets['boll']]
         targets_num = len(targets)
+
         if targets_num:
-            buy_num = min(max(targets_num, param.min_num), param.max_num)
+            buy_num = int(min(max(targets_num, param.min_num), param.max_num))
             buy_vol = round(money / buy_num, 3)
             if buy_vol < min_vol:
                 buy_vol = min_vol
@@ -112,10 +114,11 @@ def back_trace(
             for cont_loss in np.concatenate([low_targets, up_targets])[:buy_num]:
                 if not cont_loss['id2']:
                     continue
-                
+
                 buy_price, buy_time = get_buy_price_and_time(
                     cont_loss, param, date, interval
                 )
+                
                 if buy_time == 0:
                     continue
 
@@ -133,7 +136,7 @@ def back_trace(
             total_buy_vol = 0
 
         money -= total_buy_vol
-        
+
         holding_money = 0
         for record in holding_list:
             base_klines = base_klines_dict.dict(record.symbol)
@@ -355,7 +358,6 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
     cont_loss_list_path = f'{ROOT}/back_trace/npy/cont_list.npy'
     klines_dict_path = f'{ROOT}/back_trace/npy/base_klines_dict.npy'
     # cont_loss_csv_path = f'{ROOT}/test/csv/cont_loss_{start_date}_{end_date}.csv'
-
     if klines_dict:
         max_ts = klines_dict.data['id'].max()
     elif load and os.path.exists(klines_dict_path):
