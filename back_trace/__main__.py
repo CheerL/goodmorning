@@ -1,4 +1,5 @@
 import time
+import argparse
 from back_trace.model import Global, Param
 from back_trace.func import back_trace, get_data, ROOT
 from user.binance import BinanceUser
@@ -6,6 +7,16 @@ from utils.parallel import run_process_pool, run_thread_pool, run_process
 from itertools import product
 import numpy as np
 # from utils.profile import do_cprofile
+
+def str2list(string, t=float, sep=','):
+    return [t(each) for each in string.split(sep)]
+
+def str2range(string, t=float, sep=','):
+    if ':' in string:
+        l = str2list(string, t, ':')
+        return np.arange(*l)
+    else:
+        return str2list(string, t, sep)
 
 if __name__ == '__main__':
     # @do_cprofile('back_trace/result.prof')
@@ -25,7 +36,7 @@ if __name__ == '__main__':
                 cont_loss_list, base_klines_dict, param,
                 min_vol=u.min_usdt_amount,
                 fee_rate=u.fee_rate, 
-                days=days, 
+                days=args.days, 
                 end=end,
                 write=sub_write,
                 interval=interval,
@@ -35,8 +46,8 @@ if __name__ == '__main__':
         # run_process([[sub_worker, [end,],] for end in range(2,200,20)], is_lock=True, limit_num=2)
         for end in end_list:
             loss_list, _ = get_data(
-                days, end, load,
-                min_before=min_before,
+                args.days, end, load,
+                min_before=args.min_before,
                 klines_dict=klines_dict,
             )
             sub_worker(end, loss_list, klines_dict)
@@ -53,74 +64,88 @@ if __name__ == '__main__':
             with open(best_params_path, 'a+') as f:
                 f.write(f'{param.to_csv()},{mean_total_money},{mean_profit_rate},{mean_back_rate}\n')
 
-    days = 750
-    min_before = 180
-    load = True
-    param_search = False
-    detailed_check = True
-    interval = '1min'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--days', default=365, type=int)
+    parser.add_argument('-b', '--min_before', default=180, type=int)
+    parser.add_argument('-l', '--load', action='store_true', default=False)
+    parser.add_argument('-s', '--search', action='store_true', default=False)
+    parser.add_argument('-e', '--end', default='1', type=str)
+
+    parser.add_argument('--min_price_list', default='0')
+    parser.add_argument('--max_price_list', default='1')
+    parser.add_argument('--max_hold_days_list', default='2')
+    parser.add_argument('--min_buy_vol_list', default='5000000')
+    parser.add_argument('--max_buy_vol_list', default='1e11')
+    parser.add_argument('--min_num_list', default='3')
+    parser.add_argument('--max_num_list', default='10')
+    parser.add_argument('--max_buy_ts_list', default='3600')
+    parser.add_argument('--buy_rate_list', default='-0.01')
+    parser.add_argument('--high_rate_list', default='0.10:0.35:0.05')
+    parser.add_argument('--high_back_rate_list', default='0.5')
+    parser.add_argument('--low_rate_list', default='0.02:0.09:0.01')
+    parser.add_argument('--low_back_rate_list', default='0.01:0.07:0.01')
+    parser.add_argument('--clear_rate_list', default='-0.01')
+    parser.add_argument('--final_rate_list', default='0:0.1:0.02')
+    parser.add_argument('--stop_loss_rate_list', default='-1')
+    parser.add_argument('--min_cont_rate_list', default='-0.05:-0.3:-0.05')
+    parser.add_argument('--break_cont_rate_list', default='-0.2:-0.4:-0.05')
+    parser.add_argument('--up_cont_rate_list', default='-0.05:-0.4:-0.05')
+
+
+    parser.add_argument('--min_price', default=0, type=float)
+    parser.add_argument('--max_price', default=1, type=float)
+    parser.add_argument('--max_hold_days', default=2, type=float)
+    parser.add_argument('--min_buy_vol', default=5000000, type=float)
+    parser.add_argument('--max_buy_vol', default=1e11, type=float)
+    parser.add_argument('--min_num', default=3, type=float)
+    parser.add_argument('--max_num', default=10, type=float)
+    parser.add_argument('--max_buy_ts', default=60*60*12, type=float)
+    parser.add_argument('--buy_rate', default=-0.01, type=float)
+    parser.add_argument('--high_rate', default=0.25, type=float)
+    parser.add_argument('--high_back_rate', default=0.6, type=float)
+    parser.add_argument('--low_rate', default=0.06, type=float)
+    parser.add_argument('--low_back_rate', default=0.02, type=float)
+    parser.add_argument('--clear_rate', default=-0.01, type=float)
+    parser.add_argument('--final_rate', default=0.08, type=float)
+    parser.add_argument('--stop_loss_rate', default=-1, type=float)
+    parser.add_argument('--min_cont_rate', default=-0.15, type=float)
+    parser.add_argument('--break_cont_rate', default=-0.3, type=float)
+    parser.add_argument('--up_cont_rate', default=-0.1, type=float)
+
+    args = parser.parse_args()
+
     # end_list = range(5, 200, 20)
-    end_list = [500]
+    interval = '1min'
+    end_list = str2list(args.end, int)
 
     [u] = BinanceUser.init_users()
     Global.user = u
     best_params_path = f'{ROOT}/back_trace/csv/params_new2.csv'
-    cont_loss_list, klines_dict = get_data(days=days, end=5, min_before=min_before, filter_=False)
+    cont_loss_list, klines_dict = get_data(days=args.days, end=1, min_before=args.min_before, filter_=False)
 
-    if param_search:
-        min_price_list = [10]
-        max_price_list = [1000]
-        max_hold_days_list = np.arange(2, 14, 2)
-        min_buy_vol_list = [5000000]
-        max_buy_vol_list = [1e10]
-        min_num_list = [3]
-        max_num_list = [10]
-        high_rate_list = np.arange(0.10, 0.35, 0.05)
-        high_back_rate_list = [0.5]
-        low_rate_list = np.arange(0.02, 0.09, 0.01)
-        low_back_rate_list = np.arange(0.01, 0.07, 0.01)
-        clear_rate_list = [-0.01]
-        final_rate_list = np.arange(0, 0.1, 0.02)
-        stop_loss_rate_list = [-1]
-        min_cont_rate_list = np.arange(-0.05, -0.3, -0.05)
-        break_cont_rate_list = np.arange(-0.2, -0.4, -0.05)
-        up_cont_rate_list = np.arange(-0.05, -0.4, -0.05)
-        # min_price_list = [0]
-        # max_price_list = [1]
-        # max_hold_days_list = [2]
-        # min_buy_vol_list = [5000000]
-        # max_buy_vol_list = [1e10]
-        # min_num_list = [2]
-        # max_num_list = [10]
-        # high_rate_list = [0.1]
-        # high_back_rate_list = np.arange(0, 1, 0.01)
-        # low_rate_list = [0.07]
-        # low_back_rate_list = [0.02]
-        # clear_rate_list = [-0.01]
-        # final_rate_list = [0.08]
-        # stop_loss_rate_list = [-1]
-        # min_cont_rate_list = [-0.15]
-        # break_cont_rate_list = [-0.3]
-        # up_cont_rate_list = [-0.11]
+    if args.search:
+        
 
         params_list = [
-            min_price_list,
-            max_price_list,
-            max_hold_days_list,
-            min_buy_vol_list,
-            max_buy_vol_list,
-            min_num_list,
-            max_num_list,
-            high_rate_list,
-            high_back_rate_list,
-            low_rate_list,
-            low_back_rate_list,
-            clear_rate_list,
-            final_rate_list,
-            stop_loss_rate_list,
-            min_cont_rate_list,
-            break_cont_rate_list,
-            up_cont_rate_list
+            str2range(args.min_price_list),
+            str2range(args.max_price_list),
+            str2range(args.max_hold_days_list),
+            str2range(args.min_buy_vol_list),
+            str2range(args.max_buy_vol_list),
+            str2range(args.min_num_list),
+            str2range(args.max_num_list),
+            str2range(args.max_buy_ts_list),
+            str2range(args.buy_rate_list),
+            str2range(args.high_rate_list),
+            str2range(args.high_back_rate_list),
+            str2range(args.low_rate_list),
+            str2range(args.low_back_rate_list),
+            str2range(args.clear_rate_list),
+            str2range(args.final_rate_list),
+            str2range(args.stop_loss_rate_list),
+            str2range(args.min_cont_rate_list),
+            str2range(args.break_cont_rate_list),
+            str2range(args.up_cont_rate_list)
         ]
 
         with open(best_params_path, 'w') as f:
@@ -137,29 +162,11 @@ if __name__ == '__main__':
             time.sleep(10)
 
     else:
-        param = Param(
-            min_price=0,
-            max_price=1,
-            max_hold_days=2,
-            min_buy_vol=5000000,
-            max_buy_vol=1e11,
-            min_num=3,
-            max_num=10,
-            high_rate=0.25,
-            high_back_rate=0.6,
-            low_rate=0.06,
-            low_back_rate=0.02,
-            clear_rate=-0.01,
-            final_rate=0.08,
-            stop_loss_rate=-1,
-            min_cont_rate=-0.15,
-            break_cont_rate=-0.3,
-            up_cont_rate=-0.11,
-        )
+        param = Param(**args.__dict__)
         sub_back_trace(
             param,
             write=False,
             sub_write=True,
             show=True,
-            load=load
+            load=args.load
         )

@@ -9,13 +9,9 @@ from utils import get_rate, datetime
 class Global:
     user = None
     num =  multiprocessing.Value('i', 0)
-    # num = 0
-    # manager = multiprocessing.Manager()
     sell_dict = dict()
-    # cont_loss_list_dict = manager.dict()
-    # base_klines_list_dict = manager.dict()
-    # klines_dict = manager.dict()
-    # sell_dict = {}
+    buy_dict = dict()
+
 
     @classmethod
     def add_num(cls):
@@ -37,6 +33,8 @@ class Param:
         'max_buy_vol',
         'min_num',
         'max_num',
+        'max_buy_ts',
+        'buy_rate',
         'high_rate',
         'high_back_rate',
         'low_rate',
@@ -57,6 +55,8 @@ class Param:
         self.max_buy_vol=10000000000
         self.min_num=3
         self.max_num=10
+        self.max_buy_ts=3600
+        self.buy_rate=-0.01
         self.high_rate=0.25
         self.high_back_rate=0.5
         self.low_rate=0.06
@@ -72,7 +72,8 @@ class Param:
             self.__setattr__(self.orders[i], value)
 
         for key, value in kwargs.items():
-            self.__setattr__(key, value)
+            if key in self.orders:
+                self.__setattr__(key, value)
 
     def check(self):
         return (
@@ -218,7 +219,13 @@ class BaseKlineDict(NumpyData):
 
     def __init__(self):
         super().__init__()
-        self.dict = {}
+
+    def dict(self, symbol=''):
+        if not symbol:
+            return np.unique(self.data['symbol'])
+        else:
+            symbol = symbol.encode() if isinstance(symbol, str) else symbol
+            return self.data[self.data['symbol']==symbol]
 
     def load_from_raw(self, symbol, klines):
         temp_list = [(
@@ -227,7 +234,6 @@ class BaseKlineDict(NumpyData):
         ) for kline in klines]
         data = np.array(temp_list, dtype=self.dtype)
         self.data = np.concatenate([self.data, data])
-        self.dict[symbol] = self.data[self.data['symbol']==symbol.encode()]
 
     @classmethod
     def load_from_pkl(cls, filename):
@@ -243,10 +249,6 @@ class BaseKlineDict(NumpyData):
     @classmethod
     def load(cls, filename):
         self = super().load(filename)
-        
-        for symbol in np.unique(self.data['symbol']):
-            self.dict[symbol.decode()] = self.data[self.data['symbol']==symbol]
-
         return self
 
 class ContLossList(NumpyData):
@@ -272,6 +274,7 @@ class ContLossList(NumpyData):
         ('boll', 'f4'),
         ('bollup', 'f4'),
         ('bolldown', 'f4'),
+        ('index', 'i4')
     ])
 
     def load_from_raw(self, cont_loss_list: 'list[ContLoss]'):
@@ -284,13 +287,13 @@ class ContLossList(NumpyData):
                 cont_loss.rate, cont_loss.cont_loss_days, cont_loss.cont_loss_rate,
                 cont_loss.is_big_loss, cont_loss.is_max_loss, 
                 cont_loss.boll, cont_loss.bollup, cont_loss.bolldown,
-                0,0,0,0,0,0,
+                0,0,0,0,0,0,0
             ]
             try:
                 kline2 = cont_loss.more_klines[0]
-                temp_item[-6:] = [
+                temp_item[-7:] = [
                     kline2.id,kline2.open,kline2.close,
-                    kline2.high,kline2.low,kline2.vol
+                    kline2.high,kline2.low,kline2.vol,1
                 ]
             except IndexError:
                 pass
