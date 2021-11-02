@@ -9,7 +9,7 @@ from client.loss_dealer import LossDealerClient as Client
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 EXCHANGE = user_config.get('setting', 'Exchange')
 
-def main(user):
+def main(user, args):
     user.start()
     client = Client.init_dealer(user)
     client.resume()
@@ -21,7 +21,9 @@ def main(user):
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
     client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
-    # client.report(False)
+
+    if args.report:
+        client.report(True)
     # print(client.find_targets(end=1))
     client.wait_state(10)
 
@@ -32,6 +34,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--type', default='', type=str)
     parser.add_argument('-n', '--num', default=0, type=int)
+    parser.add_argument('-r', '--report', action='store_true', default=False)
     args = parser.parse_args()
 
     User_dict = {User.user_type: User for User in [BinanceUser, HuobiUser]}
@@ -44,4 +47,4 @@ if __name__ == '__main__':
         exchange = list(User_dict.keys())[0]
 
     [user] = User_dict[exchange].init_users(num=args.num)
-    main(user)
+    main(user, args)

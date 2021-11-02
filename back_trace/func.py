@@ -321,7 +321,6 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         klines_dict = BaseKlineDict()
         max_ts = 0
 
-    print(max_ts, end_ts)
     if max_ts < end_ts:
         def worker(symbol):
             try:
