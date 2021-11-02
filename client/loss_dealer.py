@@ -541,6 +541,7 @@ class LossDealerClient(BaseDealerClient):
             OrderSQL.date >= start_date,
             OrderSQL.finished == 0
         ])
+        print(orders)
         report_info = {
             'new_buy': [],
             'new_sell': [],
@@ -594,6 +595,7 @@ class LossDealerClient(BaseDealerClient):
                     load['tm'] = datetime.ts2time(summary.ts)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],load)
 
+        print(report_info)
         if not force and not report_info['new_sell'] + report_info['new_buy']:
             return
 
@@ -627,10 +629,10 @@ class LossDealerClient(BaseDealerClient):
             report_info['holding'].append((
                 symbol, amount, buy_price, price, profit, percent, date
             ))
-
+        print(3)
         if not report_info['holding'] + report_info['new_sell'] + report_info['new_buy']:
             return
-
+        print(4)
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
