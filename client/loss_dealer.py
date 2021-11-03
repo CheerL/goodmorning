@@ -608,7 +608,7 @@ class LossDealerClient(BaseDealerClient):
                 if target.own and amount and vol >= 1:
                     target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0, 'date': target.date})
                     target_info[symbol]['amount'] += amount
-                    target_info[symbol]['buy_vol'] += amount * target.buy_price
+                    target_info[symbol]['buy_vol'] += amount * target.real_buy_price
 
         tickers = self.market.get_market_tickers()
         for ticker in tickers:

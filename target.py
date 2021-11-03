@@ -102,6 +102,8 @@ class LossTarget(BaseTarget):
         self.ticker_id = 0
         self.recent_price = []
         self.fee_rate = 0
+        self.buy_price = 0
+        self.real_buy_price = 0
 
         self.high_mark_price = 0
         self.high_mark_back_price = 0
@@ -144,7 +146,8 @@ class LossTarget(BaseTarget):
         self.own_amount += amount * (1 - self.fee_rate)
         self.buy_vol += vol
         if self.own_amount:
-            self.buy_price = (own_vol+vol) / self.own_amount * (1 - self.fee_rate)
+            self.real_buy_price = (own_vol+vol) / self.own_amount 
+            self.buy_price = self.real_buy_price * (1 - self.fee_rate)
 
     def set_sell(self, amount, vol=0):
         if amount <= 0:
