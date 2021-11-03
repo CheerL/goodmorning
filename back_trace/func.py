@@ -371,7 +371,6 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         def worker(symbol):
             try:
                 klines = market.get_candlestick(symbol, '1day', start_ts=start_ts, end_ts=end_ts+86400)
-                print(symbol, len(klines))
             except Exception as e:
                 print(e)
                 return
