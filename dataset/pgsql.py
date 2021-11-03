@@ -13,6 +13,7 @@ PGNAME = user_config.get('setting', 'PGDatabase')
 Base = declarative_base()
 TRADE_CLASS = {}
 MS_IN_DAY = 60*60*24*1000
+Engine_dict = {}
 
 def create_Trade(day):
     class Trade(Base):
@@ -262,8 +263,20 @@ class Order(Base):
             all_profit = sum([each.profit for each in data])
             return day_profit, month_profit, all_profit
 
+def get_engine(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD):
+    conn_url = f'postgresql://{user}:{password}@{host}:{port}/{db}'
+    if conn_url not in Engine_dict:
+        engine = create_engine(
+            conn_url,
+            pool_recycle=600,
+            pool_size=10,
+            pool_timeout=30
+        )
+        Engine_dict[conn_url] = engine
+    return Engine_dict[conn_url]
+
 def get_session(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD) -> Session:
-    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
+    engine = get_engine(host, port, db, user, password)
     Session = sessionmaker(bind=engine)
     Base.metadata.bind=engine
     Base.metadata.create_all()
