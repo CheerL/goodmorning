@@ -175,12 +175,7 @@ class Message(Base):
 def get_engine(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASSWORD):
     conn_url = f'postgresql://{user}:{password}@{host}:{port}/{db}'
     if conn_url not in Engine_dict:
-        engine = create_engine(
-            conn_url,
-            pool_recycle=600,
-            pool_size=10,
-            pool_timeout=30
-        )
+        engine = create_engine(conn_url,pool_recycle=300,pool_size=10,pool_timeout=30)
         Engine_dict[conn_url] = engine
     return Engine_dict[conn_url]
 
