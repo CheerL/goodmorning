@@ -268,7 +268,7 @@ def get_engine(host=PGHOST, port=PGPORT, db=PGNAME, user=PGUSER, password=PGPASS
     if conn_url not in Engine_dict:
         engine = create_engine(
             conn_url,
-            pool_recycle=600,
+            pool_recycle=300,
             pool_size=10,
             pool_timeout=30
         )
