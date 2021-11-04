@@ -117,6 +117,9 @@ def back_trace(
             for cont_loss in np.concatenate([low_targets, up_targets])[:buy_num]:
                 if not cont_loss['id2']:
                     continue
+                
+                if cont_loss['symbol'] == b'COCOSUSDT' and 1610668800 <= cont_loss['id'] <= 1611100800:
+                    continue
 
                 buy_price, buy_time = get_buy_price_and_time(
                     cont_loss, param, date, interval
@@ -142,9 +145,19 @@ def back_trace(
 
         holding_money = 0
         for record in holding_list:
-            base_klines = base_klines_dict.dict(record.symbol)
-            close = base_klines[base_klines['id'] == ts]['close'][0]
-            holding_money += record.amount * close
+            try:
+                base_klines = base_klines_dict.dict(record.symbol)
+                close = base_klines[base_klines['id'] == ts]['close'][0]
+                holding_money += record.amount * close
+            except Exception as e:
+                if 1611100800 <= ts < 1611360000 and record.symbol == 'COCOSUSDT':
+                    close = base_klines[base_klines['id'] == 1611014400]['close'][0]
+                    holding_money += record.amount * close
+                else:
+                    print(record.symbol, datetime.ts2time(ts))
+                    raise e
+
+
 
         total_money = money + holding_money
         day_profit = total_money - last_money
@@ -348,8 +361,6 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
             sell_price, sell_time = sell_detailed_back_trace(
                 symbol, start_time, buy_time, high_price, high_back_price, low_price, low_back_price, 0, interval=interval
             )
-        if symbol == 'DOGEUSDT' and '2020-11' in date:
-            print(date, close, final_price, clear_price, sell_price, sell_time)
 
         Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time
