@@ -161,6 +161,16 @@ class LossDealerClient(BaseDealerClient):
             )
 
         elif target.low_check():
+            @retry(5, delay=0.1)
+            def cancel_buy_callback(summary=None):
+                if not summary:
+                    return
+                target.set_buy(summary.vol, summary.amount)
+
+            self.cancel_and_sell_limit_target(
+                target, 0, direction='buy', force=True,
+                cancel_callback=cancel_buy_callback
+            )
             self.cancel_and_sell_limit_target(
                 target, target.low_mark_back_price,
                 selling_level=2, force=True
@@ -307,6 +317,9 @@ class LossDealerClient(BaseDealerClient):
 
             target.set_buy(summary.vol, summary.amount)
         
+        if target.high_mark or target.low_mark:
+            return
+
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
 
@@ -739,4 +752,4 @@ class LossDealerClient(BaseDealerClient):
             now_target = self.targets[date].setdefault(symbol, target)
             now_target.set_mark_price(target.init_price)
             self.cancel_and_buy_limit_target(now_target, target.init_price)
-            Timer(1800, cancel, args=[now_target]).start()
+            Timer(85000, cancel, args=[now_target]).start()
