@@ -56,18 +56,25 @@ class BaseTarget:
         self.sell_market_min_order_amt = info.sell_market_min_order_amt
         self.limit_order_min_order_amt = info.limit_order_min_order_amt
 
-    def check_amount(self, amount):
-        checked_amount = round(amount, self.amount_precision)
-        if checked_amount <= 0:
-            return 0
-        if checked_amount > amount:
-            checked_amount = round(amount - 0.1 ** self.amount_precision, self.amount_precision)
-            if checked_amount<= 0:
-                return 0
+    def check_amount(self, amount, to_str=False):
+        if amount <= 0:
+            checked_amount = 0
+        else:
+            checked_amount = round(amount, self.amount_precision)
+            if checked_amount < 0:
+                checked_amount = 0
+            elif checked_amount > amount:
+                return self.check_amount(amount - 0.1 ** self.amount_precision, to_str)
+
+        if to_str:
+            return f'%.{self.amount_precision}f' % checked_amount
         return checked_amount
 
-    def check_price(self, price):
-        return round(price, self.price_precision)
+    def check_price(self, price, to_str=False):
+        checked_price = round(price, self.price_precision)
+        if to_str:
+            return f'%.{self.price_precision}f' % checked_price
+        return checked_price
 
 class MorningTarget(BaseTarget):
     def __init__(self, symbol, price, time, high_stop_profit=True):

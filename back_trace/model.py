@@ -44,7 +44,8 @@ class Param:
         'stop_loss_rate',
         'min_cont_rate',
         'break_cont_rate',
-        'up_cont_rate'
+        'up_cont_rate',
+        'min_close_rate'
     ]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -67,6 +68,7 @@ class Param:
         self.min_cont_rate=-0.15
         self.break_cont_rate=-0.3
         self.up_cont_rate=-0.11
+        self.min_close_rate=0
 
         for i, value in enumerate(args):
             self.__setattr__(self.orders[i], value)

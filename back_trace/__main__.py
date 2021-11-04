@@ -85,30 +85,33 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--search', action='store_true', default=False)
     parser.add_argument('-e', '--end', default='10', type=str)
 
-    parser.add_argument('--search_num', default=10, type=int)
+    parser.add_argument('--param_csv', default='param_csv', type=str)
+    parser.add_argument('--search_num', default=50, type=int)
+    parser.add_argument('--search_name', default='best_param')
     parser.add_argument('--new_search', default=False, action='store_true')
+    parser.add_argument('--search_show', default=False, action='store_true')
     parser.add_argument('--node_trials', default=1000, type=int)
 
     parser.add_argument('--min_price_list', default='0')
     parser.add_argument('--max_price_list', default='1')
-    parser.add_argument('--max_hold_days_list', default='2')
-    parser.add_argument('--min_buy_vol_list', default='5000000')
+    parser.add_argument('--max_hold_days_list', default='2:14')
+    parser.add_argument('--min_buy_vol_list', default='100000:10000000:100000')
     parser.add_argument('--max_buy_vol_list', default='1e11')
     parser.add_argument('--min_num_list', default='3')
-    parser.add_argument('--max_num_list', default='10')
+    parser.add_argument('--max_num_list', default='5:50')
     parser.add_argument('--max_buy_ts_list', default='86300')
-    parser.add_argument('--buy_rate_list', default='-0.05:0')
-    parser.add_argument('--high_rate_list', default='0.05:0.5')
-    parser.add_argument('--high_back_rate_list', default='0.3:0.8')
-    parser.add_argument('--low_rate_list', default='0.02:0.08')
-    parser.add_argument('--low_back_rate_list', default='0:0.05')
-    parser.add_argument('--clear_rate_list', default='-0.01')
+    parser.add_argument('--buy_rate_list', default='-0.1:0')
+    parser.add_argument('--high_rate_list', default='0.05:0.6')
+    parser.add_argument('--high_back_rate_list', default='0.2:0.95')
+    parser.add_argument('--low_rate_list', default='0.01:0.2')
+    parser.add_argument('--low_back_rate_list', default='0:0.2')
+    parser.add_argument('--clear_rate_list', default='-0.1:0.1')
     parser.add_argument('--final_rate_list', default='0:0.1')
     parser.add_argument('--stop_loss_rate_list', default='-1')
-    parser.add_argument('--min_cont_rate_list', default='-0.25:-0.1')
-    parser.add_argument('--break_cont_rate_list', default='-0.35:-0.15')
-    parser.add_argument('--up_cont_rate_list', default='-0.25:-0.05')
-
+    parser.add_argument('--min_cont_rate_list', default='-0.3:-0.01')
+    parser.add_argument('--break_cont_rate_list', default='-0.4:-0.01')
+    parser.add_argument('--up_cont_rate_list', default='-0.3:-0.01')
+    parser.add_argument('--min_close_rate_list', default='-0.05:0.05')
 
     parser.add_argument('--min_price', default=0, type=float)
     parser.add_argument('--max_price', default=1, type=float)
@@ -118,17 +121,19 @@ if __name__ == '__main__':
     parser.add_argument('--min_num', default=3, type=float)
     parser.add_argument('--max_num', default=10, type=float)
     parser.add_argument('--max_buy_ts', default=86300, type=float)
-    parser.add_argument('--buy_rate', default=-0.01, type=float)
-    parser.add_argument('--high_rate', default=0.25, type=float)
-    parser.add_argument('--high_back_rate', default=0.6, type=float)
-    parser.add_argument('--low_rate', default=0.06, type=float)
-    parser.add_argument('--low_back_rate', default=0.02, type=float)
+    parser.add_argument('--buy_rate', default=-0.0118, type=float)
+    parser.add_argument('--high_rate', default=0.251, type=float)
+    parser.add_argument('--high_back_rate', default=0.731, type=float)
+    parser.add_argument('--low_rate', default=0.067, type=float)
+    parser.add_argument('--low_back_rate', default=0.016, type=float)
     parser.add_argument('--clear_rate', default=-0.01, type=float)
-    parser.add_argument('--final_rate', default=0.08, type=float)
+    parser.add_argument('--final_rate', default=0.1, type=float)
     parser.add_argument('--stop_loss_rate', default=-1, type=float)
     parser.add_argument('--min_cont_rate', default=-0.15, type=float)
-    parser.add_argument('--break_cont_rate', default=-0.3, type=float)
-    parser.add_argument('--up_cont_rate', default=-0.1, type=float)
+    parser.add_argument('--break_cont_rate', default=-0.313, type=float)
+    parser.add_argument('--up_cont_rate', default=-0.101, type=float)
+    parser.add_argument('--min_close_rate', default=0, type=float)
+
 
     args = parser.parse_args()
 
@@ -138,8 +143,8 @@ if __name__ == '__main__':
 
     [u] = BinanceUser.init_users()
     Global.user = u
-    best_params_path = f'{ROOT}/back_trace/csv/params_new2.csv'
-    cont_loss_list, klines_dict = get_data(days=args.days, end=min(end_list), min_before=args.min_before, filter_=False)
+    best_params_path = f'{ROOT}/back_trace/csv/{args.param_csv}.csv'
+    cont_loss_list, klines_dict = get_data(days=args.days+max(end_list)+args.min_before, end=min(end_list), min_before=args.min_before, filter_=False)
 
     if args.search:
         def objective(trial: optuna.Trial):
@@ -147,7 +152,7 @@ if __name__ == '__main__':
                 min_price = trial.suggest_float('min_price', *str2range(args.min_price_list)),
                 max_price = trial.suggest_float('max_price', *str2range(args.max_price_list)),
                 max_hold_days = trial.suggest_int('max_hold_days', *str2range(args.max_hold_days_list, int)),
-                min_buy_vol = trial.suggest_float('min_buy_vol', *str2range(args.min_buy_vol_list)),
+                min_buy_vol = trial.suggest_int('min_buy_vol', *str2range(args.min_buy_vol_list, int)),
                 max_buy_vol = trial.suggest_float('max_buy_vol', *str2range(args.max_buy_vol_list)),
                 min_num = trial.suggest_int('min_num', *str2range(args.min_num_list, int)),
                 max_num = trial.suggest_int('max_num', *str2range(args.max_num_list, int)),
@@ -162,76 +167,46 @@ if __name__ == '__main__':
                 stop_loss_rate = trial.suggest_float('stop_loss_rate', *str2range(args.stop_loss_rate_list)),
                 min_cont_rate = trial.suggest_float('min_cont_rate', *str2range(args.min_cont_rate_list)),
                 break_cont_rate = trial.suggest_float('break_cont_rate', *str2range(args.break_cont_rate_list)),
-                up_cont_rate = trial.suggest_float('up_cont_rate', *str2range(args.up_cont_rate_list))
+                up_cont_rate = trial.suggest_float('up_cont_rate', *str2range(args.up_cont_rate_list)),
+                min_close_rate = trial.suggest_float('min_close_rate', *str2range(args.min_close_rate_list))
             )
             mean_total_money, mean_profit_rate, mean_back_rate = sub_back_trace(param)
             return mean_total_money
-
-        if args.new_search:
-            with open(best_params_path, 'w') as f:
-                params_title = ','.join(Param.orders)
-                f.write(f'{params_title},final_money,profit_rate,max_back_rate\n')
-        
-        opt_logger = optuna.logging._get_library_root_logger()
-        for handler in logger.handlers:
-            opt_logger.handlers.append(handler)
 
         study = optuna.create_study(
             storage='sqlite:///back_trace/param.db',
             sampler=optuna.samplers.TPESampler(),
             direction='maximize',
             pruner=optuna.pruners.HyperbandPruner(),
-            study_name='best_param',
+            study_name=args.search_name,
             load_if_exists=True
             )
 
-        run_process_pool([(study.optimize, (objective, args.node_trials)) for _ in range(args.search_num)], True, args.search_num)
-        print('Number of finished trials:', len(study.trials))
-        print("------------------------------------------------")
-        print('Best trial:', study.best_trial.params)
-        print("------------------------------------------------")
-        print(study.trials_dataframe())
-        print("------------------------------------------------")
+        if args.search_show:
+            print('Best trial:', study.best_trial.params)
+            print("------------------------------------------------")
+            print(study.trials_dataframe())
+            fig = optuna.visualization.plot_parallel_coordinate(study)
+            fig.show()
 
-        # params_list = [
-        #     str2range(args.min_price_list),
-        #     str2range(args.max_price_list),
-        #     str2range(args.max_hold_days_list, int),
-        #     str2range(args.min_buy_vol_list),
-        #     str2range(args.max_buy_vol_list),
-        #     str2range(args.min_num_list),
-        #     str2range(args.max_num_list),
-        #     str2range(args.max_buy_ts_list),
-        #     str2range(args.buy_rate_list),
-        #     str2range(args.high_rate_list),
-        #     str2range(args.high_back_rate_list),
-        #     str2range(args.low_rate_list),
-        #     str2range(args.low_back_rate_list),
-        #     str2range(args.clear_rate_list),
-        #     str2range(args.final_rate_list),
-        #     str2range(args.stop_loss_rate_list),
-        #     str2range(args.min_cont_rate_list),
-        #     str2range(args.break_cont_rate_list),
-        #     str2range(args.up_cont_rate_list)
-        # ]
-        # def report():
-        #     while Global.num.value < tasks_num:
-        #         Global.show(tasks_num)
-        #         time.sleep(10)
+        else:
+            if args.new_search:
+                with open(best_params_path, 'w') as f:
+                    params_title = ','.join(Param.orders)
+                    f.write(f'{params_title},final_money,profit_rate,max_back_rate\n')
+            
+            opt_logger = optuna.logging._get_library_root_logger()
+            for handler in logger.handlers:
+                opt_logger.handlers.append(handler)
 
-        # with open(best_params_path, 'w') as f:
-        #     params_title = ','.join(Param.orders)
-        #     f.write(f'{params_title},final_money,profit_rate,max_back_rate\n')
+            
 
-        # tasks = ((sub_back_trace, [Param(*each)],) for each in product(*params_list))
-        # tasks_num = np.prod([len(each) for each in params_list])
-        # print(f'Start with {tasks_num} task')
-
-        # run_thread([(report, ())], False)
-        # # print(tasks_num, np.prod(tasks_num))
-        # run_process_pool(tasks, is_lock=True, limit_num=args.search_num)
-
-        
+            run_process_pool([(study.optimize, (objective, args.node_trials)) for _ in range(args.search_num)], True, args.search_num)
+            print('Number of finished trials:', len(study.trials))
+            print("------------------------------------------------")
+            print('Best trial:', study.best_trial.params)
+            print("------------------------------------------------")
+            print(study.trials_dataframe())
 
     else:
         param = Param(**args.__dict__)

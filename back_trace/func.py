@@ -1,6 +1,7 @@
 import os
 import time
 import math
+from typing_extensions import final
 import numpy as np
 
 from retry import retry
@@ -21,29 +22,6 @@ def get_boll(i, close, n=20, m=2):
     std = price.std()
     return sma, sma+m*std, sma-m*std
 
-def find_cont_loss(klines_dict, days, end, min_before=180, with_klines=False):
-    cont_loss_list = ContLossList()
-    for symbol in np.unique(klines_dict.data['symbol']):
-        data = klines_dict.data[klines_dict.data['symbol']==symbol]
-        rate_list = data['close']/data['open'] - 1
-        temp_list = []
-
-        cont_loss_days = cont_loss_rate = 0
-        for i, rate in enumerate(rate_list):
-            if rate < 0:
-                cont_loss_days += 1
-                cont_loss_rate += rate
-                is_max_loss = rate_list[i-cont_loss_days+1:i+1].min() == rate
-            else:
-                cont_loss_days = cont_loss_rate = is_max_loss = 0
-
-            temp_list.append((*data[i], *[*data[3]][1:6], rate, cont_loss_days, cont_loss_rate, is_max_loss))
-        
-        cont_loss_list.data = np.concatenate([
-            cont_loss_rate.data,
-            np.array(temp_list, dtype=ContLossList.dtype)
-        ])
-
 def back_trace(
         cont_loss_list, base_klines_dict, param: Param,
         min_vol = 10, fee_rate = 0.002, days = 365, end = 2,
@@ -55,9 +33,34 @@ def back_trace(
     money_record_path = f'{ROOT}/back_trace/csv/money_{start_date}_{end_date}.csv'
 
     data = cont_loss_list.data
+
+    symbol=''
+    for i, each in enumerate(data):
+        if symbol != each['symbol']:
+            symbol = each['symbol']
+            cont_loss = cont_loss_days = 0
+            is_max_loss=False
+
+        if each['rate'] < 0 and cont_loss_days ==0:
+            cont_loss_days = 1
+            cont_loss=each['rate']
+            is_max_loss=True
+        elif each['rate'] < param.min_close_rate and cont_loss_days > 0:
+            start_i = i-cont_loss_days
+            cont_loss_days+=1
+            cont_loss=each['close']/data[start_i]['open']-1
+            is_max_loss=data[start_i:i+1]['rate'].min()>=each['rate']
+        else:
+            cont_loss=cont_loss_days=0
+            is_max_loss=False
+        each['cont_loss_days']=cont_loss_days
+        each['cont_loss_rate']=cont_loss
+        each['is_max_loss']=is_max_loss
+
     data = data[
         (param.min_buy_vol <= data['vol']) & (data['vol'] <= param.max_buy_vol) &
         (param.min_price <= data['close']) & (data['close'] <= param.max_price) &
+        (data['rate'] < param.min_close_rate) &
         # (data['low2']/data['close']-1 <= -0.002) &
         (
             (
@@ -311,6 +314,7 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
         clear_price = close * (1 + param.clear_rate)
         final_price = close * (1 + param.final_rate)
         stop_loss_price = close * (1 + param.stop_loss_rate)
+        
         # sell_price = cont_loss['close2']
         # sell_time = cont_loss['id2']+86340
         if cont_loss['high2'] < low_price and cont_loss['low2'] > 0:
@@ -344,6 +348,8 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
             sell_price, sell_time = sell_detailed_back_trace(
                 symbol, start_time, buy_time, high_price, high_back_price, low_price, low_back_price, 0, interval=interval
             )
+        if symbol == 'DOGEUSDT' and '2020-11' in date:
+            print(date, close, final_price, clear_price, sell_price, sell_time)
 
         Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time
@@ -380,6 +386,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         market = Global.user.market
         symbols = market.all_symbol_info.keys()
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)
+        klines_dict.data = np.unique(klines_dict.data)
         klines_dict.data.sort(order=['symbol', 'id'])
         klines_dict.save(klines_dict_path)
     
@@ -397,10 +404,10 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
 
     if max_ts < end_ts or min_ts > start_ts:
         cont_loss_list = ContLossList()
+        temp_list = []
         for symbol in klines_dict.dict():
             data = klines_dict.dict(symbol)
             rate_list = data['close']/data['open'] - 1
-            temp_list = []
 
             cont_loss_days = cont_loss_rate = 0
             for i, rate in enumerate(rate_list):
@@ -424,10 +431,10 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
                     *get_boll(i, data['close']), i
                 ))
             
-            cont_loss_list.data = np.concatenate([
-                cont_loss_list.data,
-                np.array(temp_list, dtype=ContLossList.dtype)
-            ])
+        cont_loss_list.data = np.unique(np.concatenate([
+            cont_loss_list.data,
+            np.array(temp_list, dtype=ContLossList.dtype)
+        ]))
 
         cont_loss_list.data.sort(order=['symbol', 'id'])
         cont_loss_list.save(cont_loss_list_path)
@@ -438,8 +445,8 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         cont_loss_list.data = data[
             (data['index']>min_before) &
             (data['id']>=start_ts) &
-            (data['id']<end_ts) &
-            (data['rate']<0)
+            (data['id']<end_ts)
+            # (data['rate']<0)
         ]
 
     return cont_loss_list, klines_dict

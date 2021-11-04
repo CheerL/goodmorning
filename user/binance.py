@@ -259,8 +259,9 @@ class BinanceUser(BaseUser):
     def buy_limit(self, target: Target, vol, price=None):
         if not price:
             price = target.get_target_buy_price()
-        else:
-            price = target.check_price(price)
+
+        str_price = target.check_price(price, True)
+        price = float(str_price)
         symbol = target.symbol
         amount = target.check_amount(max(
             vol / price,
@@ -273,7 +274,7 @@ class BinanceUser(BaseUser):
             type='LIMIT',
             timeInForce='GTC',
             quantity=amount,
-            price=price,
+            price=str_price,
             timestamp=now,
             newOrderRespType='ACK'
         )
@@ -338,7 +339,8 @@ class BinanceUser(BaseUser):
             raise Exception(e)
 
     def sell_limit(self, target: Target, amount, price, ioc=False):
-        price = target.check_price(price)
+        str_price = target.check_price(price, True)
+        price = float(str_price)
         symbol = target.symbol
         amount = target.check_amount(max(
             amount,
@@ -351,7 +353,7 @@ class BinanceUser(BaseUser):
             type='LIMIT',
             timeInForce='GTC',
             quantity=amount,
-            price=price,
+            price=str_price,
             timestamp=now,
             newOrderRespType='ACK'
         )
