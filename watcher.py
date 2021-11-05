@@ -119,10 +119,15 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
     }
     return warpper
 
-def error_callback(symbol):
-    def warpper(error):
-        logger.error(f'[{symbol}] {error}')
-    
+def error_callback(watch_dog: WatchDog):
+    def warpper(name):
+        def inner_warpper(error):
+            logger.error(f'[{name}] {error}')
+            if 'Connection is already closed' in error.error_message:
+                wm = watch_dog.websocket_manage_dict[name]
+                watch_dog.close_and_wait_reconnect(wm)
+
+        return inner_warpper
     return warpper
 
 def update_symbols(client: WatcherClient, watch_dog: WatchDog):
@@ -131,7 +136,7 @@ def update_symbols(client: WatcherClient, watch_dog: WatchDog):
         logger.info(f'Find new symbols: {", ".join(new_symbols)}')
         for i, symbol in enumerate(new_symbols):
             client.market_client.sub_trade_detail(
-                symbol, trade_detail_callback(symbol, client), error_callback(symbol)
+                symbol, trade_detail_callback(symbol, client), error_callback(watch_dog)(symbol)
             )
             watch_dog.after_connection_created(symbol)
             if not i % 10:

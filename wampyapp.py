@@ -301,7 +301,7 @@ class DealerClient(ControlledClient):
         target.set_info(self.market_client.symbols_info[symbol])
         self.targets[symbol] = target
 
-        self.user.buy_limit_and_sell(target, self)
+        self.user.buy_and_sell(target, self, True)
         logger.info(f'Buy. {symbol}, recieved at {receive_time}, sent at {now}, price {price}')
 
     def after_buy(self, symbol, price):

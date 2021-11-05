@@ -57,8 +57,8 @@ class User:
         self.all_stop_profit_asset = self.start_asset + self.usdt_balance * ALL_STOP_PROFIT_RATE / 100
 
     def start(self, callback, error_callback):
-        self.account_client.sub_account_update(AccountBalanceMode.TOTAL, self.balance_callback, error_callback)
-        self.trade_client.sub_order_update('*', callback, error_callback)
+        self.account_client.sub_account_update(AccountBalanceMode.TOTAL, self.balance_callback, error_callback('account'))
+        self.trade_client.sub_order_update('*', callback, error_callback('trade'))
 
         while 'usdt' not in self.balance:
             time.sleep(0.1)
@@ -163,10 +163,9 @@ class User:
 
     def sell(self, target: Target, amount):
         symbol = target.symbol
-        amount = target.check_amount(max(
-            amount,
-            target.sell_market_min_order_amt
-        ))
+        amount = target.check_amount(amount)
+        assert amount >= target.sell_market_min_order_amt, 'amount too less'
+
         order = dict(
             symbol=symbol,
             account_id=self.account_id,
@@ -203,10 +202,10 @@ class User:
             price = target.check_price(price)
 
         symbol = target.symbol
-        amount = target.check_amount(max(
-            amount,
-            target.limit_order_min_order_amt
-        ))
+        amount = target.check_amount(amount)
+        assert amount >= target.limit_order_min_order_amt, f'amount too less, {amount}/{target.limit_order_min_order_amt}'
+        assert price * amount >= target.min_order_value, f'vol too less, {price * amount}/{target.min_order_value}'
+
         order = dict(
             symbol=symbol,
             account_id=self.account_id,
@@ -273,16 +272,23 @@ class User:
     def get_amount(self, currency):
         return self.balance[currency]
 
+    @retry(tries=5, delay=0.05)
+    def get_target_amount(self, target, summary=None, buy=False):
+        if summary:
+            if buy:
+                amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
+                assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
+            else:
+                amount = min(self.get_amount(target.base_currency), summary.remain_amount)
+                assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
+        else:
+            amount = self.get_amount(target.base_currency)
+        return amount
+
     def cancel_and_sell_in_buy_price(self, targets: 'list[Target]'):
         def callback_generator(target):
-            @retry(tries=5, delay=0.05)
             def callback(summary=None):
-                if summary:
-                    amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-                    assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
-                else:
-                    amount = self.get_amount(target.base_currency)
-
+                amount = self.get_target_amount(target, summary)
                 self.sell_limit(target, amount, price=target.buy_price)
             return callback
 
@@ -290,41 +296,34 @@ class User:
             self.cancel_and_sell(target, callback_generator(target), market=False)
 
     def cancel_and_sell_ioc(self, target: Target, price: float, count: int):
-        @retry(tries=5, delay=0.05)
         def callback(summary=None):
-            if summary:
-                amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-                assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
-            else:
-                amount = self.get_amount(target.base_currency)
-
+            amount = self.get_target_amount(target, summary)
             sell_price = price * (1 - IOC_RATE / 100)
             sell_rate = 1 / (IOC_BATCH_NUM - count) if count > 0 else 1 / (IOC_BATCH_NUM - 1)
             sell_amount = amount * sell_rate
             logger.info(f'Try to ioc sell {sell_amount} {target.symbol} with price {sell_price}')
-            self.sell_limit(target, sell_amount, sell_price, ioc=True)
+            try:
+                self.sell_limit(target, sell_amount, sell_price, ioc=True)
+            except Exception as e:
+                logger.error(e)
 
         if count < IOC_BATCH_NUM - 1:
             self.cancel_and_sell(target, callback, False)
         else:
             self.cancel_and_sell(target, market=True)
 
-    def cancel_and_sell(self, target: Target, callback=None, market=True):
-        @retry(tries=5, delay=0.05)
-        def _callback(summary=None):
-            if summary:
-                amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-                assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
-            else:
-                amount = self.get_amount(target.base_currency)
 
+
+    def cancel_and_sell(self, target: Target, callback=None, market=True):
+        def _callback(summary=None):
+            amount = self.get_target_amount(target, summary)
             if market:
                 self.sell(target, amount)
             else:
                 self.sell_limit(target, amount)
 
         symbol = target.symbol
-        callback = callback if callback else _callback
+        callback = callback or _callback
         is_canceled = False
         
         if symbol in self.orders['sell']:
@@ -346,14 +345,8 @@ class User:
                 logger.error(e)
 
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
-        @retry(tries=5, delay=0.05)
         def _callback(summary=None):
-            if summary:
-                amount = min(self.get_amount(target.base_currency), summary.remain_amount)
-                assert amount - 0.9 * summary.remain_amount > 0, "Not yet arrived"
-            else:
-                amount = self.get_amount(target.base_currency)
-
+            amount = self.get_target_amount(target, summary)
             self.sell_limit(target, amount, (price + 2 * target.buy_price) / 3)
 
         for target in targets:
@@ -370,7 +363,7 @@ class User:
             self.cancel_and_sell(target, callback, False)
             logger.info(f'Turn {target.symbol} to low profit')
 
-    def buy_and_sell(self, target: Target, client):
+    def buy_and_sell(self, target: Target, client, limit=False):
         @retry(tries=5, delay=0.05)
         def callback(summary):
             client.after_buy(target.symbol, summary.aver_price)
@@ -378,38 +371,16 @@ class User:
                 logger.error(f'Fail to buy {target.symbol}')
                 return
 
-            amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
-            assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
+            amount = self.get_target_amount(target, summary, True)
             self.sell_limit(target, amount)
             Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
 
         def buy_callback():
-            summary = self.buy(target, self.buy_amount)
-            if summary != None:
-                summary.check_after_buy(client)
-                summary.add_filled_callback(callback, [summary])
-                summary.add_cancel_callback(callback, [summary])
+            if limit:
+                summary = self.buy_limit(target, self.buy_amount)
             else:
-                client.after_buy(target.symbol, 0)
+                summary = self.buy(target, self.buy_amount)
 
-        Timer(0, buy_callback).start()
-
-    def buy_limit_and_sell(self, target: Target, client):
-        @retry(tries=5, delay=0.05)
-        def callback(summary):
-            client.after_buy(target.symbol, summary.aver_price)
-            if summary.aver_price <=0:
-                logger.error(f'Fail to buy {target.symbol}')
-                return
-
-            amount = min(self.get_amount(target.base_currency), summary.amount * 0.998)
-            assert amount - 0.9 * summary.amount > 0, "Not yet arrived"
-            self.sell_limit(target, amount)
-            Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
-
-        def buy_callback():
-            buy_price = target.get_buy_price()
-            summary = self.buy_limit(target, float(self.buy_amount), buy_price)
             if summary != None:
                 summary.check_after_buy(client)
                 summary.add_filled_callback(callback, [summary])

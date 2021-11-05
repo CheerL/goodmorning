@@ -78,15 +78,24 @@ def trade_update_callback(client: Client):
 
     return warpper
 
-def error_callback(symbol):
-    def warpper(error):
-        logger.error(f'[{symbol}] {error}')
-    
+def error_callback(watch_dog: WatchDog):
+    def warpper(name):
+        def inner_warpper(error):
+            logger.error(f'[{name}] {error}')
+            if 'Connection is already closed' in error.error_message:
+                wm = watch_dog.websocket_manage_dict[name]
+                watch_dog.close_and_wait_reconnect(wm)
+
+        return inner_warpper
     return warpper
 
 def error_ping(watch_dog: WatchDog):
     for wm in watch_dog.websocket_manage_list:
         if wm: wm.send('{"action": "test"}')
+
+def check_orders(client: Client):
+    # TODO
+    pass
 
 @retry(tries=5, delay=1, logger=logger)
 def init_users(num=-1) -> 'list[User]':
@@ -123,8 +132,8 @@ def main(user: User, watch_dog: WatchDog):
         logger.info('Start run sub process')
         client = init_dealer(user)
         scheduler = Scheduler()
-        client.user.start(trade_update_callback(client), error_callback('order'))
-        watch_dog.after_connection_created(['account', 'order'])
+        client.user.start(trade_update_callback(client), error_callback(watch_dog))
+        watch_dog.after_connection_created(['account', 'trade'], [None, (check_orders, (client,))])
         watch_dog.scheduler.add_job(error_ping, "interval", max_instances=1, seconds=0.5, args=[watch_dog])
         client.wait_state(State.RUNNING)
         client.user.set_start_asset()
@@ -162,6 +171,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logger.info('Dealer')
 
-    watch_dog = replace_watch_dog(heart_beat_limit_ms=3000, reconnect_after_ms=500)
+    watch_dog = replace_watch_dog(heart_beat_limit_ms=2000, reconnect_after_ms=100)
     users = init_users(num=args.num)
     run_process([(main, (user, watch_dog), user.username) for user in users], is_lock=True)
