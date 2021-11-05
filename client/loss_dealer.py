@@ -230,10 +230,10 @@ class LossDealerClient(BaseDealerClient):
             return True
         return False
 
-    def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS):
+    def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS, force=False):
         infos = self.market.get_all_symbols_info()
         ori_symbols = symbols
-        if len(symbols) < MIN_NUM:
+        if len(symbols) < MIN_NUM and not force:
             symbols = infos.keys()
         targets = {}
         now = time.time()

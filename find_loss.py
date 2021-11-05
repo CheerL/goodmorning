@@ -22,9 +22,20 @@ def main(user, args):
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
     client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
 
+    if args.manual_buy:
+        targets = client.targets.setdefault(args.manual_date, {})
+        if args.manual_symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
+            targets[args.manual_symbol] = client.find_targets([args.manual_symbol], end, force=True)
+        target = targets[args.manual_symbol]
+        client.buy_target(target, args.manual_price, args.manual_amount)
+
+    if args.manual_sell:
+        target = client.targets[args.manual_date][args.manual_symbol]
+        client.sell_target(target, args.manual_price, args.manual_amount, 10)
+    
     if args.report:
         client.report(True)
-    # print(client.find_targets(end=1))
     client.wait_state(10)
 
     kill_all_threads()
@@ -35,6 +46,13 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--type', default='', type=str)
     parser.add_argument('-n', '--num', default=0, type=int)
     parser.add_argument('-r', '--report', action='store_true', default=False)
+    parser.add_argument('--manual_sell', action='store_true', default=False)
+    parser.add_argument('--manual_buy', action='store_true', default=False)
+    parser.add_argument('--manual_date', default='')
+    parser.add_argument('--manual_symbol', default='')
+    parser.add_argument('--manual_price', default=0, type=float)
+    parser.add_argument('--manual_amount', default=0, type=float)
+
     args = parser.parse_args()
 
     User_dict = {User.user_type: User for User in [BinanceUser, HuobiUser]}
