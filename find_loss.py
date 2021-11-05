@@ -34,8 +34,7 @@ def main(user, args):
         target = client.targets[args.manual_date][args.manual_symbol]
         client.sell_target(target, args.manual_price, args.manual_amount, 10)
     
-    if args.report:
-        client.report(True)
+    client.report(True, args.report)
     client.wait_state(10)
 
     kill_all_threads()

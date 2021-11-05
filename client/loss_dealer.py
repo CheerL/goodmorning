@@ -555,7 +555,7 @@ class LossDealerClient(BaseDealerClient):
 
         return summary
 
-    def report(self, force):
+    def report(self, force, send=True):
         now = time.time()
         start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
         orders: list[OrderSQL] = OrderSQL.get_orders([
@@ -658,7 +658,8 @@ class LossDealerClient(BaseDealerClient):
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
 
-        wx_loss_report(self.user.user_type, self.user.wxuid, self.user.username, report_info, usdt, day_profit, month_profit, all_profit)
+        if send:
+            wx_loss_report(self.user.user_type, self.user.wxuid, self.user.username, report_info, usdt, day_profit, month_profit, all_profit)
 
         logger.info('Summary')
         for each in report_info['new_buy']:
