@@ -124,17 +124,25 @@ class LossDealerClient(BaseDealerClient):
         for symbol, target in self.targets[self.date].items():
             [ticker] = self.market.get_candlestick(symbol, '1day', 1)
             if ticker.high >= target.high_mark_price:
-                logger.info(f'{symbol} of {self.date} already reach high mark')
+                logger.info(f'{symbol} of {self.date} already reach high mark {target.high_mark_price}, now price {target.now_price}')
                 target.high_mark = target.low_mark = True
-                if target.selling > 0:
+                if not target.own:
+                    logger.info(f'{symbol} of {self.date} has been sold')
+                elif target.selling > 0:
                     logger.info(f'{symbol} of {self.date} is high back selling')
                     target.high_selling = True
+                else:
+                    logger.info(f'{symbol} of {self.date} is holding')
             elif ticker.high >= target.low_mark_price:
-                logger.info(f'{symbol} of {self.date} already reach low mark')
+                logger.info(f'{symbol} of {self.date} already reach low mark {target.low_mark_price}, now price {target.now_price}')
                 target.low_mark = True
-                if target.selling > 0:
+                if not target.own:
+                    logger.info(f'{symbol} of {self.date} has been sold')
+                elif target.selling > 0:
                     logger.info(f'{symbol} of {self.date} is low back selling')
                     target.low_selling = True
+                else:
+                    logger.info(f'{symbol} of {self.date} is holding')
 
         for date, targets in self.targets.items():
             if date >= self.date:
