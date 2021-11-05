@@ -86,6 +86,7 @@ class LossDealerClient(BaseDealerClient):
                     loss_target.price = loss_target.now_price = self.market.mark_price[loss_target.symbol]
                     self.targets[order.date][order.symbol] = loss_target
                     if now - kline.id > 86400:
+                        logger.info(f'Update target {loss_target.symbol} in DB')
                         TargetSQL.add_target(
                             symbol=loss_target.symbol,
                             exchange=self.user.user_type,
@@ -123,12 +124,16 @@ class LossDealerClient(BaseDealerClient):
         for symbol, target in self.targets[self.date].items():
             [ticker] = self.market.get_candlestick(symbol, '1day', 1)
             if ticker.high >= target.high_mark_price:
+                logger.info(f'{symbol} of {self.date} already reach high mark')
                 target.high_mark = target.low_mark = True
                 if target.selling > 0:
+                    logger.info(f'{symbol} of {self.date} is high back selling')
                     target.high_selling = True
             elif ticker.high >= target.low_mark_price:
+                logger.info(f'{symbol} of {self.date} already reach low mark')
                 target.low_mark = True
                 if target.selling > 0:
+                    logger.info(f'{symbol} of {self.date} is low back selling')
                     target.low_selling = True
 
         for date, targets in self.targets.items():
@@ -142,7 +147,7 @@ class LossDealerClient(BaseDealerClient):
                 amount = min(self.user.available_balance[target.base_currency], target.own_amount)
                 if amount < target.sell_market_min_order_amt:
                     continue
-
+                logger.info(f'Find old {amount} {target.symbol} of {target.date}, long sell with price {target.long_sell_price}')
                 self.sell_target(
                     target,
                     price=target.long_sell_price,
@@ -154,26 +159,31 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Finish loading data')
 
     def check_target_price(self, target: Target):
-        if target.high_check():
-            self.cancel_and_sell_limit_target(
-                target, target.high_mark_back_price,
-                selling_level=2, force=True
-            )
-
-        elif target.low_check():
+        def low_callback(target):
             @retry(5, delay=0.1)
             def cancel_buy_callback(summary=None):
                 if not summary:
                     return
                 target.set_buy(summary.vol, summary.amount)
 
+            logger.info(f'Cancel buy {target.symbol} since reach low mark')
             self.cancel_and_sell_limit_target(
-                target, 0, direction='buy', force=True,
+                target, price=0, direction='buy', force=True,
                 cancel_callback=cancel_buy_callback
             )
+
+        if target.high_check():
+            logger.info(f'High back sell {target.symbol}')
+            self.cancel_and_sell_limit_target(
+                target, target.high_mark_back_price,
+                selling_level=3, force=True
+            )
+
+        elif target.low_check(low_callback):
+            logger.info(f'Low back sell {target.symbol}')
             self.cancel_and_sell_limit_target(
                 target, target.low_mark_back_price,
-                selling_level=2, force=True
+                selling_level=3.5, force=True
             )
 
     def filter_targets(self, targets, symbols=[]):
@@ -664,13 +674,14 @@ class LossDealerClient(BaseDealerClient):
 
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
-        def sell_today_targets(level=4):
+        def clear_today_targets(level=4):
             for target in self.targets.get(date, {}).values():
                 if not target.own or target.own_amount < target.sell_market_min_order_amt:
                     target.own = False
                     continue
 
-                market_price = target.now_price * (1-1.5*SELL_UP_RATE)
+                logger.info(f'Sell {target.symbol} of {target.date}(yestoday)')
+                market_price = target.now_price * (1-SELL_UP_RATE)
                 sell_price = max(target.clear_price, market_price)
                 self.cancel_and_sell_limit_target(target, sell_price, level)
 
@@ -679,7 +690,8 @@ class LossDealerClient(BaseDealerClient):
                 if not target.own or target.own_amount < target.sell_market_min_order_amt:
                     target.own = False
                     continue
-
+                
+                logger.info(f'Long sell {target.symbol} of {target.date}(yestoday)')
                 self.cancel_and_sell_limit_target(target, target.long_sell_price, level)
 
         def clear_old_targets(level=6):
@@ -690,7 +702,8 @@ class LossDealerClient(BaseDealerClient):
                     if not target.own or target.own_amount < target.sell_market_min_order_amt:
                         target.own = False
 
-                    market_price = ticker.close*(1-SELL_UP_RATE)
+                    logger.info(f'Finally sell {target.symbol} of {target.date}')
+                    market_price = ticker.close * (1-SELL_UP_RATE)
                     self.cancel_and_sell_limit_target(target, market_price, level)
 
         logger.info('Start to sell')
@@ -706,20 +719,23 @@ class LossDealerClient(BaseDealerClient):
                     clear_targets.setdefault(symbol, []).append(target)
 
         clear_symbols = ",".join(clear_targets.keys())
-        logger.info(f'Clear day {clear_date}, targets are {clear_symbols}')
+        logger.info(f'Clear old: {clear_date}. targets are {clear_symbols}')
         Timer(0, clear_old_targets, args=[6]).start()
         Timer(15, clear_old_targets, args=[6.1]).start()
         Timer(30, clear_old_targets, args=[6.2]).start()
 
-        logger.info(f'Sell targets of yesterday {date}')
-        Timer(0, sell_today_targets, args=[4]).start()
-        Timer(15, sell_today_targets, args=[4.1]).start()
-        Timer(30, sell_today_targets, args=[4.2]).start()
-
         Timer(120, long_sell_today_targets, args=[5]).start()
 
+        symbols = ','.join(self.targets.get(date, {}).keys())
+        logger.info(f'Clear yesterday: {date}. targets are {symbols}')
+        Timer(0, clear_today_targets, args=[4]).start()
+        Timer(15, clear_today_targets, args=[4.1]).start()
+        Timer(30, clear_today_targets, args=[4.2]).start()
+
+        
+
     def buy_targets(self, end=0):
-        logger.info('Start to find new targets')
+        logger.info('Start to find today new targets')
         targets, date = self.find_targets(end=end)
         targets = self.filter_targets(targets)
         self.targets[date] = targets

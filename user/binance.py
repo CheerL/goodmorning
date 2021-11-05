@@ -241,14 +241,14 @@ class BinanceUser(BaseUser):
             if order_id in self.orders:
                 order_summary = self.orders[order_id]
             else:
-                order_summary = OrderSummary(order_id, symbol, 'BUY')
+                order_summary = OrderSummary(order_id, symbol, 'buy')
                 self.orders[order_id] = order_summary
 
             order_summary.created_vol = vol
             order_summary.remain = vol
             self.buy_id.append(order_id)
             
-            logger.debug(f'Speed {vol} USDT to buy {target.symbol[:-4]}')
+            logger.debug(f'Buy {vol}U {target.symbol[:-4]} with market price')
             return order_summary
         except Exception as e:
             logger.error(e)
@@ -294,7 +294,7 @@ class BinanceUser(BaseUser):
             order_summary.remain = amount
             self.buy_id.append(order_id)
             
-            logger.debug(f'Buy {vol} {symbol[:-4]}')
+            logger.debug(f'Buy {vol} {symbol[:-4]} with price {str_price}')
             return order_summary
         except Exception as e:
             logger.error(e)

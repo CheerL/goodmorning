@@ -1,4 +1,4 @@
-from utils import config
+from utils import config, logger
 
 MIN_STOP_LOSS_HOLD_TIME = config.getfloat('time', 'MIN_STOP_LOSS_HOLD_TIME')
 STOP_LOSS_RATE = config.getfloat('sell', 'STOP_LOSS_RATE')
@@ -143,6 +143,7 @@ class LossTarget(BaseTarget):
         self.low_mark_back_price = price * (1+low_back_rate)
         self.clear_price = price * (1+clear_rate)
         self.long_sell_price = price * (1+sell_rate)
+        logger.info(f'price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
 
     def set_buy(self, vol, amount):
         if vol <= 0 or amount <= 0:
@@ -181,28 +182,36 @@ class LossTarget(BaseTarget):
         # if self.recent_price:
         #     self.price = sum(self.recent_price) / len(self.recent_price)
 
-    def high_check(self):
+    def high_check(self, callback=None):
         if (
             self.high_mark and self.own and not self.high_selling and
-            self.price <= self.high_mark_back_price*(1+2*SELL_UP_RATE) 
+            self.price <= self.high_mark_back_price*(1+5*SELL_UP_RATE) 
         ):
+            logger.info(f'{self.symbol} reach high back {self.high_mark_back_price}, now price {self.price}')
             self.high_selling = True
             return True
 
         elif not self.high_mark and self.price >= self.high_mark_price:
             self.high_mark = True
+            logger.info(f'{self.symbol} reach high mark {self.high_mark_price}, now price {self.price}, back price {self.high_mark_back_price}')
+            if callback:
+                callback(self)
 
         return False
 
-    def low_check(self):
+    def low_check(self, callback=None):
         if (
             self.low_mark and self.own and not self.low_selling and
             self.price <= self.low_mark_back_price*(1+2*SELL_UP_RATE) 
         ):
+            logger.info(f'{self.symbol} reach low back {self.low_mark_back_price}, now price {self.price}')
             self.low_selling = True
             return True
 
         elif not self.low_mark and self.price >= self.low_mark_price:
             self.low_mark = True
+            logger.info(f'{self.symbol} reach low mark {self.low_mark_price}, now price {self.price}, back price {self.low_mark_back_price}')
+            if callback:
+                callback(self)
 
         return False

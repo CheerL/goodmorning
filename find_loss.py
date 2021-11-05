@@ -28,7 +28,7 @@ def main(user, args):
             end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
             targets[args.manual_symbol] = client.find_targets([args.manual_symbol], end, force=True)
         target = targets[args.manual_symbol]
-        client.buy_target(target, args.manual_price, args.manual_amount)
+        client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
 
     if args.manual_sell:
         target = client.targets[args.manual_date][args.manual_symbol]
