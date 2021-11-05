@@ -2,7 +2,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-FMT = "%(asctime)s {%(processName)s} [%(pathname)s:%(lineno)d] %(name)s-%(levelname)s: %(message)s"
+FMT = "%(asctime)s {%(name)s} [%(module)s:%(lineno)d]-%(levelname)s: %(message)s"
 
 
 def no_addHandler(*args, **kwargs):

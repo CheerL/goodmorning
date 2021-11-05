@@ -23,7 +23,7 @@ LOG_PATH = os.path.join(ROOT, 'log', 'trade.log')
 URL = 'https://api-aws.huobi.pro'
 WS_URL = 'wss://api-aws.huobi.pro'
 
-logger_name = 'goodmorning'
+logger_name = 'loss'
 logger = create_logger(logger_name, LOG_PATH)
 quite_logger(all_logger=True, except_list=[logger_name])
 config = configparser.ConfigParser()

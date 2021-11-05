@@ -10,6 +10,7 @@ PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 EXCHANGE = user_config.get('setting', 'Exchange')
 
 def main(user, args):
+    logger.name = user.username
     user.start()
     client = Client.init_dealer(user)
     client.resume()
