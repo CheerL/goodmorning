@@ -17,12 +17,12 @@ RESTART_MS = 621500
 RESTART_RANGE = 60000
 ConnectionState.RECONNECTING = 6
 
-def replace_watch_dog():
+def replace_watch_dog(is_auto_connect=True, heart_beat_limit_ms=HEART_BEAT_MS, reconnect_after_ms=RECONNECT_MS, restart_ms=RESTART_MS):
     old_watch_dog = SubscribeClient.subscribe_watch_dog
     [job] = old_watch_dog.scheduler.get_jobs()
     job.pause()
 
-    watch_dog = WatchDog()
+    watch_dog = WatchDog(is_auto_connect, heart_beat_limit_ms, reconnect_after_ms, restart_ms)
     SubscribeClient.subscribe_watch_dog = watch_dog
     return watch_dog
 
@@ -47,7 +47,8 @@ def check_reconnect(watch_dog: 'WatchDog'):
             if watch_dog.is_auto_connect:
                 if ts > websocket_manage.last_receive_time + watch_dog.heart_beat_limit_ms:
                     watch_dog.logger.warning(f"[{name}] No response from server")
-                    close_and_wait_reconnect(websocket_manage, watch_dog.wait_reconnect_millisecond())
+                    reconnect_at = watch_dog.wait_reconnect_millisecond()
+                    close_and_wait_reconnect(websocket_manage, reconnect_at)
 
                 elif ts > watch_dog.get_random_restart_at(websocket_manage):
                     close_and_wait_reconnect(websocket_manage, ts+100)
@@ -78,7 +79,7 @@ class WatchDog(WebSocketWatchDog):
         threading.Thread.__init__(self)
         self.is_auto_connect = is_auto_connect
         self.heart_beat_limit_ms = heart_beat_limit_ms
-        self.reconnect_after_ms = reconnect_after_ms if reconnect_after_ms > heart_beat_limit_ms else heart_beat_limit_ms
+        self.reconnect_after_ms = reconnect_after_ms + heart_beat_limit_ms
         self.restart_ms = restart_ms
         self.logger = logger
         self.scheduler = Scheduler()
@@ -95,8 +96,9 @@ class WatchDog(WebSocketWatchDog):
         del self.websocket_manage_dict[name]
         self.mutex.release()
 
-    def after_connection_created(self, name):
-        [wm] = [wm for wm in self.websocket_manage_list if wm not in self.websocket_manage_dict.values()]
-        self.mutex.acquire()
-        self.websocket_manage_dict[name] = wm
-        self.mutex.release()
+    def after_connection_created(self, names):
+        wms = [wm for wm in self.websocket_manage_list if wm not in self.websocket_manage_dict.values()]
+        for wm, name in zip(wms, names):
+            self.mutex.acquire()
+            self.websocket_manage_dict[name] = wm
+            self.mutex.release()

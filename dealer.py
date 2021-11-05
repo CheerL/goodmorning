@@ -11,6 +11,7 @@ from retry import retry
 from user import User
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
 from target import Target
+from websocket_handler import replace_watch_dog, WatchDog
 
 TEST = user_config.getboolean('setting', 'Test')
 FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
@@ -83,6 +84,10 @@ def error_callback(symbol):
     
     return warpper
 
+def error_ping(watch_dog: WatchDog):
+    for wm in watch_dog.websocket_manage_list:
+        if wm: wm.send('{"action": "test"}')
+
 @retry(tries=5, delay=1, logger=logger)
 def init_users(num=-1) -> 'list[User]':
     ACCESSKEY = user_config.get('setting', 'AccessKey')
@@ -113,12 +118,14 @@ def init_dealer(user) -> Client:
     client.start()
     return client
 
-def main(user: User):
+def main(user: User, watch_dog: WatchDog):
     try:
         logger.info('Start run sub process')
         client = init_dealer(user)
         scheduler = Scheduler()
         client.user.start(trade_update_callback(client), error_callback('order'))
+        watch_dog.after_connection_created(['account', 'order'])
+        watch_dog.scheduler.add_job(error_ping, "interval", max_instances=1, seconds=0.5, args=[watch_dog])
         client.wait_state(State.RUNNING)
         client.user.set_start_asset()
         if TEST:
@@ -134,7 +141,6 @@ def main(user: User):
             scheduler.add_job(client.sell_in_buy_price, args=[], trigger='cron', hour=0, minute=0, second=FINAL_STOP_PROFIT_TIME)
             scheduler.add_job(client.state_handler, args=[1], trigger='cron', hour=0, minute=0, second=CLEAR_TIME + 12)
         scheduler.start()
-        #run_thread([(client.check_all_stop_profit, ())], False)
         client.wait_state(State.STARTED)
     except Exception as e:
         logger.error(e)
@@ -152,9 +158,10 @@ def main(user: User):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', '--num', default=-1, type=int)
+    parser.add_argument('-n', '--num', default=0, type=int)
     args = parser.parse_args()
-
     logger.info('Dealer')
+
+    watch_dog = replace_watch_dog(heart_beat_limit_ms=3000, reconnect_after_ms=500)
     users = init_users(num=args.num)
-    run_process([(main, (user,), user.username) for user in users], is_lock=True)
+    run_process([(main, (user, watch_dog), user.username) for user in users], is_lock=True)

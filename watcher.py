@@ -190,7 +190,7 @@ def main():
             client.market_client.sub_trade_detail(
                 symbol, trade_detail_callback(symbol, client, redis=is_redis), error_callback
             )
-            watch_dog.after_connection_created(symbol)
+            watch_dog.after_connection_created([symbol])
             if not i % 10:
                 time.sleep(0.5)
 
