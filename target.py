@@ -143,7 +143,7 @@ class LossTarget(BaseTarget):
         self.low_mark_back_price = price * (1+low_back_rate)
         self.clear_price = price * (1+clear_rate)
         self.long_sell_price = price * (1+sell_rate)
-        logger.info(f'price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
+        logger.info(f'{self.symbol} price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
 
     def set_buy(self, vol, amount):
         if vol <= 0 or amount <= 0:
