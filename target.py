@@ -195,7 +195,10 @@ class LossTarget(BaseTarget):
             self.high_mark = True
             logger.info(f'{self.symbol} reach high mark {self.high_mark_price}, now price {self.price}, back price {self.high_mark_back_price}')
             if callback:
-                callback(self)
+                try:
+                    callback(self)
+                except Exception as e:
+                    logger.error(e)
 
         return False
 
@@ -204,14 +207,17 @@ class LossTarget(BaseTarget):
             self.low_mark and self.own and not self.low_selling and
             self.price <= self.low_mark_back_price*(1+2*SELL_UP_RATE) 
         ):
-            logger.info(f'{self.symbol} reach low back {self.low_mark_back_price}, now price {self.price}')
             self.low_selling = True
+            logger.info(f'{self.symbol} reach low back {self.low_mark_back_price}, now price {self.price}')
             return True
 
         elif not self.low_mark and self.price >= self.low_mark_price:
             self.low_mark = True
             logger.info(f'{self.symbol} reach low mark {self.low_mark_price}, now price {self.price}, back price {self.low_mark_back_price}')
             if callback:
-                callback(self)
+                try:
+                    callback(self)
+                except Exception as e:
+                    logger.error(e)
 
         return False
