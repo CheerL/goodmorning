@@ -1,7 +1,6 @@
 import time
 import datetime
 import argparse
-from order import OrderSummaryStatus
 
 from wampyapp import DealerClient as Client, State
 from utils.parallel import run_process
@@ -11,8 +10,8 @@ from market import MarketClient
 from retry import retry
 from user import User
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
-from target import Target
 from websocket_handler import replace_watch_dog, WatchDog
+from order import OrderSummaryStatus
 
 TEST = user_config.getboolean('setting', 'Test')
 FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
