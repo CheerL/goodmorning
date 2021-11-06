@@ -1,6 +1,8 @@
 from huobi.model.trade.order_update import OrderUpdate
 from threading import Timer
-from utils import logger
+from utils import logger, config
+
+CANCEL_BUY_TIME = config.getfloat('time', 'CANCEL_BUY_TIME')
 
 class OrderSummaryStatus:
     FAILED = -1
@@ -17,6 +19,14 @@ class OrderSummaryStatus:
         2: 'PARTIAL_FILLED',
         3: 'FILLED',
         4: 'CANCELED'
+    }
+
+    map_dict = {
+        'submitted': 1,
+        'partial-filled': 2,
+        'partial-canceled': 4,
+        'filled': 3,
+        'canceled': 4
     }
 
     @staticmethod
@@ -37,6 +47,7 @@ class OrderSummary:
         self.vol = 0
         self.remain_amount = 0
         self.fee = 0
+        self.ts = 0
         self.orders: list[OrderUpdate] = []
         self.status = 0
         self.error_msg = ''
@@ -54,6 +65,7 @@ class OrderSummary:
         if 'market' in data.type:
             self.limit = False
         self.status = OrderSummaryStatus.CREATED
+        self.ts = data.tradeTime / 1000
         self.report()
 
     def update(self, data: OrderUpdate):
@@ -70,11 +82,13 @@ class OrderSummary:
         elif 'filled' == data.orderStatus:
             self.status = OrderSummaryStatus.FILLED
             self.remain_amount = 0
+        self.ts = data.tradeTime / 1000
         self.report()
 
     def cancel_update(self, data: OrderUpdate):
         self.status = OrderSummaryStatus.CANCELED
         self.remain_amount = float(data.remainAmt)
+        self.ts = data.tradeTime / 1000
         self.report()
 
     def finish(self):
@@ -86,14 +100,15 @@ class OrderSummary:
         self.order_id = -1
         self.report()
         
-    def check_after_buy(self, client):
+    def check_cancel(self, client):
         def wrapper():
-            if self.status in [OrderSummaryStatus.FAILED, OrderSummaryStatus.EMPTY]:
-                client.after_buy(self.symbol, 0)
-            elif self.status in [OrderSummaryStatus.CREATED, OrderSummaryStatus.PARTIAL_FILLED]:
-                client.user.trade_client.cancel_order(self.symbol, self.order_id)
+            if self.status not in [OrderSummaryStatus.FILLED, OrderSummaryStatus.CANCELED]:
+                if self.order_id:
+                    client.user.trade_client.cancel_order(self.symbol, self.order_id)
+                else:
+                    client.after_buy(self.symbol, 0)
         
-        Timer(1.5, wrapper).start()
+        Timer(CANCEL_BUY_TIME, wrapper).start()
 
     def add_filled_callback(self, callback, args=[]):
         self.filled_callback = callback

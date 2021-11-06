@@ -341,7 +341,8 @@ class DealerClient(ControlledClient):
         logger.info(f'Stop profit. {symbol}: {price}USDT')
 
     def sell_in_buy_price(self):
-        self.user.cancel_and_sell_in_buy_price(self.targets.values())
+        for target in self.targets.values():
+            self.user.cancel_and_sell_in_buy_price(target)
 
     def check_and_sell(self, limit=True):
         self.user.check_and_sell(self.targets.values(), limit)

@@ -23,6 +23,7 @@ BUY_BACK_RATE = config.getfloat('buy', 'BUY_BACK_RATE')
 CLEAR_TIME = int(config.getfloat('time', 'CLEAR_TIME'))
 STOP_BUY_TIME = config.getfloat('time', 'STOP_BUY_TIME')
 GOOD_SYMBOL = config.get('buy', 'GOOD_SYMBOL').split(',')
+FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
 
 BUY_BACK_RATE = BUY_BACK_RATE / 100
 
@@ -97,9 +98,11 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                     client.redis_conn.del_target(symbol)
 
             if (
-                symbol not in client.targets 
-                and (trade_time < client.target_time + STOP_BUY_TIME or symbol in GOOD_SYMBOL)
-                and len(client.targets) < BUY_NUM
+                symbol not in client.targets and 
+                (trade_time < client.target_time + STOP_BUY_TIME or 
+                (trade_time < client.target_time + FINAL_STOP_PROFIT_TIME and
+                symbol in GOOD_SYMBOL))  and
+                len(client.targets) < BUY_NUM
             ):
                 check_buy_signal(client, symbol, info, price, trade_time, now)
 

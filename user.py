@@ -14,6 +14,8 @@ from report import wx_report, add_profit, get_profit, wx_name
 from target import Target
 from order import OrderSummary, OrderSummaryStatus
 
+FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
+CLEAR_TIME = int(config.getint('time', 'CLEAR_TIME'))
 STOP_PROFIT_RATE_HIGH = config.getfloat('sell', 'STOP_PROFIT_RATE_HIGH')
 STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 ALL_STOP_PROFIT_RATE = config.getfloat('sell', 'ALL_STOP_PROFIT_RATE')
@@ -65,7 +67,7 @@ class User:
         
         self.usdt_balance = self.balance['usdt']
         if isinstance(self.buy_amount, str) and self.buy_amount.startswith('/'):
-            self.buy_amount = max(math.floor(self.usdt_balance / float(self.buy_amount[1:])), 5)
+            self.buy_amount = float(max(math.floor(self.usdt_balance / float(self.buy_amount[1:])), 5))
         else:
             self.buy_amount = float(self.buy_amount)
         
@@ -101,16 +103,14 @@ class User:
         order_summary = OrderSummary(symbol, 'buy')
         order_summary.created_vol = amount
         order_summary.remain_amount = amount
-        if symbol not in self.orders['buy']:
-            self.orders['buy'][symbol] = [order_summary]
-        else:
-            self.orders['buy'][symbol].append(order_summary)
+        self.orders['buy'].setdefault(symbol, []).append(order_summary)
 
         try:
+            logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
             order_id = self.trade_client.create_order(**order)
             self.buy_id.append(order_id)
             self.buy_order_list.append(order)
-            logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
+            order_summary.order_id = order_id
             return order_summary
         except Exception as e:
             # order_summary.error(e)
@@ -123,8 +123,7 @@ class User:
     def buy_limit(self, target: Target, amount, price=None):
         if not price:
             price = target.get_buy_price()
-        else:
-            price = target.check_price(price)
+        price = target.check_price(price)
         symbol = target.symbol
         amount = target.check_amount(max(
             amount / price,
@@ -142,23 +141,18 @@ class User:
         order_summary.created_amount = amount
         order_summary.created_price = price
         order_summary.remain_amount = amount
-        if symbol not in self.orders['buy']:
-            self.orders['buy'][symbol] = [order_summary]
-        else:
-            self.orders['buy'][symbol].append(order_summary)
-
+        self.orders['buy'].setdefault(symbol, []).append(order_summary)
 
         try:
+            logger.debug(f'Buy {amount} {symbol[:-4]}')
             order_id = self.trade_client.create_order(**order)
             self.buy_id.append(order_id)
             self.buy_order_list.append(order)
-            logger.debug(f'Buy {amount} {symbol[:-4]}')
+            order_summary.order_id = order_id
             return order_summary
         except Exception as e:
-            # order_summary.error(e)
             logger.error(e)
             self.orders['buy'][symbol].remove(order_summary)
-            # raise Exception(e)
             return None
 
     def sell(self, target: Target, amount):
@@ -177,30 +171,26 @@ class User:
         order_summary = OrderSummary(symbol, 'sell')
         order_summary.created_amount = amount
         order_summary.remain_amount = amount
-        if symbol not in self.orders['sell']:
-            self.orders['sell'][symbol] = [order_summary]
-        else:
-            self.orders['sell'][symbol].append(order_summary)
-
+        self.orders['sell'].setdefault(symbol, []).append(order_summary)
 
         try:
+            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
             order_id = self.trade_client.create_order(**order)
             self.sell_id.append(order_id)
             self.sell_order_list.append(order)
-            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
+            order_summary.order_id = order_id
             return order_summary
         except Exception as e:
             order_summary.error(e)
             logger.error(e)
+            self.orders['sell'][symbol].remove(order_summary)
             raise Exception(e)
         
 
     def sell_limit(self, target: Target, amount, price=None, ioc=False):
         if not price:
-            price = target.check_price(target.stop_profit_price)
-        else:
-            price = target.check_price(price)
-
+            price = target.stop_profit_price
+        price = target.check_price(price)
         symbol = target.symbol
         amount = target.check_amount(amount)
         assert amount >= target.limit_order_min_order_amt, f'amount too less, {amount}/{target.limit_order_min_order_amt}'
@@ -218,20 +208,19 @@ class User:
         order_summary.created_amount = amount
         order_summary.created_price = price
         order_summary.remain_amount = amount
-        if symbol not in self.orders['sell']:
-            self.orders['sell'][symbol] = [order_summary]
-        else:
-            self.orders['sell'][symbol].append(order_summary)
+        self.orders['sell'].setdefault(symbol, []).append(order_summary)
         
         try:
+            logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
             order_id = self.trade_client.create_order(**order)
             self.sell_id.append(order_id)
             self.sell_order_list.append(order)
-            logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
+            order_summary.order_id = order_id
             return order_summary
         except Exception as e:
             order_summary.error(e)
             logger.error(e)
+            self.orders['sell'][symbol].remove(order_summary)
             raise Exception(e)
         
 
@@ -285,15 +274,12 @@ class User:
             amount = self.get_amount(target.base_currency)
         return amount
 
-    def cancel_and_sell_in_buy_price(self, targets: 'list[Target]'):
-        def callback_generator(target):
-            def callback(summary=None):
-                amount = self.get_target_amount(target, summary)
-                self.sell_limit(target, amount, price=target.buy_price)
-            return callback
+    def cancel_and_sell_in_buy_price(self, target: 'Target'):
+        def callback(summary=None):
+            amount = self.get_target_amount(target, summary)
+            self.sell_limit(target, amount, price=target.buy_price)
 
-        for target in list(targets):
-            self.cancel_and_sell(target, callback_generator(target), market=False)
+        self.cancel_and_sell(target, callback, market=False)
 
     def cancel_and_sell_ioc(self, target: Target, price: float, count: int):
         def callback(summary=None):
@@ -366,14 +352,38 @@ class User:
     def buy_and_sell(self, target: Target, client, limit=False):
         @retry(tries=5, delay=0.05)
         def callback(summary):
-            client.after_buy(target.symbol, summary.aver_price)
             if summary.aver_price <=0:
+                client.after_buy(target.symbol, summary.aver_price)
                 logger.error(f'Fail to buy {target.symbol}')
                 return
 
+            if target.symbol not in client.targets:
+                client.targets[target.symbol] = target
+
+            client.after_buy(target.symbol, summary.aver_price)
             amount = self.get_target_amount(target, summary, True)
-            self.sell_limit(target, amount)
-            Timer(HIGH_STOP_PROFIT_HOLD_TIME, self.turn_low_cancel_and_sell, [target, None]).start()
+            now = time.time()
+            turn_low_time = summary.ts + HIGH_STOP_PROFIT_HOLD_TIME
+            buy_price_sell_time = client.target_time + FINAL_STOP_PROFIT_TIME
+            clear_time = client.target_time + CLEAR_TIME
+            stop_time = clear_time + 10
+
+            if now > stop_time:
+                self.sell(target, amount)
+            elif clear_time <= now < stop_time:
+                pass
+            elif now < turn_low_time:
+                self.sell_limit(target, amount)
+                if turn_low_time < clear_time:
+                    Timer(
+                        turn_low_time - now, 
+                        self.turn_low_cancel_and_sell, [target, None]
+                    ).start()
+            elif now < buy_price_sell_time:
+                self.turn_low_cancel_and_sell(target, None)
+            elif now >= buy_price_sell_time:
+                self.cancel_and_sell_in_buy_price(target)
+
 
         def buy_callback():
             if limit:
@@ -382,7 +392,7 @@ class User:
                 summary = self.buy(target, self.buy_amount)
 
             if summary != None:
-                summary.check_after_buy(client)
+                summary.check_cancel(client)
                 summary.add_filled_callback(callback, [summary])
                 summary.add_cancel_callback(callback, [summary])
             else:

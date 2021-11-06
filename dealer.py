@@ -1,6 +1,7 @@
 import time
 import datetime
 import argparse
+from order import OrderSummaryStatus
 
 from wampyapp import DealerClient as Client, State
 from utils.parallel import run_process
@@ -17,7 +18,7 @@ TEST = user_config.getboolean('setting', 'Test')
 FINAL_STOP_PROFIT_TIME = int(config.getfloat('time', 'FINAL_STOP_PROFIT_TIME'))
 CHECK_SELL_TIME = int(config.getint('time', 'CHECK_SELL_TIME'))
 CLEAR_TIME = int(config.getint('time', 'CLEAR_TIME'))
-
+CANCEL_BUY_TIME = config.getfloat('time', 'CANCEL_BUY_TIME')
 
 
 def trade_update_callback(client: Client):
@@ -38,10 +39,16 @@ def trade_update_callback(client: Client):
 
             try:
                 if etype == 'creation':
-                    for summary in client.user.orders[direction][symbol]:
-                        if summary.order_id == None:
+                    empty_pos = -1
+                    for i, summary in enumerate(client.user.orders[direction][symbol]):
+                        if summary.order_id == order_id:
                             summary.create(update)
                             break
+                        elif summary.order_id == None and empty_pos == -1:
+                            empty_pos = i
+                    else:
+                        summary = client.user.orders[direction][symbol][empty_pos]
+                        summary.create(update)
 
                 elif etype == 'trade':
                     for summary in client.user.orders[direction][symbol]:
@@ -49,13 +56,6 @@ def trade_update_callback(client: Client):
                             summary.update(update)
                             if update.orderStatus == 'filled' and summary.filled_callback:
                                 summary.filled_callback(*summary.filled_callback_args)
-                                if symbol not in client.targets:
-                                    target = Target(
-                                        symbol, summary.aver_price, time.time(), client.high_stop_profit
-                                    )
-                                    target.set_info(client.market_client.symbols_info[symbol])
-                                    target.set_buy_price(summary.aver_price)
-                                    client.targets[symbol] = target
                             break
 
                 elif etype == 'cancellation':
@@ -95,7 +95,46 @@ def error_ping(watch_dog: WatchDog):
 
 def check_orders(client: Client):
     # TODO
-    pass
+    for symbol, summary_list in client.user.orders['buy'].items():
+        for summary in summary_list.copy():
+            order_id = summary.order_id
+            if not order_id:
+                continue
+            
+            try:
+                order = client.user.trade_client.get_order(order_id)
+            except Exception as e:
+                logger.info(e)
+                continue
+            
+            status = OrderSummaryStatus.map_dict[order.state]
+            if order.amount == 0 and summary.amount == 0 and summary.status < status:
+                summary.status = status
+
+            elif order.amount > 0 and summary.amount / order.amount < 0.97:
+                summary.limit = 'limit' in order.type
+                summary.amount = order.filled_amount
+                summary.vol = order.filled_cash_amount
+                summary.aver_price = summary.vol / summary.amount
+                summary.fee = order.filled_fees
+                summary.status = status
+                summary.ts = (order.finished_at or order.created_at) / 1000
+
+                if summary.limit:
+                    summary.remain_amount = summary.created_amount - summary.amount
+                else:
+                    summary.remain_amount = summary.created_vol - summary.vol
+            else:
+                continue
+
+            if summary.state == OrderSummaryStatus.FILLED and summary.filled_callback:
+                summary.filled_callback(*summary.filled_callback_args)
+            elif summary.state == OrderSummaryStatus.CANCELED and summary.canceled_callback:
+                summary.canceled_callback(*summary.canceled_callback_args)
+            elif summary.state == OrderSummaryStatus.PARTIAL_FILLED and time.time() > order.created_at / 1000 + CANCEL_BUY_TIME:
+                client.user.trade_client.cancel_order(symbol, order_id)
+
+
 
 @retry(tries=5, delay=1, logger=logger)
 def init_users(num=-1) -> 'list[User]':
