@@ -199,21 +199,26 @@ class LossDealerClient(BaseDealerClient):
         targets_num = len(targets)
         usdt_amount = self.user.get_amount('usdt', available=True, check=False)
         buy_num = max(min(targets_num-symbols_num, MAX_NUM-symbols_num), MIN_NUM-symbols_num)
-        buy_amount = usdt_amount // buy_num
+        buy_amount = usdt_amount // buy_num if not TEST else self.user.buy_amount
         if buy_amount < self.user.min_usdt_amount:
             buy_amount = self.user.min_usdt_amount
             buy_num = int(usdt_amount // buy_amount)
 
-        new_targets_list = [target for symbol, target in targets.items() if symbol not in symbols]
         old_targets_list = [target for symbol, target in targets.items() if symbol in symbols]
+        new_targets_list = sorted(
+            [target for symbol, target in targets.items() if symbol not in symbols],
+            key=lambda x: (x.close > x.boll, -x.vol)
+        )[:buy_num]
+        logger.info(f'Now money {usdt_amount}U')
+        logger.info(f'{len(old_targets_list)} old targets')
+        logger.info(f'{len(new_targets_list)} new targets')
+        
         
         for target in new_targets_list:
-            target.init_buy_amount = self.user.buy_amount if TEST else buy_amount
+            target.init_buy_amount = buy_amount
+            logger.info(f'Select {target.symbol} as new target, buy {buy_amount}U')
 
-        targets = {
-            target.symbol: target for target in
-            old_targets_list + sorted(new_targets_list, key=lambda x: (x.close > x.boll, -x.vol))[:buy_num]
-        }
+        targets = {target.symbol: target for target in old_targets_list + new_targets_list}
 
         return targets
 
@@ -455,12 +460,8 @@ class LossDealerClient(BaseDealerClient):
             if summary:
                 target.set_buy(summary.vol, summary.amount)
 
-            vol = float(target.init_buy_amount) - target.own_amount * target.buy_price
-            if vol < target.min_order_value:
-                return
-
             self.buy_target(
-                target, price, vol, limit_rate,
+                target, price, None, limit_rate,
                 filled_callback=filled_callback,
                 cancel_callback=cancel_callback
             )

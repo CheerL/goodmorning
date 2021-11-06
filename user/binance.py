@@ -236,6 +236,7 @@ class BinanceUser(BaseUser):
             newOrderRespType='ACK'
         )
         try:
+            logger.debug(f'Buy {vol}U {target.symbol[:-4]} with market price')
             response = self.api.new_order(**order)
             order_id = response['orderId']
             if order_id in self.orders:
@@ -248,7 +249,6 @@ class BinanceUser(BaseUser):
             order_summary.remain = vol
             self.buy_id.append(order_id)
             
-            logger.debug(f'Buy {vol}U {target.symbol[:-4]} with market price')
             return order_summary
         except Exception as e:
             logger.error(e)
@@ -281,6 +281,7 @@ class BinanceUser(BaseUser):
         # order_id = -1
 
         try:
+            logger.debug(f'Buy {vol} {symbol[:-4]} with price {str_price}')
             response = self.api.new_order(**order)
             order_id = response['orderId']
             if order_id in self.orders:
@@ -294,7 +295,6 @@ class BinanceUser(BaseUser):
             order_summary.remain = amount
             self.buy_id.append(order_id)
             
-            logger.debug(f'Buy {vol} {symbol[:-4]} with price {str_price}')
             return order_summary
         except Exception as e:
             logger.error(e)
@@ -319,6 +319,7 @@ class BinanceUser(BaseUser):
         )
 
         try:
+            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
             response = self.api.new_order(**order)
             order_id = response['orderId']
             if order_id in self.orders:
@@ -331,7 +332,6 @@ class BinanceUser(BaseUser):
             order_summary.remain = amount
             self.sell_id.append(order_id)
             
-            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
             return order_summary
         except Exception as e:
             # order_summary.error(e)
@@ -359,6 +359,7 @@ class BinanceUser(BaseUser):
         )
 
         try:
+            logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
             response = self.api.new_order(**order)
             order_id = response['orderId']
             if order_id in self.orders:
@@ -371,7 +372,6 @@ class BinanceUser(BaseUser):
             order_summary.created_price = price
             order_summary.remain = amount
             self.sell_id.append(order_id)
-            logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
             return order_summary
         except Exception as e:
             logger.error(e)
