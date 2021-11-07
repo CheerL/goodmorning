@@ -56,6 +56,9 @@ class OrderSummary:
         self.cancel_callback = None
         self.cancel_callback_args = []
 
+    def __repr__(self) -> str:
+        return f'<OrderSummary id={self.order_id}, symbol={self.symbol}, status={OrderSummaryStatus.str_dict[self.status]}, direction={self.direction}, limit={self.limit}, amount={self.amount}, price={self.aver_price}, ts={self.ts}>'
+
     def report(self):
         logger.info(f'{self.order_id}: {self.symbol} : {self.direction}-{"limit" if self.limit else "market"} {OrderSummaryStatus.str(self.status)} | amount: {self.amount} vol: {self.vol} price: {self.aver_price} remain: {self.remain_amount} | created amount: {self.created_amount} vol: {self.created_vol} price: {self.created_price}| {self.error_msg}')
 
@@ -104,7 +107,11 @@ class OrderSummary:
         def wrapper():
             if self.status not in [OrderSummaryStatus.FILLED, OrderSummaryStatus.CANCELED]:
                 if self.order_id:
-                    client.user.trade_client.cancel_order(self.symbol, self.order_id)
+                    try:
+                        client.user.trade_client.cancel_order(self.symbol, self.order_id)
+                    except Exception as e:
+                        logger.error(e)
+                        client.after_buy(self.symbol, 0)
                 else:
                     client.after_buy(self.symbol, 0)
         

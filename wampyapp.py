@@ -114,6 +114,7 @@ class WatcherClient(ControlledClient):
         self.high_stop_profit = True
         self.task : list[str] = []
         self.targets : dict[str, Target] = {}
+        self.deleted_targets: dict[str, Target] = {}
         self.redis_conn: Redis = Redis()
 
     def get_task(self) -> 'list[str]':
@@ -153,12 +154,14 @@ class WatcherClient(ControlledClient):
     @subscribe(topic=Topic.AFTER_BUY)
     def after_buy_handler(self, symbol, price, *args, **kwargs):
         if symbol not in self.targets:
-            return
+            if price != 0 and symbol in self.deleted_targets:
+                self.target[symbol] = self.deleted_targets[symbol]
+                del self.deleted_targets
+                self.redis_conn.write_target(symbol)
+            else:
+                return
 
-        if price == 0:
-            # del self.targets[symbol]
-            pass
-        else:
+        if price != 0:
             self.targets[symbol].set_buy_price(price)
 
 

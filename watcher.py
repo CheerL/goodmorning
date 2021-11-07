@@ -94,6 +94,7 @@ def trade_detail_callback(symbol: str, client: WatcherClient, interval=300, redi
                 if target.own:
                     check_sell_signal(client, target, info, price, trade_time, now)
                 elif now > target.time + 2.5:
+                    client.deleted_targets[symbol] = client.targets[symbol]
                     del client.targets[symbol]
                     client.redis_conn.del_target(symbol)
 

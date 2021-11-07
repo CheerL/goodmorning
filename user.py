@@ -80,8 +80,9 @@ class User:
         if not update.changeTime:
             update.changeTime = 0
 
-        if (update.currency not in self.balance_update_time
-            or update.changeTime > self.balance_update_time[update.currency]
+        if (update.currency not in self.balance_update_time or
+            update.changeTime == 0 or
+            update.changeTime > self.balance_update_time[update.currency]
         ):
             self.balance[update.currency] = float(update.balance)
             self.balance_update_time[update.currency] = int(update.changeTime) / 1000
@@ -314,7 +315,9 @@ class User:
         
         if symbol in self.orders['sell']:
             for summary in self.orders['sell'][symbol]:
-                if summary.status in [OrderSummaryStatus.PARTIAL_FILLED, OrderSummaryStatus.CREATED]:
+                if summary.status not in [OrderSummaryStatus.FILLED, OrderSummaryStatus.CANCELED]:
+                    if not summary.order_id:
+                        continue
                     try:
                         self.trade_client.cancel_order(summary.symbol, summary.order_id)
                         summary.add_cancel_callback(callback, [summary])
@@ -352,6 +355,7 @@ class User:
     def buy_and_sell(self, target: Target, client, limit=False):
         @retry(tries=5, delay=0.05)
         def callback(summary):
+            # print('callback')
             if summary.aver_price <=0:
                 client.after_buy(target.symbol, summary.aver_price)
                 logger.error(f'Fail to buy {target.symbol}')
@@ -369,10 +373,13 @@ class User:
             stop_time = clear_time + 10
 
             if now > stop_time:
+                # print('clear')
                 self.sell(target, amount)
             elif clear_time <= now < stop_time:
+                # print('ioc')
                 pass
             elif now < turn_low_time:
+                # print('high')
                 self.sell_limit(target, amount)
                 if turn_low_time < clear_time:
                     Timer(
@@ -380,8 +387,10 @@ class User:
                         self.turn_low_cancel_and_sell, [target, None]
                     ).start()
             elif now < buy_price_sell_time:
+                # print('low')
                 self.turn_low_cancel_and_sell(target, None)
             elif now >= buy_price_sell_time:
+                # print('same')
                 self.cancel_and_sell_in_buy_price(target)
 
 
