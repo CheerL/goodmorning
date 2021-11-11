@@ -356,13 +356,13 @@ class User:
         @retry(tries=5, delay=0.05)
         def callback(summary):
             # print('callback')
-            if summary.aver_price <=0:
-                client.after_buy(target.symbol, summary.aver_price)
-                logger.error(f'Fail to buy {target.symbol}')
-                return
-
             if target.symbol not in client.targets:
                 client.targets[target.symbol] = target
+
+            if summary.aver_price <=0:
+                client.after_buy(target.symbol, 0)
+                logger.error(f'Fail to buy {target.symbol}')
+                return
 
             client.after_buy(target.symbol, summary.aver_price)
             amount = self.get_target_amount(target, summary, True)
@@ -375,7 +375,7 @@ class User:
             if now > stop_time:
                 # print('clear')
                 self.sell(target, amount)
-            elif clear_time <= now < stop_time:
+            elif now >= clear_time:
                 # print('ioc')
                 pass
             elif now < turn_low_time:

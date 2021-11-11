@@ -68,7 +68,7 @@ class OrderSummary:
         if 'market' in data.type:
             self.limit = False
         self.status = OrderSummaryStatus.CREATED
-        self.ts = data.tradeTime / 1000
+        self.ts = max(data.tradeTime / 1000, self.ts)
         self.report()
 
     def update(self, data: OrderUpdate):
@@ -85,13 +85,13 @@ class OrderSummary:
         elif 'filled' == data.orderStatus:
             self.status = OrderSummaryStatus.FILLED
             self.remain_amount = 0
-        self.ts = data.tradeTime / 1000
+        self.ts = max(data.tradeTime / 1000, self.ts)
         self.report()
 
     def cancel_update(self, data: OrderUpdate):
         self.status = OrderSummaryStatus.CANCELED
         self.remain_amount = float(data.remainAmt)
-        self.ts = data.tradeTime / 1000
+        self.ts = max(data.tradeTime / 1000, self.ts)
         self.report()
 
     def finish(self):
