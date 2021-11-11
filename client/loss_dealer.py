@@ -168,17 +168,8 @@ class LossDealerClient(BaseDealerClient):
 
     def check_target_price(self, target: Target):
         def low_callback(target):
-            @retry(5, delay=0.1)
-            def cancel_buy_callback(summary=None):
-                if not summary:
-                    return
-                target.set_buy(summary.vol, summary.amount)
-
             logger.info(f'Cancel buy {target.symbol} since reach low mark')
-            self.cancel_and_sell_limit_target(
-                target, price=0, direction='buy', force=True,
-                cancel_callback=cancel_buy_callback
-            )
+            self.cancel_and_sell_limit_target(target, price=0, direction='buy', force=True, sell=False)
 
         if target.high_check():
             logger.info(f'High back sell {target.symbol}')
@@ -410,7 +401,7 @@ class LossDealerClient(BaseDealerClient):
             logger.error(f'Failed to sell {target.symbol}')
         return summary
 
-    def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False):
+    def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False, sell=True):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
             if summary:
@@ -420,13 +411,14 @@ class LossDealerClient(BaseDealerClient):
                 else:
                     target.set_buy(summary.vol, summary.amount)
 
-            sell_amount = self.get_sell_amount(target)
-            self.sell_target(
-                target, price, sell_amount, selling_level,
-                filled_callback=filled_callback,
-                cancel_callback=cancel_callback,
-                limit=sell_amount * price > target.min_order_value
-            )
+            if sell:
+                sell_amount = self.get_sell_amount(target)
+                self.sell_target(
+                    target, price, sell_amount, selling_level,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=sell_amount * price > target.min_order_value
+                )
 
         if not force and direction=='sell' and selling_level <= target.selling:
             return

@@ -223,7 +223,7 @@ def buy_detailed_back_trace(symbol, start_time, buy_price, low_price, max_buy_ts
 
     return buy_price, buy_time
 
-def sell_detailed_back_trace(symbol, start_time, buy_time, high_price, high_back_price, low_price, low_back_price, stop_loss_price, interval='1min'):
+def sell_detailed_back_trace_high_fix(symbol, start_time, buy_time, high_price, high_back_price, low_price, low_back_price, stop_loss_price, interval='1min'):
     klines = get_detailed_klines(symbol, interval, start_time)
     data = klines.data
     data = data[data['id'] > buy_time]
@@ -235,6 +235,55 @@ def sell_detailed_back_trace(symbol, start_time, buy_time, high_price, high_back
         high_back_ts = data[(data['low'] <= high_back_price) & (data['id']>high_ts)]['id'][0]
     except:
         high_back_ts = end_ts + 1
+
+    try:
+        low_ts = data[data['high'] >= low_price]['id'][0]
+        low_back_ts = data[(data['low'] <= low_back_price) & (data['id']>low_ts)]['id'][0]
+    except:
+        low_back_ts = end_ts + 2
+
+    try:
+        stop_loss_ts = data[data['low'] <= stop_loss_price]['id'][0]
+        # print(data[data['low'] <= stop_loss_price]['id'])
+    except:
+        stop_loss_ts = end_ts + 3
+
+    result_dict = {
+        end_ts: (end_price, end_ts),
+        high_back_ts: (high_back_price, high_back_ts),
+        low_back_ts: (low_back_price, low_back_ts),
+        stop_loss_ts: (stop_loss_price, stop_loss_ts),
+    }
+    # print(end_ts, high_back_ts, low_back_ts, stop_loss_ts)
+    return result_dict[min(end_ts, high_back_ts, low_back_ts, stop_loss_ts)]
+    
+def sell_detailed_back_trace(symbol, start_time, buy_time, high_price, high_back_rate, high_hold_time, low_price, low_back_price, stop_loss_price, interval='1min'):
+    klines = get_detailed_klines(symbol, interval, start_time)
+    data = klines.data
+    data = data[data['id'] > buy_time]
+    end_ts = data[-1]['id']
+    end_price = data[-1]['close']
+    open_price = data[0]['open']
+    # print(datetime.ts2time(data[0]['id']), stop_loss_price)
+    try:
+        high_ts = data[data['high'] >= high_price]['id'][0]
+        max_high_hold_time = high_ts + high_hold_time
+        cum_high_back = high_back_rate * np.maximum.accumulate(data['high']) + (1-high_back_rate) * open_price
+        high_back = data[
+            (data['low'] <= cum_high_back) & 
+            (data['id'] > high_ts) & 
+            (data['id'] <= max_high_hold_time)
+        ]
+        if high_back.size:
+            high_back_ts = high_back['id'][0]
+            high_back_price = cum_high_back[data['id'] == high_back_ts][0]
+        else:
+            high_max_hold = data[data['id'] > max_high_hold_time][0]
+            high_back_ts = high_max_hold['id']
+            high_back_price = high_max_hold['open']
+    except:
+        high_back_ts = end_ts + 1
+        high_back_price = 0
 
     try:
         low_ts = data[data['high'] >= low_price]['id'][0]
@@ -283,12 +332,20 @@ def sell_detailed_next_back_trace(symbol, start_time, stop_profit_price, stop_lo
     return result_dict[min(stop_profit_ts, stop_loss_ts)]
 
 def get_buy_price_and_time(cont_loss, param: Param, date, interval):
-    key = f'{cont_loss["symbol"].decode()}{date}{interval}{param.max_hold_days:02}{param.low_rate:.4f}{param.buy_rate:.4f}{param.max_buy_ts}'
+    symbol = cont_loss['symbol'].decode()
+    params_key = ''.join([
+        f'{each:.4f}' for each in
+        [
+            param.max_buy_ts,
+            param.buy_rate,
+            param.low_rate
+        ]
+    ])
+    key = f'{symbol}{date}{interval}{params_key}'
     if key in Global.buy_dict:
         return Global.buy_dict[key]
 
     else:
-        symbol = cont_loss['symbol'].decode()
         close = cont_loss['close']
         buy_price = close * (1 + param.buy_rate)
         low_price = close * (1 + param.low_rate)
@@ -301,12 +358,27 @@ def get_buy_price_and_time(cont_loss, param: Param, date, interval):
         return buy_price, buy_time
 
 def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, interval, buy_time):
-    key = f'{cont_loss["symbol"].decode()}{date}{interval}{param.max_hold_days:02}{param.high_rate:.4f}{param.high_back_rate:.4f}{param.low_rate:.4f}{param.low_back_rate:.4f}{param.clear_rate:.4f}{param.final_rate:.4f}{param.stop_loss_rate:.4f}{param.buy_rate:.4f}{param.max_buy_ts}'
+    symbol = cont_loss['symbol'].decode()
+    params_key = ''.join([
+        f'{each:.4f}' for each in
+        [
+            param.max_hold_days,
+            param.high_rate,
+            param.high_back_rate,
+            param.high_hold_time,
+            param.low_rate,
+            param.low_back_rate,
+            param.clear_rate,
+            param.final_rate,
+            param.stop_loss_rate,
+            buy_time
+        ]
+    ])
+    key = f'{symbol}{date}{interval}{params_key}'
     if key in Global.sell_dict:
         return Global.sell_dict[key]
 
     else:
-        symbol = cont_loss['symbol'].decode()
         close = cont_loss['close']
         # high_price = max(
         #     (cont_loss['open'] + cont_loss['close']) / 2,
@@ -359,8 +431,15 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
         else:
             start_time = cont_loss['id2']
             sell_price, sell_time = sell_detailed_back_trace(
-                symbol, start_time, buy_time, high_price, high_back_price, low_price, low_back_price, 0, interval=interval
+                symbol, start_time, buy_time,
+                high_price, param.high_back_rate, param.high_hold_time,
+                low_price, low_back_price, 0, interval=interval
             )
+            # sell_price, sell_time = sell_detailed_back_trace_high_fix(
+            #     symbol, start_time, buy_time,
+            #     high_price, high_back_price,
+            #     low_price, low_back_price, 0, interval=interval
+            # )
 
         Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time

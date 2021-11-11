@@ -37,6 +37,7 @@ class Param:
         'buy_rate',
         'high_rate',
         'high_back_rate',
+        'high_hold_time',
         'low_rate',
         'low_back_rate',
         'clear_rate',
@@ -79,7 +80,8 @@ class Param:
 
     def check(self):
         return (
-            self.low_back_rate < self.low_rate
+            # self.low_back_rate < self.low_rate
+            self.low_back_rate < 0.85 * self.low_rate
             and self.clear_rate < self.low_rate
             and self.stop_loss_rate < self.clear_rate
             and self.break_cont_rate < self.min_cont_rate
@@ -87,6 +89,7 @@ class Param:
             and self.min_price < self.max_price
             and self.min_buy_vol < self.max_buy_vol
             and self.min_num < self.max_num
+            and self.break_cont_rate < self.up_cont_rate
         )
 
     def to_csv(self):
