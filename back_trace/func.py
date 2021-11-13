@@ -41,7 +41,7 @@ def back_trace(
             cont_loss = cont_loss_days = 0
             is_max_loss=False
 
-        if each['rate'] < 0 and cont_loss_days ==0:
+        if each['rate'] < min(0, param.min_close_rate) and cont_loss_days ==0:
             cont_loss_days = 1
             cont_loss=each['rate']
             is_max_loss=True
