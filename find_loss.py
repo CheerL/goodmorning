@@ -23,6 +23,11 @@ def main(user, args):
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
     client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
 
+    if args.manual_target:
+        client.find_targets(end=args.manual_end)
+        kill_all_threads()
+        return
+
     if args.manual_buy:
         targets = client.targets.setdefault(args.manual_date, {})
         if args.manual_symbol not in targets:
@@ -52,6 +57,8 @@ if __name__ == '__main__':
     parser.add_argument('--manual_symbol', default='')
     parser.add_argument('--manual_price', default=0, type=float)
     parser.add_argument('--manual_amount', default=0, type=float)
+    parser.add_argument('--manual_target', action='store_true', default=False)
+    parser.add_argument('--manual_end', default=0, type=int)
 
     args = parser.parse_args()
 
