@@ -6,7 +6,7 @@ from utils import config, logger, user_config, get_rate, datetime, parallel
 from order import OrderSummary, OrderSummaryStatus
 from client import BaseDealerClient
 from user.base import BaseUser as User
-from dataset.pgsql import Order as OrderSQL, LossTarget as TargetSQL
+from dataset.pgsql import Order as OrderSQL, LossTarget as TargetSQL, Asset
 from report import wx_loss_report
 from threading import Timer
 
@@ -771,3 +771,13 @@ class LossDealerClient(BaseDealerClient):
             now_target.set_mark_price(target.init_price)
             self.cancel_and_buy_limit_target(now_target, target.init_price)
             Timer(85000, cancel, args=[now_target]).start()
+            
+    def update_asset(self, limit=1):
+        if limit > 1:
+            limit = min(limit, 30)
+            asset_his = self.user.get_asset_history(limit)
+            for date, asset in asset_his:
+                Asset.add_asset(self.user.account_id, date, asset)
+        else:
+            date, asset = self.user.get_asset()
+            Asset.add_asset(self.user.account_id, date, asset)

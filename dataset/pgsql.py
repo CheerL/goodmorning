@@ -209,6 +209,26 @@ class Message(Base):
     uids = Column(VARCHAR(200))
 
 
+class Asset(Base):
+    __tablename__ = 'asset_his'
+    key = Column(VARCHAR(200), primary_key=True)
+    account = Column(VARCHAR(200))
+    asset = Column(REAL)
+    date = Column(VARCHAR(30))
+    
+    @classmethod
+    def add_asset(cls, account_id, date, asset):
+        with get_session() as session:
+            account = str(account_id)
+            order = cls(
+                key=date+account,
+                date=date,
+                account=account,
+                asset=asset
+            )
+            session.merge(order)
+            session.commit()
+
 class Order(Base):
     __tablename__ = 'order'
     id = Column(INTEGER, primary_key=True)
@@ -226,6 +246,11 @@ class Order(Base):
     @classmethod
     def add_order(cls, summary, date, account_id):
         with get_session() as session:
+            asset = session.query(cls).filter(
+                cls.account==str(account_id),
+                cls.date==date
+            )
+            asset
             order = cls(
                 order_id=str(summary.order_id),
                 symbol=summary.symbol,

@@ -376,3 +376,32 @@ class BinanceUser(BaseUser):
         except Exception as e:
             logger.error(e)
             raise Exception(e)
+
+    def get_asset(self):
+        self.update_currency()
+        prices = self.market.get_market_tickers()
+        asset = self.balance['USDT']
+        for price in prices:
+            if price.symbol.endswith('USDT'):
+                currency = price.symbol[:-4]
+                if currency in self.balance:
+                    asset += self.balance[currency] * price.close
+        return datetime.ts2date(), asset
+
+    def get_asset_history(self, limit=30):
+        asset_his = []
+        snapshot = self.api.account_snapshot('SPOT', limit=limit, recvWindow=6000)
+        btc_prices = self.market.get_candlestick('BTCUSDT', '1day', limit=limit)
+        for day, btc in zip(snapshot['snapshotVos'], reversed(btc_prices)):
+            ts = int(day['updateTime']/1000+1)
+            asset = float(day['data']['totalAssetOfBtc']) * btc.open
+            for each in day['data']['balances']:
+                if each['locked'] != '0':
+                    locked = float(each['locked'])
+                    if each['asset'] == 'USDT':
+                        asset += locked
+                    else:
+                        [kline] = self.market.get_candlestick(each['asset']+'USDT', '1min', start_ts=ts-1, end_ts=ts+1)
+                        asset += locked * kline.open
+            asset_his.append((datetime.ts2date(ts), asset))
+        return asset_his

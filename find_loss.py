@@ -14,19 +14,25 @@ def main(user, args):
     user.start()
     client = Client.init_dealer(user)
     client.resume()
-
-    user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
-    user.scheduler.add_job(client.update_targets, 'cron', hour=0, minute=0, second=10)
-    user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=0)
-    user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
-
-    client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
-    client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
+    
+    if args.update_asset:
+        client.update_asset(args.update_asset)
+        kill_all_threads()
+        return
 
     if args.manual_target:
         client.find_targets(end=args.manual_end)
         kill_all_threads()
         return
+
+    user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
+    user.scheduler.add_job(client.update_targets, 'cron', hour=0, minute=0, second=10)
+    user.scheduler.add_job(client.update_asset, 'cron', hour=0, minute=1, second=0)
+    user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=0)
+    user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
+
+    client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
+    client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
 
     if args.manual_buy:
         targets = client.targets.setdefault(args.manual_date, {})
@@ -59,6 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--manual_amount', default=0, type=float)
     parser.add_argument('--manual_target', action='store_true', default=False)
     parser.add_argument('--manual_end', default=0, type=int)
+    parser.add_argument('--update_asset', default=0, type=int)
 
     args = parser.parse_args()
 
