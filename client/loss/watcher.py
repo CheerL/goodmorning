@@ -14,6 +14,15 @@ class LossWatcherClient:
         self.get_targets()
         
     def get_targets(self):
+        while True:
+            try:
+                self.redis.ping()
+                break
+            except Exception as e:
+                logger.error(e)
+                time.sleep(5)
+                self.redis = Redis()
+
         new_targets = get_holding_symbol()
         for symbol in set(self.targets) - set(new_targets):
             self.redis.delete(f'Binance_price_{symbol}')
@@ -25,16 +34,22 @@ class LossWatcherClient:
             return
         elif len(self.targets) == 1:
             symbol = self.targets[0]
-            ticker = self.user.market.get_market_tickers(symbol=symbol, raw=True)
-            price = float(ticker['price'])
-            self.redis.set(f'Binance_price_{symbol}', price)
+            try:
+                ticker = self.user.market.get_market_tickers(symbol=symbol, raw=True)
+                price = float(ticker['price'])
+                self.redis.set(f'Binance_price_{symbol}', price)
+            except:
+                pass
         else:
-            tickers = self.user.market.get_market_tickers(raw=True)
-            for ticker in tickers:
-                if ticker['symbol'] in self.targets:
-                    symbol = ticker['symbol']
-                    price = float(ticker['price'])
-                    self.redis.set(f'Binance_price_{symbol}', price)
+            try:
+                tickers = self.user.market.get_market_tickers(raw=True)
+                for ticker in tickers:
+                    if ticker['symbol'] in self.targets:
+                        symbol = ticker['symbol']
+                        price = float(ticker['price'])
+                        self.redis.set(f'Binance_price_{symbol}', price)
+            except:
+                pass
     
     def wait_state(self, state=1):
         while self.state != state:

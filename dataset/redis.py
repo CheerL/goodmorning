@@ -7,6 +7,8 @@ RPORT = config.getint('data', 'RPort')
 RPASSWORD = user_config.get('setting', 'RPassword')
 
 class Redis(redis.StrictRedis):
+    pool = redis.ConnectionPool(host=RHOST, port=RPORT, db=0, password=RPASSWORD, max_connections=10)
+
     def __init__(self, host=RHOST, port=RPORT,
                 db=0, password=RPASSWORD, socket_timeout=None,
                 socket_connect_timeout=None,
@@ -19,13 +21,14 @@ class Redis(redis.StrictRedis):
                 ssl_cert_reqs='required', ssl_ca_certs=None,
                 ssl_check_hostname=False,
                 max_connections=None, single_connection_client=False,
-                health_check_interval=0, client_name=None, username=None):
+                health_check_interval=30, client_name=None, username=None):
+
         super().__init__(host=host, port=port, db=db, password=password,
                         socket_timeout=socket_timeout, 
                         socket_connect_timeout=socket_connect_timeout,
                         socket_keepalive=socket_keepalive,
                         socket_keepalive_options=socket_keepalive_options,
-                        connection_pool=connection_pool, unix_socket_path=unix_socket_path,
+                        connection_pool=connection_pool or self.pool, unix_socket_path=unix_socket_path,
                         encoding=encoding, encoding_errors=encoding_errors,
                         charset=charset, errors=errors, decode_responses=decode_responses,
                         retry_on_timeout=retry_on_timeout, ssl=ssl, ssl_keyfile=ssl_keyfile,
