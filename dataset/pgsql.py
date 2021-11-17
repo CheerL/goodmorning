@@ -523,3 +523,11 @@ def get_stat():
             'high_loss_percent': item.high_loss_percent
         } for index, item in enumerate(data)]
         return res
+    
+def get_holding_symbol():
+    with get_session() as session:
+        holding_symbol = Table('bottom_holding_symbol', Base.metadata,
+                             autoload=True, autoload_with=session.bind)
+        data = session.query(holding_symbol).all()
+        res = [each.symbol for each in data]
+        return res

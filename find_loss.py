@@ -4,7 +4,7 @@ import argparse
 from user.huobi import HuobiUser
 from user.binance import BinanceUser
 from utils import config, kill_all_threads, logger, datetime, user_config
-from client.loss_dealer import LossDealerClient as Client
+from client.loss import LossDealerClient as DClient, LossWatcherClient as WClient
 
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 EXCHANGE = user_config.get('setting', 'Exchange')
@@ -12,7 +12,7 @@ EXCHANGE = user_config.get('setting', 'Exchange')
 def main(user, args):
     logger.name = user.username
     user.start()
-    client = Client.init_dealer(user)
+    client = DClient(user)
     client.resume()
     
     if args.update_asset:
@@ -51,12 +51,23 @@ def main(user, args):
 
     kill_all_threads()
 
+def watcher(user):
+    user.start()
+    client = WClient(user)
+    
+    user.scheduler.add_job(client.get_targets, 'cron', second='*/30', max_instances=1)
+    user.scheduler.add_job(client.update_target_price, 'interval', seconds=PRICE_INTERVAL, max_instances=2)
+    
+    client.wait_state(10)
+    kill_all_threads()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--type', default='', type=str)
     parser.add_argument('-n', '--num', default=0, type=int)
     parser.add_argument('-r', '--report', action='store_true', default=False)
+    parser.add_argument('--watcher', action='store_true', default=False)
     parser.add_argument('--manual_sell', action='store_true', default=False)
     parser.add_argument('--manual_buy', action='store_true', default=False)
     parser.add_argument('--manual_date', default='')
@@ -79,4 +90,8 @@ if __name__ == '__main__':
         exchange = list(User_dict.keys())[0]
 
     [user] = User_dict[exchange].init_users(num=args.num)
-    main(user, args)
+
+    if args.watcher:
+        watcher(user)
+    else:
+        main(user, args)

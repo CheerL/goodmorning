@@ -33,12 +33,15 @@ class BinanceMarketClient(BaseMarketClient):
             and info['symbol'] not in []
         }
 
-    def get_market_tickers(self, symbol=None, all_info=False):
+    def get_market_tickers(self, symbol=None, all_info=False, raw=False):
         if all_info:
             raw_tickers = self.api.ticker_24hr(symbol)
         else:
             raw_tickers = self.api.ticker_price(symbol)
+        if raw:
+            return raw_tickers
         return [Ticker(raw_ticker) for raw_ticker in raw_tickers]
+
 
     def get_candlestick(self, symbol, interval: str, limit=10, start_ts=None, end_ts=None):
         if interval.endswith('day'):

@@ -81,3 +81,14 @@ class Redis(redis.StrictRedis):
             return float(record.split(',')[1])
         else:
             return None
+        
+    def get_binance_price(self):
+        keys = self.keys(f'Binance_price_*')
+        if keys:
+            res = self.mget(keys)
+            return {
+                symbol.decode()[14:]: float(price.decode())
+                for symbol, price in zip(keys, res)
+            }
+        else:
+            return {}
