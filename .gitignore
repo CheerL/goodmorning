@@ -10,3 +10,4 @@ node/.crossbar/*
 !config/config.inia
 network/*
 back_trace/*
+.env

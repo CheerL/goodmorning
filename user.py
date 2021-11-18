@@ -87,132 +87,84 @@ class User:
             self.balance[update.currency] = float(update.balance)
             self.balance_update_time[update.currency] = int(update.changeTime) / 1000
 
-    def buy(self, target: Target, amount):
+    def buy(self, target: Target, amount, price=None, limit=False):
         symbol = target.symbol
-        amount = target.check_amount(max(
-            amount,
-            target.min_order_value
-        ))
-        order = dict(
-            symbol=symbol,
-            account_id=self.account_id,
-            order_type=OrderType.BUY_MARKET,
-            amount=amount,
-            price=1,
-            source=OrderSource.SPOT_API
-        )
         order_summary = OrderSummary(symbol, 'buy')
-        order_summary.created_vol = amount
-        order_summary.remain_amount = amount
         self.orders['buy'].setdefault(symbol, []).append(order_summary)
-
-        try:
-            logger.debug(f'Speed {amount} USDT to buy {target.symbol[:-4]}')
-            order_id = self.trade_client.create_order(**order)
-            self.buy_id.append(order_id)
-            self.buy_order_list.append(order)
-            order_summary.order_id = order_id
-            return order_summary
-        except Exception as e:
-            # order_summary.error(e)
-            logger.error(e)
-            self.orders['buy'][symbol].remove(order_summary)
-            # raise Exception(e)
-            return None
         
-
-    def buy_limit(self, target: Target, amount, price=None):
-        if not price:
-            price = target.get_buy_price()
-        price = target.check_price(price)
-        symbol = target.symbol
-        amount = target.check_amount(max(
-            amount / price,
-            target.limit_order_min_order_amt
-        ))
+        if limit:
+            price = target.check_price(price or target.get_buy_price())
+            order_type = OrderType.BUY_LIMIT
+            amount = target.check_amount(max(
+                amount / price,
+                target.limit_order_min_order_amt
+            ))
+            order_summary.created_amount = amount
+            order_summary.created_price = price
+            logger.debug(f'Buy {amount} USDT {symbol[:-4]} with price {price}')
+        else:
+            price = 1
+            amount = target.check_amount(max(
+                amount,
+                target.min_order_value
+            ))
+            order_type = OrderType.BUY_MARKET
+            order_summary.created_vol = amount
+            logger.debug(f'Buy {amount} USDT {symbol[:-4]} with market price')
+        
         order = dict(
             symbol=symbol,
             account_id=self.account_id,
-            order_type=OrderType.BUY_LIMIT,
+            order_type=order_type,
             amount=amount,
             price=price,
-            source=OrderSource.API
+            source=OrderSource.SPOT_API
         )
-        order_summary = OrderSummary(symbol, 'buy')
-        order_summary.created_amount = amount
-        order_summary.created_price = price
         order_summary.remain_amount = amount
-        self.orders['buy'].setdefault(symbol, []).append(order_summary)
 
         try:
-            logger.debug(f'Buy {amount} {symbol[:-4]}')
             order_id = self.trade_client.create_order(**order)
             self.buy_id.append(order_id)
             self.buy_order_list.append(order)
-            order_summary.order_id = order_id
-            return order_summary
-        except Exception as e:
-            logger.error(e)
-            self.orders['buy'][symbol].remove(order_summary)
-            return None
-
-    def sell(self, target: Target, amount):
-        symbol = target.symbol
-        amount = target.check_amount(amount)
-        assert amount >= target.sell_market_min_order_amt, 'amount too less'
-
-        order = dict(
-            symbol=symbol,
-            account_id=self.account_id,
-            order_type=OrderType.SELL_MARKET,
-            amount=amount,
-            price=1,
-            source=OrderSource.SPOT_API
-        )
-        order_summary = OrderSummary(symbol, 'sell')
-        order_summary.created_amount = amount
-        order_summary.remain_amount = amount
-        self.orders['sell'].setdefault(symbol, []).append(order_summary)
-
-        try:
-            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
-            order_id = self.trade_client.create_order(**order)
-            self.sell_id.append(order_id)
-            self.sell_order_list.append(order)
             order_summary.order_id = order_id
             return order_summary
         except Exception as e:
             order_summary.error(e)
             logger.error(e)
-            self.orders['sell'][symbol].remove(order_summary)
+            self.orders['buy'][symbol].remove(order_summary)
             raise Exception(e)
-        
 
-    def sell_limit(self, target: Target, amount, price=None, ioc=False):
-        if not price:
-            price = target.stop_profit_price
-        price = target.check_price(price)
+    def sell(self, target: Target, amount, price=None, limit=False, ioc=False):
         symbol = target.symbol
-        amount = target.check_amount(amount)
-        assert amount >= target.limit_order_min_order_amt, f'amount too less, {amount}/{target.limit_order_min_order_amt}'
-        assert price * amount >= target.min_order_value, f'vol too less, {price * amount}/{target.min_order_value}'
-
-        order = dict(
-            symbol=symbol,
-            account_id=self.account_id,
-            order_type=OrderType.SELL_LIMIT if not ioc else OrderType.SELL_IOC,
-            amount=amount,
-            price=price,
-            source=OrderSource.SPOT_API
-        )
         order_summary = OrderSummary(symbol, 'sell')
-        order_summary.created_amount = amount
-        order_summary.created_price = price
-        order_summary.remain_amount = amount
         self.orders['sell'].setdefault(symbol, []).append(order_summary)
+        amount = target.check_amount(amount)
         
-        try:
+        if limit:
+            price = target.check_price(price or target.stop_profit_price)
+            assert amount >= target.limit_order_min_order_amt, f'amount too less, {amount}/{target.limit_order_min_order_amt}'
+            assert price * amount >= target.min_order_value, f'vol too less, {price * amount}/{target.min_order_value}'
+            order_type=OrderType.SELL_LIMIT if not ioc else OrderType.SELL_IOC
+            order_summary.created_price = price
             logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
+        else:
+            price = 1
+            assert amount >= target.sell_market_min_order_amt, 'amount too less'
+            order_type=OrderType.SELL_MARKET
+            logger.debug(f'Sell {amount} {symbol[:-4]} with market price')
+
+        order = dict(
+            symbol=symbol,
+            account_id=self.account_id,
+            amount=amount,
+            order_type=order_type,
+            price=price,
+            source=OrderSource.SPOT_API
+        )
+        order_summary.created_amount = amount
+        order_summary.remain_amount = amount
+
+        try:
             order_id = self.trade_client.create_order(**order)
             self.sell_id.append(order_id)
             self.sell_order_list.append(order)
@@ -223,7 +175,6 @@ class User:
             logger.error(e)
             self.orders['sell'][symbol].remove(order_summary)
             raise Exception(e)
-        
 
     @timeout_handle([])
     def get_open_orders(self, targets, side=OrderSide.SELL) -> 'list[huobi.model.trade.order.Order]':
@@ -237,7 +188,7 @@ class User:
         @retry(tries=5, delay=0.05)
         def _sell(target: Target, amount, limit=True):
             if limit and amount > target.limit_order_min_order_amt:
-                self.sell_limit(target, amount)
+                self.sell(target, amount, limit=True)
             elif not limit and amount > target.sell_market_min_order_amt:
                 self.sell(target, amount)
 
@@ -278,7 +229,7 @@ class User:
     def cancel_and_sell_in_buy_price(self, target: 'Target'):
         def callback(summary=None):
             amount = self.get_target_amount(target, summary)
-            self.sell_limit(target, amount, price=target.buy_price)
+            self.sell(target, amount, price=target.buy_price, limit=True)
 
         self.cancel_and_sell(target, callback, market=False)
 
@@ -290,7 +241,7 @@ class User:
             sell_amount = amount * sell_rate
             logger.info(f'Try to ioc sell {sell_amount} {target.symbol} with price {sell_price}')
             try:
-                self.sell_limit(target, sell_amount, sell_price, ioc=True)
+                self.sell(target, sell_amount, sell_price, limit=True ,ioc=True)
             except Exception as e:
                 logger.error(e)
 
@@ -304,10 +255,7 @@ class User:
     def cancel_and_sell(self, target: Target, callback=None, market=True):
         def _callback(summary=None):
             amount = self.get_target_amount(target, summary)
-            if market:
-                self.sell(target, amount)
-            else:
-                self.sell_limit(target, amount)
+            self.sell(target, amount, limit=(not market))
 
         symbol = target.symbol
         callback = callback or _callback
@@ -336,7 +284,7 @@ class User:
     def high_cancel_and_sell(self, targets: 'list[Target]', symbol, price):
         def _callback(summary=None):
             amount = self.get_target_amount(target, summary)
-            self.sell_limit(target, amount, (price + 2 * target.buy_price) / 3)
+            self.sell(target, amount, (price + 2 * target.buy_price) / 3, limit=True)
 
         for target in targets:
             if target.symbol == symbol:
@@ -380,7 +328,7 @@ class User:
                 pass
             elif now < turn_low_time:
                 # print('high')
-                self.sell_limit(target, amount)
+                self.sell(target, amount, limit=True)
                 if turn_low_time < clear_time:
                     Timer(
                         turn_low_time - now, 
@@ -395,17 +343,16 @@ class User:
 
 
         def buy_callback():
-            if limit:
-                summary = self.buy_limit(target, self.buy_amount)
-            else:
-                summary = self.buy(target, self.buy_amount)
-
-            if summary != None:
-                summary.check_cancel(client)
-                summary.add_filled_callback(callback, [summary])
-                summary.add_cancel_callback(callback, [summary])
-            else:
+            try:
+                summary = retry(tries=4, delay=0.05)(self.buy)(target, self.buy_amount, limit=limit)
+            except Exception as e:
+                logger.error(e)
                 client.after_buy(target.symbol, 0)
+                return
+
+            summary.check_cancel(client)
+            summary.add_filled_callback(callback, [summary])
+            summary.add_cancel_callback(callback, [summary])
 
         Timer(0, buy_callback).start()
 
