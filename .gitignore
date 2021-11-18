@@ -11,3 +11,4 @@ node/.crossbar/*
 !node/.crossbar/config.json
 !.gitkeep
 !config/config.ini
+.env

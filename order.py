@@ -64,12 +64,14 @@ class OrderSummary:
             if data['o'] == 'MARKET':
                 self.limit = False
             
-            ts = data['O'] / 1000 
+            ts = data['O'] / 1000
             self.created_ts = ts
+            self.created_price = data['p']
             if ts < self.ts:
                 return
 
             self.ts = ts
+            self.aver_price = float(data['p'])
 
         self.status = OrderSummaryStatus.CREATED
         self.report()

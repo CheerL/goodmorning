@@ -246,6 +246,7 @@ class BinanceUser(BaseUser):
                 order_summary = self.orders[order_id]
             else:
                 order_summary = OrderSummary(order_id, symbol, 'buy')
+                order_summary.created_ts = order_summary.ts = time.time() - 5
                 self.orders[order_id] = order_summary
 
             order_summary.created_vol = vol
@@ -291,6 +292,7 @@ class BinanceUser(BaseUser):
                 order_summary = self.orders[order_id]
             else:
                 order_summary = OrderSummary(order_id, symbol, 'buy')
+                order_summary.created_ts = order_summary.ts = time.time() - 5
                 self.orders[order_id] = order_summary
 
             order_summary.created_amount = amount
@@ -329,6 +331,7 @@ class BinanceUser(BaseUser):
                 order_summary = self.orders[order_id]
             else:
                 order_summary = OrderSummary(order_id, symbol, 'sell')
+                order_summary.created_ts = order_summary.ts = time.time() - 5
                 self.orders[order_id] = order_summary
 
             order_summary.created_amount = amount
@@ -369,6 +372,7 @@ class BinanceUser(BaseUser):
                 order_summary = self.orders[order_id]
             else:
                 order_summary = OrderSummary(order_id, symbol, 'sell')
+                order_summary.created_ts = order_summary.ts = time.time() - 5
                 self.orders[order_id] = order_summary
 
             order_summary.created_amount = amount

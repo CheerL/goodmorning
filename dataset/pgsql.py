@@ -246,19 +246,14 @@ class Order(Base):
     @classmethod
     def add_order(cls, summary, date, account_id):
         with get_session() as session:
-            asset = session.query(cls).filter(
-                cls.account==str(account_id),
-                cls.date==date
-            )
-            asset
             order = cls(
                 order_id=str(summary.order_id),
                 symbol=summary.symbol,
                 date=date,
-                tm='',
+                tm=datetime.ts2time(summary.ts) if summary.ts else '',
                 account=str(account_id),
                 direction=summary.direction,
-                aver_price=0,
+                aver_price=summary.aver_price,
                 amount=0,
                 vol=0,
                 finished=0

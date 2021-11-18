@@ -551,7 +551,7 @@ class LossDealerClient(BaseDealerClient):
             summary.status = status
             summary.amount = detail.filled_amount
             summary.vol = detail.filled_cash_amount
-            summary.aver_price = summary.vol / summary.amount if summary.amount else 0
+            summary.aver_price = summary.vol / summary.amount if summary.amount else summary.created_price
             summary.fee = summary.vol * self.user.fee_rate
 
         return summary
@@ -611,12 +611,20 @@ class LossDealerClient(BaseDealerClient):
                 report_info['opening'].append((
                     datetime.ts2time(summary.created_ts), symbol, amount, price, summary.direction
                 ))
+                if summary.amount == 0 and summary.aver_price != order.aver_price:
+                    update_load = {
+                        'aver_price': summary.aver_price,
+                        'tm': datetime.ts2time(summary.ts)
+                    }
+                    OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
 
             elif summary.status in [-1, 3, 4]:
-                load = {'finished': 1}
+                update_load = {'finished': 1}
                 if summary.ts:
-                    load['tm'] = datetime.ts2time(summary.ts)
-                OrderSQL.update([OrderSQL.order_id==order.order_id],load)
+                    update_load['tm'] = datetime.ts2time(summary.ts)
+                OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
+            
+                
 
         if not force and not report_info['new_sell'] + report_info['new_buy']:
             return
