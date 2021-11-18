@@ -344,7 +344,8 @@ class User:
 
         def buy_callback():
             try:
-                summary = retry(tries=4, delay=0.05)(self.buy)(target, self.buy_amount, limit=limit)
+                func = lambda: self.buy(target, self.buy_amount, limit=limit)
+                summary = retry(tries=4, delay=0.05)(func)()
             except Exception as e:
                 logger.error(e)
                 client.after_buy(target.symbol, 0)
