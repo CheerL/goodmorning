@@ -60,7 +60,7 @@ class Param:
         self.max_buy_ts=3600
         self.buy_rate=-0.01
         self.high_rate=0.25
-        self.high_back_rate=0.5
+        self.high_back_rate=0.6
         self.low_rate=0.06
         self.low_back_rate=0.02
         self.clear_rate=-0.01
@@ -68,7 +68,7 @@ class Param:
         self.stop_loss_rate=-1
         self.min_cont_rate=-0.15
         self.break_cont_rate=-0.3
-        self.up_cont_rate=-0.11
+        self.up_cont_rate=-0.1
         self.min_close_rate=0
 
         for i, value in enumerate(args):

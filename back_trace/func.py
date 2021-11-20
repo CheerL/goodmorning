@@ -430,16 +430,16 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
 
         else:
             start_time = cont_loss['id2']
-            sell_price, sell_time = sell_detailed_back_trace(
-                symbol, start_time, buy_time,
-                high_price, param.high_back_rate, param.high_hold_time,
-                low_price, low_back_price, 0, interval=interval
-            )
-            # sell_price, sell_time = sell_detailed_back_trace_high_fix(
+            # sell_price, sell_time = sell_detailed_back_trace(
             #     symbol, start_time, buy_time,
-            #     high_price, high_back_price,
+            #     high_price, param.high_back_rate, param.high_hold_time,
             #     low_price, low_back_price, 0, interval=interval
             # )
+            sell_price, sell_time = sell_detailed_back_trace_high_fix(
+                symbol, start_time, buy_time,
+                high_price, high_back_price,
+                low_price, low_back_price, 0, interval=interval
+            )
 
         Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time
