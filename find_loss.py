@@ -20,8 +20,30 @@ def main(user, args):
         kill_all_threads()
         return
 
-    if args.manual_target:
-        client.find_targets(end=args.manual_end)
+    if args.show_target:
+        client.find_targets(end=args.target_end)
+        kill_all_threads()
+        return
+    
+    if args.buy:
+        targets = client.targets.setdefault(args.manual_date, {})
+        if args.manual_symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
+            targets[args.manual_symbol] = client.find_targets([args.manual_symbol], end, force=True)
+        target = targets[args.manual_symbol]
+        client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
+        kill_all_threads()
+        return
+
+    if args.sell:
+        target = client.targets[args.manual_date][args.manual_symbol]
+        client.sell_target(target, args.manual_price, args.manual_amount, 10)
+        kill_all_threads()
+        return
+        
+    if args.cancel:
+        target = client.targets[args.manual_date][args.manual_symbol]
+        client.cancel_target(target, direction=args.cancel_direction)
         kill_all_threads()
         return
 
@@ -33,18 +55,6 @@ def main(user, args):
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
     client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
-
-    if args.manual_buy:
-        targets = client.targets.setdefault(args.manual_date, {})
-        if args.manual_symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
-            targets[args.manual_symbol] = client.find_targets([args.manual_symbol], end, force=True)
-        target = targets[args.manual_symbol]
-        client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
-
-    if args.manual_sell:
-        target = client.targets[args.manual_date][args.manual_symbol]
-        client.sell_target(target, args.manual_price, args.manual_amount, 10)
     
     client.report(True, args.report)
     client.wait_state(10)
@@ -68,14 +78,16 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--num', default=0, type=int)
     parser.add_argument('-r', '--report', action='store_true', default=False)
     parser.add_argument('--watcher', action='store_true', default=False)
-    parser.add_argument('--manual_sell', action='store_true', default=False)
-    parser.add_argument('--manual_buy', action='store_true', default=False)
+    parser.add_argument('--sell', action='store_true', default=False)
+    parser.add_argument('--buy', action='store_true', default=False)
+    parser.add_argument('--cancel', action='store_true', default=False)
+    parser.add_argument('--cancel_direction', default='buy')
     parser.add_argument('--manual_date', default='')
     parser.add_argument('--manual_symbol', default='')
     parser.add_argument('--manual_price', default=0, type=float)
     parser.add_argument('--manual_amount', default=0, type=float)
-    parser.add_argument('--manual_target', action='store_true', default=False)
-    parser.add_argument('--manual_end', default=0, type=int)
+    parser.add_argument('--show_target', action='store_true', default=False)
+    parser.add_argument('--target_end', default=0, type=int)
     parser.add_argument('--update_asset', default=0, type=int)
 
     args = parser.parse_args()

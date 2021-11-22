@@ -401,6 +401,9 @@ class LossDealerClient(BaseDealerClient):
             logger.error(f'Failed to sell {target.symbol}')
         return summary
 
+    def cancel_target(self, target: Target, direction='sell'):
+        self.cancel_and_sell_limit_target(target, price=0, direction=direction, sell=False, force=True)
+
     def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False, sell=True):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
