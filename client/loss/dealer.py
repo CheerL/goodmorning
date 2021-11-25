@@ -687,6 +687,10 @@ class LossDealerClient(BaseDealerClient):
 
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
+        def clear_buy():
+            for target in self.targets.get(date, {}).values():
+                self.cancel_target(target, 'buy')
+        
         def clear_today_targets(level=4):
             for target in self.targets.get(date, {}).values():
                 if not target.own or target.own_amount < target.sell_market_min_order_amt:
@@ -731,19 +735,21 @@ class LossDealerClient(BaseDealerClient):
                 ):
                     clear_targets.setdefault(symbol, []).append(target)
 
+        Timer(0, clear_buy).start()
+        
         clear_symbols = ",".join(clear_targets.keys())
         logger.info(f'Clear old: {clear_date}. targets are {clear_symbols}')
         Timer(0, clear_old_targets, args=[6]).start()
         Timer(15, clear_old_targets, args=[6.1]).start()
         Timer(30, clear_old_targets, args=[6.2]).start()
 
-        Timer(120, long_sell_today_targets, args=[5]).start()
-
         symbols = ','.join(self.targets.get(date, {}).keys())
         logger.info(f'Clear yesterday: {date}. targets are {symbols}')
         Timer(0, clear_today_targets, args=[4]).start()
         Timer(15, clear_today_targets, args=[4.1]).start()
         Timer(30, clear_today_targets, args=[4.2]).start()
+
+        Timer(120, long_sell_today_targets, args=[5]).start()
 
         
 
