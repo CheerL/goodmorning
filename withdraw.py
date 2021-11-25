@@ -1,14 +1,14 @@
 import argparse
 import math
-from utils import user_config
 from user.huobi import HuobiUser
 from user.binance import BinanceUser
 from client.loss import LossDealerClient as DClient
 from dataset.redis import Redis
 from report import wx_withdraw_report
+from utils import user_config
 
-BN_ADDR = user_config.get('BN_ADDR')
-HB_ADDR = user_config.get('HB_ADDR')
+BN_ADDR = user_config.get('setting', 'BN_ADDR')
+HB_ADDR = user_config.get('setting', 'HB_ADDR')
 
 def binance2huobi(bn_addr, hb_addr, num):
     currency = 'USDT'
