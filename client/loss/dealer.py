@@ -534,7 +534,7 @@ class LossDealerClient(BaseDealerClient):
             'canceled': 4,
             'partial-canceled': 4,
             'NEW': 1,
-            'PARTIAL_FILLED': 2,
+            'PARTIALLY_FILLED': 2,
             'FILLED': 3,
             'CANCELED': 4,
             'REJECTED': 0,
