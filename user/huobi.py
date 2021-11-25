@@ -352,4 +352,4 @@ class HuobiUser(BaseUser):
             raise Exception(e)
         
     def withdraw_usdt(self, address: str, amount: float):
-        self.wallet_client.post_create_withdraw(address, amount, 'usdt', 1, chain='trc20usdt')
+        self.wallet_client.post_create_withdraw(address, amount, 'usdt', 0, chain='trc20usdt')
