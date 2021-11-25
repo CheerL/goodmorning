@@ -9,7 +9,7 @@ from client.loss import LossDealerClient as DClient, LossWatcherClient as WClien
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 EXCHANGE = user_config.get('setting', 'Exchange')
 
-def main(user, args):
+def dealer(user, args):
     logger.name = user.username
     user.start()
     client = DClient(user)
@@ -106,4 +106,4 @@ if __name__ == '__main__':
     if args.watcher:
         watcher(user)
     else:
-        main(user, args)
+        dealer(user, args)

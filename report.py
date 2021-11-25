@@ -205,3 +205,12 @@ def wx_report(account_id, wxuid, username, pay, income, profit, percent, buy_inf
         sell_records = Record.from_record_info(sell_info, profit_id, 'sell')
         session.add_all(buy_records + sell_records)
         session.commit()
+
+
+@retry(tries=5, delay=0.2)
+def wx_tmr_target_report(wxuid, targets):
+    if not wxuid:
+        return
+
+    msg = f'明日可能购买: {targets}'
+    wx_push(content=msg, uids=wxuid, content_type=1)
