@@ -1,4 +1,4 @@
-from utils import logger, config, datetime, user_config, parallel
+from utils import logger, config, datetime, user_config, parallel, get_rate
 from dataset.pgsql import get_holding_symbol
 from dataset.redis import Redis
 from retry import retry
@@ -8,14 +8,29 @@ from report import wx_tmr_target_report
 import time
 
 TEST = user_config.getboolean('setting', 'TEST')
+
+MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
+BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
+UP_LOSS_RATE = config.getfloat('loss', 'UP_LOSS_RATE')
+BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
+SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+MAX_DAY = config.getint('loss', 'MAX_DAY')
 MIN_NUM = config.getint('loss', 'MIN_NUM')
+MAX_NUM = config.getint('loss', 'MAX_NUM')
+MIN_VOL = config.getfloat('loss', 'MIN_VOL')
+MAX_VOL = config.getfloat('loss', 'MAX_VOL')
+MIN_PRICE = config.getfloat('loss', 'MIN_PRICE')
+MAX_PRICE = config.getfloat('loss', 'MAX_PRICE')
 MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
+SPECIAL_SYMBOLS = config.get('loss', 'SPECIAL_SYMBOLS')
 
 class LossWatcherClient:
     def __init__(self, user) -> None:
         self.user = user
+        self.market = user.market
         self.client_type = 'loss_watcher'
         self.targets = []
+        self.special_symbols = SPECIAL_SYMBOLS.split(',')
         logger.info('Start loss watcher.')
         self.redis = Redis()
         self.state = 0
@@ -63,6 +78,37 @@ class LossWatcherClient:
         while self.state != state:
             time.sleep(0.1)
 
+    def is_buy(self, klines, symbol=''):
+        if len(klines) <= MIN_BEFORE_DAYS and symbol not in self.special_symbols:
+            return False
+
+        cont_loss_list = []
+        for kline in klines:
+            rate = get_rate(kline.close, kline.open)
+            if rate < 0:
+                cont_loss_list.append(rate)
+            else:
+                break
+        
+        if not cont_loss_list:
+            return False
+
+        kline = klines[0]
+        rate = cont_loss_list[0]
+        cont_loss = sum(cont_loss_list)
+        max_loss = min(cont_loss_list)
+        boll = sum([kline.close for kline in klines[:20]]) / 20
+        if (
+            (
+                (len(cont_loss_list)==1 and cont_loss <= UP_LOSS_RATE and kline.close > boll) or
+                (rate == max_loss and cont_loss <= MIN_LOSS_RATE) or 
+                cont_loss <= BREAK_LOSS_RATE
+            )
+            and MIN_VOL <= kline.vol <= MAX_VOL and MIN_PRICE <= kline.close <= MAX_PRICE
+        ):
+            return True
+        return False
+
     def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS, force=False):
         infos = self.market.get_all_symbols_info()
         ori_symbols = symbols
@@ -104,4 +150,6 @@ class LossWatcherClient:
     
     def tmr_targets(self):
         targets, _ = self.find_targets(end=0)
-        wx_tmr_target_report(self.user.wxuid, ", ".join(targets.keys()))
+
+        if targets:
+            wx_tmr_target_report(self.user.wxuid, ", ".join(targets.keys()))

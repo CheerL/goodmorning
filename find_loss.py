@@ -67,7 +67,8 @@ def watcher(user):
     
     user.scheduler.add_job(client.get_targets, 'cron', second='*/30', max_instances=1)
     user.scheduler.add_job(client.update_target_price, 'interval', seconds=PRICE_INTERVAL, max_instances=2)
-    
+    user.scheduler.add_job(client.tmr_targets, 'cron', hour=16, minute=2, second=0, max_instances=1)
+
     client.wait_state(10)
     kill_all_threads()
 
