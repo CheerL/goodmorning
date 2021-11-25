@@ -213,7 +213,8 @@ def wx_tmr_target_report(wxuid, targets):
         return
 
     msg = f'明日可能购买: {targets}'
-    wx_push(content=msg, uids=wxuid, content_type=1)
+    summary = f'明日: {targets}'
+    wx_push(content=msg, uids=wxuid, content_type=1, summary=summary)
 
 @retry(tries=5, delay=0.2)
 def wx_withdraw_report(wxuid, bn_addr, hb_addr, direction, amount, currency):
@@ -222,6 +223,8 @@ def wx_withdraw_report(wxuid, bn_addr, hb_addr, direction, amount, currency):
 
     if direction == 'b2h':
         msg = f'币安 {bn_addr} 向火币 {hb_addr} 转入 {amount} {currency.upper()}'
+        summary = f'币安向火币转入 {amount}'
     elif direction == 'h2b':
         msg = f'火币 {hb_addr} 向币安 {bn_addr} 转入 {amount} {currency.upper()}'
-    wx_push(content=msg, uids=wxuid, content_type=1)
+        summary = f'火币向币安转入 {amount}'
+    wx_push(content=msg, uids=wxuid, content_type=1, summary=summary)
