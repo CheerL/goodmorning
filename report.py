@@ -214,3 +214,14 @@ def wx_tmr_target_report(wxuid, targets):
 
     msg = f'明日可能购买: {targets}'
     wx_push(content=msg, uids=wxuid, content_type=1)
+
+@retry(tries=5, delay=0.2)
+def wx_withdraw_report(wxuid, bn_addr, hb_addr, direction, amount, currency):
+    if not wxuid:
+        return
+
+    if direction == 'b2h':
+        msg = f'币安 {bn_addr} 向火币 {hb_addr} 转入 {amount} {currency.upper()}'
+    elif direction == 'h2b':
+        msg = f'火币 {hb_addr} 向币安 {bn_addr} 转入 {amount} {currency.upper()}'
+    wx_push(content=msg, uids=wxuid, content_type=1)

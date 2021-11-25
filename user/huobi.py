@@ -9,6 +9,7 @@ monkey.patch_all()
 from utils import logger, datetime
 from huobi.client.account import AccountClient
 from huobi.client.trade import TradeClient
+from huobi.client.wallet import WalletClient
 from huobi.constant import OrderSource, OrderType, AccountBalanceMode
 from huobi.model.account.account_update_event import AccountUpdateEvent, AccountUpdate
 from huobi.model.trade.order_update_event import OrderUpdateEvent, OrderUpdate
@@ -77,6 +78,7 @@ class HuobiUser(BaseUser):
         self.watch_dog = replace_watch_dog(gevent=True)
         self.account_client = AccountClient(api_key=access_key, secret_key=secret_key)
         self.trade_client = TradeClient(api_key=access_key, secret_key=secret_key)
+        self.wallet_client = WalletClient(api_key=access_key, secret_key=secret_key)
         super().__init__(access_key, secret_key, buy_amount, wxuid)
         self.scheduler = self.watch_dog.scheduler
         self.scheduler.timezone = datetime.Tz.get_tz()
@@ -348,3 +350,6 @@ class HuobiUser(BaseUser):
         except Exception as e:
             logger.error(e)
             raise Exception(e)
+        
+    def withdraw_usdt(self, address: str, amount: float):
+        self.wallet_client.post_create_withdraw(address, amount, 'usdt', 1, chain='trc20usdt')

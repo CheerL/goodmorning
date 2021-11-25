@@ -412,3 +412,6 @@ class BinanceUser(BaseUser):
                         asset += locked * kline.open
             asset_his.append((datetime.ts2date(ts), asset))
         return asset_his
+    
+    def withdraw_usdt(self, address: str, amount: float):
+        self.api.withdraw('USDT', amount, address, network='TRX')
