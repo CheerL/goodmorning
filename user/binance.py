@@ -269,9 +269,13 @@ class BinanceUser(BaseUser):
         symbol = target.symbol
         amount = target.check_amount(max(
             vol / price,
-            target.limit_order_min_order_amt
+            target.limit_order_min_order_amt,
         ))
-        ice_amount = target.check_amount(amount * 0.9)
+        ice_amount = target.check_amount(max(
+            amount / target.ice_part,
+            target.limit_order_min_order_amt,
+            target.min_order_value / price + 1 ** target.amount_precision
+        ))
         now = int(time.time())
         order = dict(
             symbol=symbol,
@@ -284,6 +288,7 @@ class BinanceUser(BaseUser):
             timestamp=now,
             newOrderRespType='ACK'
         )
+        print(order)
         # order_id = -1
 
         try:
@@ -355,7 +360,11 @@ class BinanceUser(BaseUser):
             target.limit_order_min_order_amt
         ))
         now = int(time.time())
-        ice_amount = target.check_amount(amount * 0.9)
+        ice_amount = target.check_amount(max(
+            amount / target.ice_part,
+            target.limit_order_min_order_amt,
+            target.min_order_value / price + 1 ** target.amount_precision
+        ))
         order = dict(
             symbol=symbol,
             side='SELL',
@@ -367,6 +376,7 @@ class BinanceUser(BaseUser):
             timestamp=now,
             newOrderRespType='ACK'
         )
+        print(order)
 
         try:
             logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')

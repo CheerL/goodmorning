@@ -46,6 +46,7 @@ class Symbol:
         self.symbol = info['symbol']
         self.state = info['status']
         self.sell_market_min_order_amt = 0.0
+        self.ice_part = 1
 
         for each in info['filters']:
             if each['filterType'] == 'PRICE_FILTER':
@@ -59,6 +60,8 @@ class Symbol:
                 self.sell_market_max_order_amt = float(each['maxQty'])
             elif each['filterType'] == 'MIN_NOTIONAL':
                 self.min_order_value = float(each['minNotional'])
+            elif each['filterType'] == 'ICEBERG_PARTS':
+                self.ice_part = int(each['limit'])
 
         min_amount_step = round(0.1**self.amount_precision, self.amount_precision)
         self.sell_market_min_order_amt = max(self.sell_market_min_order_amt, min_amount_step)

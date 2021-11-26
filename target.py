@@ -130,6 +130,7 @@ class LossTarget(BaseTarget):
 
     def set_info(self, info, fee_rate):
         super().set_info(info)
+        self.ice_part = info.ice_part
         self.fee_rate = fee_rate
 
     def set_mark_price(self, price,
