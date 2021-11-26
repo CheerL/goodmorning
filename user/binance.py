@@ -271,12 +271,14 @@ class BinanceUser(BaseUser):
             vol / price,
             target.limit_order_min_order_amt
         ))
+        ice_amount = target.check_amount(amount * 0.9)
         now = int(time.time())
         order = dict(
             symbol=symbol,
             side='BUY',
             type='LIMIT',
             timeInForce='GTC',
+            icebergQty=ice_amount,
             quantity=amount,
             price=str_price,
             timestamp=now,
@@ -353,12 +355,14 @@ class BinanceUser(BaseUser):
             target.limit_order_min_order_amt
         ))
         now = int(time.time())
+        ice_amount = target.check_amount(amount * 0.9)
         order = dict(
             symbol=symbol,
             side='SELL',
             type='LIMIT',
             timeInForce='GTC',
             quantity=amount,
+            icebergQty=ice_amount,
             price=str_price,
             timestamp=now,
             newOrderRespType='ACK'
