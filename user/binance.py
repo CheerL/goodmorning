@@ -288,7 +288,6 @@ class BinanceUser(BaseUser):
             timestamp=now,
             newOrderRespType='ACK'
         )
-        print(order)
         # order_id = -1
 
         try:
@@ -376,7 +375,6 @@ class BinanceUser(BaseUser):
             timestamp=now,
             newOrderRespType='ACK'
         )
-        print(order)
 
         try:
             logger.debug(f'Sell {amount} {symbol[:-4]} with price {price}')
