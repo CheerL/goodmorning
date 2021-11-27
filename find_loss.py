@@ -29,20 +29,31 @@ def dealer(user, args):
         targets = client.targets.setdefault(args.manual_date, {})
         if args.manual_symbol not in targets:
             end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
-            targets[args.manual_symbol] = client.find_targets([args.manual_symbol], end, force=True)
+            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+            targets.update(new_target)
         target = targets[args.manual_symbol]
         client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
         kill_all_threads()
         return
 
     if args.sell:
-        target = client.targets[args.manual_date][args.manual_symbol]
+        targets = client.targets.setdefault(args.manual_date, {})
+        if args.manual_symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
+            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+            targets.update(new_target)
+        target = targets[args.manual_symbol]
         client.sell_target(target, args.manual_price, args.manual_amount, 10)
         kill_all_threads()
         return
         
     if args.cancel:
-        target = client.targets[args.manual_date][args.manual_symbol]
+        targets = client.targets.setdefault(args.manual_date, {})
+        if args.manual_symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
+            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+            targets.update(new_target)
+        target = targets[args.manual_symbol]
         client.cancel_target(target, direction=args.cancel_direction)
         kill_all_threads()
         return

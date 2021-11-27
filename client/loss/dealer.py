@@ -189,8 +189,16 @@ class LossDealerClient(BaseDealerClient):
         symbols_num = len(symbols)
         targets_num = len(targets)
         usdt_amount = self.user.get_amount('usdt', available=True, check=False)
-        buy_num = max(min(targets_num-symbols_num, MAX_NUM-symbols_num), MIN_NUM-symbols_num)
-        buy_amount = usdt_amount // buy_num if not TEST else self.user.buy_amount
+        buy_num = max(
+            min(targets_num-symbols_num, MAX_NUM-symbols_num),
+            MIN_NUM-symbols_num
+        )
+
+        if TEST or buy_num == 0:
+            buy_amount = self.user.buy_amount
+        else:
+            buy_amount = usdt_amount // buy_num
+
         if buy_amount < self.user.min_usdt_amount:
             buy_amount = self.user.min_usdt_amount
             buy_num = int(usdt_amount // buy_amount)

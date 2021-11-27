@@ -118,26 +118,23 @@ class BaseUser:
 
     def get_amount(self, currency: str, available=False, check=True):
         @retry(tries=5, delay=0.05, logger=logger)
-        def _get_amount(_currency):
-            if _currency in self.balance:
-                pass
-            elif _currency.upper() in self.balance:
-                _currency = _currency.upper()
-            else:
+        def _get_amount():
+            if currency not in self.balance:
                 return 0
 
-            if available:
-                return self.available_balance[_currency]
             if check:
-                assert self.balance[_currency] - self.available_balance[_currency] < 1e-8, 'unavailable'
-            return self.balance[_currency]
+                assert self.balance[currency] - self.available_balance[currency] < 1e-8, 'unavailable'
+
+            if available:
+                return self.available_balance[currency]
+            return self.balance[currency]
 
         try:
-            return _get_amount(currency)
+            return _get_amount()
         except Exception as e:
             if isinstance(e, AssertionError):
                 self.update_currency(currency)
-                return _get_amount(currency)
+                return _get_amount()
             else:
                 raise e
 

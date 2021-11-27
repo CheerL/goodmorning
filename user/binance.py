@@ -113,6 +113,9 @@ class BinanceUser(BaseUser):
             user.account_id = id
         return users
 
+    def get_amount(self, currency: str, available=False, check=True):
+        return super().get_amount(currency.upper(), available=available, check=check)
+
     def get_account_id(self) -> int:
         return -1
 
@@ -272,7 +275,7 @@ class BinanceUser(BaseUser):
             target.limit_order_min_order_amt,
         ))
         ice_amount = target.check_amount(max(
-            amount / target.ice_part,
+            amount / target.ice_part + 1 ** target.amount_precision,
             target.limit_order_min_order_amt,
             target.min_order_value / price + 1 ** target.amount_precision
         ))
@@ -360,7 +363,7 @@ class BinanceUser(BaseUser):
         ))
         now = int(time.time())
         ice_amount = target.check_amount(max(
-            amount / target.ice_part,
+            amount / target.ice_part + 1 ** target.amount_precision,
             target.limit_order_min_order_amt,
             target.min_order_value / price + 1 ** target.amount_precision
         ))

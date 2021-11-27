@@ -107,6 +107,9 @@ class HuobiUser(BaseUser):
         else:
             self.buy_amount = float(self.buy_amount)
 
+    def get_amount(self, currency: str, available=False, check=True):
+        return super().get_amount(currency.lower(), available=available, check=check)
+
     def update_currency(self, currency=''):
         def _update_currency(_balance):
             _currency = _balance.currency
