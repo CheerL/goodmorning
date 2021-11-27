@@ -356,7 +356,8 @@ class LossDealerClient(BaseDealerClient):
             price = target.now_price
 
         if limit:
-            summary = self.user.buy_limit(target, vol, price * (1+limit_rate))
+            random_rate = float(str(hash(target.date))[-1]) / 10000 - 0.0005
+            summary = self.user.buy_limit(target, vol, price * (1+limit_rate+random_rate))
         else:
             summary = self.user.buy(target, vol)
 
