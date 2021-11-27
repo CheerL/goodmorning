@@ -9,8 +9,8 @@ from utils import user_config, config
 
 BN_ADDR = user_config.get('setting', 'BN_ADDR')
 HB_ADDR = user_config.get('setting', 'HB_ADDR')
-MAX_VOL = config.get('withdraw', 'MAX_VOL')
-MIN_VOL = config.get('withdraw', 'MIN_VOL')
+MAX_VOL = config.getfloat('withdraw', 'MAX_VOL')
+MIN_VOL = config.getfloat('withdraw', 'MIN_VOL')
 
 def binance2huobi(bn_addr, hb_addr, num):
     currency = 'USDT'
