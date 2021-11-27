@@ -5,27 +5,32 @@ from user.binance import BinanceUser
 from client.loss import LossDealerClient as DClient
 from dataset.redis import Redis
 from report import wx_withdraw_report
-from utils import user_config
+from utils import user_config, config
 
 BN_ADDR = user_config.get('setting', 'BN_ADDR')
 HB_ADDR = user_config.get('setting', 'HB_ADDR')
+MAX_VOL = config.get('withdraw', 'MAX_VOL')
+MIN_VOL = config.get('withdraw', 'MIN_VOL')
 
 def binance2huobi(bn_addr, hb_addr, num):
     currency = 'USDT'
     [user] = BinanceUser.init_users(num=num)
     user.update_currency(currency)
     amount = math.floor(user.available_balance[currency])-1
-    if amount > 500:
+    if amount > MIN_VOL:
         # date = datetime.ts2date()
-        user.withdraw_usdt(hb_addr, amount)
         redis = Redis()
         key = f'{bn_addr}-{hb_addr}'
         old_amount = redis.get(key)
         if old_amount:
             old_amount = float(old_amount.decode())
-            amount += old_amount
+            # amount += old_amount
+        else:
+            old_amount = 0
 
-        redis.set(key, amount)
+        amount = min(amount, MAX_VOL - old_amount)
+        user.withdraw_usdt(hb_addr, amount)
+        redis.set(key, amount + old_amount)
         wx_withdraw_report(user.wxuid, bn_addr, hb_addr, 'b2h', amount, currency)
 
 def huobi2binance(bn_addr, hb_addr, num):
