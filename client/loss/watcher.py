@@ -149,6 +149,4 @@ class LossWatcherClient:
     
     def tmr_targets(self):
         targets, _ = self.find_targets(end=0)
-
-        if targets:
-            wx_tmr_target_report(self.user.wxuid, ", ".join(targets.keys()))
+        wx_tmr_target_report(self.user.wxuid, ", ".join(targets.keys()))
