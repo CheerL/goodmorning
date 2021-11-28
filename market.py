@@ -33,7 +33,7 @@ class MarketClient(_MarketClient):
             if symbol not in self.exclude_list
             and not re.search('\d', symbol)
             and symbol in base_price
-            and base_price[symbol] < 100
+            and base_price[symbol] < 50
         }
 
     def update_symbols_info(self) -> 'tuple[list[str], list[str]]':
