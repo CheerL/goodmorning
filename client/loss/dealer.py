@@ -1,5 +1,5 @@
 import time
-
+import hashlib
 from retry import retry
 from target import LossTarget as Target
 from utils import config, logger, user_config, get_rate, datetime, parallel
@@ -356,7 +356,8 @@ class LossDealerClient(BaseDealerClient):
             price = target.now_price
 
         if limit:
-            random_rate = float(str(hash(target.date))[-1]) / 10000 - 0.0005
+            random_rate = (int(hashlib.sha1(target.date.encode()).hexdigest(), 16)%10) * 0.0001 - 0.0005
+            # random_rate = float(str(hash(target.date))[-1]) / 10000 - 0.0005
             summary = self.user.buy_limit(target, vol, price * (1+limit_rate+random_rate))
         else:
             summary = self.user.buy(target, vol)
