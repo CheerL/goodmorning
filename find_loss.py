@@ -1,4 +1,4 @@
-
+import time
 import argparse
 
 from user.huobi import HuobiUser
@@ -33,6 +33,7 @@ def dealer(user, args):
             targets.update(new_target)
         target = targets[args.manual_symbol]
         client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
+        time.sleep(5)
         kill_all_threads()
         return
 
@@ -44,6 +45,7 @@ def dealer(user, args):
             targets.update(new_target)
         target = targets[args.manual_symbol]
         client.sell_target(target, args.manual_price, args.manual_amount, 10)
+        time.sleep(5)
         kill_all_threads()
         return
         
@@ -55,6 +57,7 @@ def dealer(user, args):
             targets.update(new_target)
         target = targets[args.manual_symbol]
         client.cancel_target(target, direction=args.cancel_direction)
+        time.sleep(5)
         kill_all_threads()
         return
 

@@ -64,7 +64,8 @@ class BaseTarget:
             if checked_amount < 0:
                 checked_amount = 0
             elif checked_amount > amount:
-                checked_amount = round(amount - 0.1 ** self.amount_precision, self.amount_precision)
+                checked_amount -= 0.1 ** self.amount_precision
+                # checked_amount = round(amount - 0.1 ** self.amount_precision, self.amount_precision)
 
         if to_str:
             return f'%.{self.amount_precision}f' % checked_amount

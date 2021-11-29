@@ -275,9 +275,9 @@ class BinanceUser(BaseUser):
             target.limit_order_min_order_amt,
         ))
         ice_amount = target.check_amount(max(
-            amount / target.ice_part + 1 ** target.amount_precision,
+            amount / target.ice_part + 0.1 ** target.amount_precision,
             target.limit_order_min_order_amt,
-            target.min_order_value / price + 1 ** target.amount_precision
+            target.min_order_value / price + 0.1 ** target.amount_precision
         ))
         now = int(time.time())
         order = dict(
@@ -363,9 +363,9 @@ class BinanceUser(BaseUser):
         ))
         now = int(time.time())
         ice_amount = target.check_amount(max(
-            amount / target.ice_part + 1 ** target.amount_precision,
+            amount / target.ice_part + 0.1 ** target.amount_precision,
             target.limit_order_min_order_amt,
-            target.min_order_value / price + 1 ** target.amount_precision
+            target.min_order_value / price + 0.1 ** target.amount_precision
         ))
         order = dict(
             symbol=symbol,
