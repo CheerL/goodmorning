@@ -306,7 +306,7 @@ class LossDealerClient(BaseDealerClient):
             self.check_target_price(target)
     
     def get_sell_amount(self, target):
-        @retry(tries=10, delay=0.05)
+        @retry(tries=10, delay=0.1)
         def _get_sell_amount():
             available_amount = self.user.get_amount(target.base_currency, True, False)
             assert_word = f'{target.base_currency} not enough, want {target.own_amount} but only have {available_amount}'
@@ -353,7 +353,7 @@ class LossDealerClient(BaseDealerClient):
             return
 
         if not price:
-            price = target.now_price
+            price = target.init_price
 
         if limit:
             random_rate = (int(hashlib.sha1(target.date.encode()).hexdigest(), 16)%10) * 0.0001 - 0.0005
@@ -389,7 +389,6 @@ class LossDealerClient(BaseDealerClient):
 
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
-        target.selling = selling_level
         sell_amount = sell_amount or self.get_sell_amount(target)
         if limit:
             if sell_amount * price < target.min_order_value:
@@ -403,6 +402,7 @@ class LossDealerClient(BaseDealerClient):
             summary = self.user.sell(target, sell_amount)
 
         if summary != None:
+            target.selling = selling_level
             summary.add_filled_callback(filled_callback, [summary])
             summary.add_cancel_callback(cancel_callback, [summary])
             summary.label = target.date
@@ -418,9 +418,9 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
             if summary:
-                target.selling = 0
-                if direction == 'sell':
+                if direction == 'sell' and target.selling != 0:
                     target.set_sell(summary.amount)
+                    target.selling = 0
                 else:
                     target.set_buy(summary.vol, summary.amount)
 
@@ -695,6 +695,22 @@ class LossDealerClient(BaseDealerClient):
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
 
+
+    def fake_trans(self, target: Target, new_target: Target, price: float):
+        new_target_amount = new_target.init_buy_amount / price
+        new_target_need_amount = max(new_target_amount - new_target.own_amount, 0)
+        trans_amount = target.check_amount(min(new_target_need_amount, target.own_amount))
+        if trans_amount > 0.1 ** target.amount_precision:
+            now = datetime.time2ts()
+            sell_summary = OrderSummary(-1, target.symbol, 'sell', target.date)
+            OrderSQL.add_order(sell_summary, target.date, self.user.account_id)
+            target.set_sell(trans_amount)
+
+            buy_summary = OrderSummary(-1, new_target.symbol, 'buy', new_target.date)
+            OrderSQL.add_order(buy_summary, new_target.date, self.user.account_id)
+            new_target.set_buy(trans_amount * price, trans_amount)
+
+
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
         def clear_buy():
@@ -724,13 +740,15 @@ class LossDealerClient(BaseDealerClient):
         def clear_old_targets(level=6):
             tickers = self.market.get_market_tickers()
             for ticker in tickers:
+                now_price = ticker.close
                 symbol = ticker.symbol
                 for target in clear_targets.get(symbol, []):
                     if not target.own or target.own_amount < target.sell_market_min_order_amt:
                         target.own = False
-
+                        continue
+                    
                     logger.info(f'Finally sell {target.symbol} of {target.date}')
-                    market_price = ticker.close * (1-SELL_UP_RATE)
+                    market_price = now_price * (1-SELL_UP_RATE)
                     self.cancel_and_sell_limit_target(target, market_price, level)
 
         logger.info('Start to sell')
@@ -746,7 +764,7 @@ class LossDealerClient(BaseDealerClient):
                     clear_targets.setdefault(symbol, []).append(target)
 
         Timer(0, clear_buy).start()
-        
+       
         clear_symbols = ",".join(clear_targets.keys())
         logger.info(f'Clear old: {clear_date}. targets are {clear_symbols}')
         Timer(0, clear_old_targets, args=[6]).start()
@@ -771,7 +789,7 @@ class LossDealerClient(BaseDealerClient):
         self.date = max(self.targets.keys())
 
         for target in self.targets[self.date].values():
-            self.buy_target(target)
+            self.buy_target(target, target.init_price)
 
     def update_targets(self, end=1):
         def cancel(target):
@@ -797,7 +815,6 @@ class LossDealerClient(BaseDealerClient):
             now_target = self.targets[date].setdefault(symbol, target)
             now_target.set_mark_price(target.init_price)
             self.cancel_and_buy_limit_target(now_target, target.init_price)
-            Timer(85000, cancel, args=[now_target]).start()
             
     def update_asset(self, limit=1):
         if limit > 1:
