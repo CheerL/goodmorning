@@ -23,7 +23,7 @@ def binance2huobi(bn_addr, hb_addr, num):
             redis = Redis()
             key = f'{bn_addr}-{hb_addr}'
             old_amount = redis.get(key)
-            old_amount = float(old_amount.decode()) if amount else 0
+            old_amount = float(old_amount.decode()) if old_amount else 0
             amount = min(amount, MAX_VOL - old_amount)
             logger.info(f'{old_amount}U has been transfered from Huobi to Binance')
             logger.info(f'Withdraw {amount}U to Binance')
