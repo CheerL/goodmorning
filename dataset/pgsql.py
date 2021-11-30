@@ -246,6 +246,7 @@ class Order(Base):
     @classmethod
     def add_order(cls, summary, date, account_id):
         with get_session() as session:
+            finished = 1 if summary.status in [3, 4] else 0
             order = cls(
                 order_id=str(summary.order_id),
                 symbol=summary.symbol,
@@ -254,9 +255,9 @@ class Order(Base):
                 account=str(account_id),
                 direction=summary.direction,
                 aver_price=summary.aver_price,
-                amount=0,
-                vol=0,
-                finished=0
+                amount=summary.amount,
+                vol=summary.vol,
+                finished=finished
             )
             session.add(order)
             session.commit()

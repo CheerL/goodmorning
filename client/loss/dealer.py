@@ -50,6 +50,7 @@ class LossDealerClient(BaseDealerClient):
         self.targets[self.date] = {}
 
         start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
+        clear_date = datetime.ts2date(now - (MAX_DAY + 1) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
             TargetSQL.exchange == self.user.user_type
@@ -127,7 +128,7 @@ class LossDealerClient(BaseDealerClient):
                 logger.info(f'{symbol} of {self.date} already reach high mark {target.high_mark_price}, now price {target.now_price}')
                 target.high_mark = target.low_mark = True
                 if not target.own:
-                    logger.info(f'{symbol} of {self.date} has been sold')
+                    logger.info(f'{symbol} of {self.date} is empty')
                 elif target.selling > 0:
                     logger.info(f'{symbol} of {self.date} is high back selling')
                     target.high_selling = True
@@ -137,7 +138,7 @@ class LossDealerClient(BaseDealerClient):
                 logger.info(f'{symbol} of {self.date} already reach low mark {target.low_mark_price}, now price {target.now_price}')
                 target.low_mark = True
                 if not target.own:
-                    logger.info(f'{symbol} of {self.date} has been sold')
+                    logger.info(f'{symbol} of {self.date} is empty')
                 elif target.selling > 0:
                     logger.info(f'{symbol} of {self.date} is low back selling')
                     target.low_selling = True
@@ -155,40 +156,51 @@ class LossDealerClient(BaseDealerClient):
                 amount = min(self.user.available_balance[target.base_currency], target.own_amount)
                 if amount < target.sell_market_min_order_amt:
                     continue
-                logger.info(f'Find old {amount} {target.symbol} of {target.date}, long sell with price {target.long_sell_price}')
-                self.sell_target(
-                    target,
-                    price=target.long_sell_price,
-                    sell_amount=amount,
-                    selling_level=1,
-                    limit=amount * target.now_price > target.min_order_value
-                )
+                
+                if target.date > clear_date:
+                    logger.info(f'Find {amount} {target.symbol} of {target.date}, long sell with price {target.long_sell_price}')
+                    self.sell_target(
+                        target,
+                        price=target.long_sell_price,
+                        sell_amount=amount,
+                        selling_level=1,
+                        limit=amount * target.now_price > target.min_order_value
+                    )
+                else:
+                    logger.info(f'Find {amount} {target.symbol} of {target.date}, sell with market price')
+                    self.sell_target(
+                        target,
+                        price=target.clear_price,
+                        sell_amount=amount,
+                        selling_level=30,
+                        limit=False
+                    )
 
         logger.info('Finish loading data')
 
     def check_target_price(self, target: Target):
         def low_callback(target):
             logger.info(f'Cancel buy {target.symbol} since reach low mark')
-            self.cancel_and_sell_limit_target(target, price=0, direction='buy', force=True, sell=False)
+            self.cancel_and_sell_target(target, price=0, direction='buy', force=True, sell=False)
 
         if target.high_check():
             logger.info(f'High back sell {target.symbol}')
-            self.cancel_and_sell_limit_target(
+            self.cancel_and_sell_target(
                 target, target.high_mark_back_price,
                 selling_level=3, force=True
             )
 
         elif target.low_check(low_callback):
             logger.info(f'Low back sell {target.symbol}')
-            self.cancel_and_sell_limit_target(
+            self.cancel_and_sell_target(
                 target, target.low_mark_back_price,
                 selling_level=3.5, force=True
             )
 
-    def filter_targets(self, targets, symbols=[]):
+    def filter_targets(self, targets, symbols=[], vol=0):
         symbols_num = len(symbols)
         targets_num = len(targets)
-        usdt_amount = self.user.get_amount('usdt', available=True, check=False)
+        usdt_amount = self.user.get_amount('usdt', available=True, check=False) + vol
         buy_num = max(
             min(targets_num-symbols_num, MAX_NUM-symbols_num),
             MIN_NUM-symbols_num
@@ -255,7 +267,7 @@ class LossDealerClient(BaseDealerClient):
     def find_targets(self, symbols=[], end=0, min_before_days=MIN_BEFORE_DAYS, force=False):
         infos = self.market.get_all_symbols_info()
         ori_symbols = symbols
-        if len(symbols) < MIN_NUM and not force:
+        if not force:
             symbols = infos.keys()
         targets = {}
         now = time.time()
@@ -290,6 +302,39 @@ class LossDealerClient(BaseDealerClient):
         date = datetime.ts2date(now - end * 86400)
         logger.info(f'Targets of {self.user.username} in {date} are {",".join(targets.keys())}')
         return targets, date
+    
+    def update_targets(self, end=0, min_before_days=MIN_BEFORE_DAYS):
+        @retry(tries=5, delay=1)
+        def worker(symbol):
+            try:
+                klines = self.market.get_candlestick(symbol, '1day', min_before_days+end+1)[end:]
+            except Exception as e:
+                logger.error(f'[{symbol}]  {e}')
+                raise e
+
+            kline = klines[0]
+            target = self.targets[date][symbol]
+            target.vol = kline.vol
+            target.set_mark_price(kline.close)
+            if now - kline.id > 86400 and not TEST:
+                TargetSQL.add_target(
+                    symbol=target.symbol,
+                    exchange=self.user.user_type,
+                    date=target.date,
+                    high=kline.high,
+                    low=kline.low,
+                    open=kline.open,
+                    close=kline.close,
+                    vol=kline.vol
+                )
+
+
+        now = time.time()
+        date = datetime.ts2date(now - end * 86400)
+        parallel.run_thread_pool([
+            (worker, (symbol,)) for symbol
+            in self.targets.setdefault(date, {}).keys()
+        ], True, 4)
 
     def watch_targets(self):
         if not self.date or not self.targets.get(self.date, {}):
@@ -385,7 +430,7 @@ class LossDealerClient(BaseDealerClient):
         if target.selling >= selling_level:
             return
         elif target.selling != 0:
-            return self.cancel_and_sell_limit_target(target, price, selling_level)
+            return self.cancel_and_sell_target(target, price, selling_level)
 
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
@@ -412,9 +457,9 @@ class LossDealerClient(BaseDealerClient):
         return summary
 
     def cancel_target(self, target: Target, direction='sell'):
-        self.cancel_and_sell_limit_target(target, price=0, direction=direction, sell=False, force=True)
+        self.cancel_and_sell_target(target, price=0, direction=direction, sell=False, force=True)
 
-    def cancel_and_sell_limit_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False, sell=True):
+    def cancel_and_sell_target(self, target: Target, price, selling_level=1, direction='sell', filled_callback=None, cancel_callback=None, force=False, sell=True, limit=True):
         @retry(tries=5, delay=0.05)
         def cancel_and_sell_callback(summary=None):
             if summary:
@@ -430,7 +475,7 @@ class LossDealerClient(BaseDealerClient):
                     target, price, sell_amount, selling_level,
                     filled_callback=filled_callback,
                     cancel_callback=cancel_callback,
-                    limit=sell_amount * price > target.min_order_value
+                    limit=sell_amount * price > target.min_order_value if limit else False
                 )
 
         if not force and direction=='sell' and selling_level <= target.selling:
@@ -459,7 +504,7 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-    def cancel_and_buy_limit_target(self, target: Target, price=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None):
+    def cancel_and_buy_target(self, target: Target, price=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True):
         @retry(tries=5, delay=0.05)
         def cancel_and_buy_callback(summary=None):
             if summary:
@@ -468,7 +513,8 @@ class LossDealerClient(BaseDealerClient):
             self.buy_target(
                 target, price, None, limit_rate,
                 filled_callback=filled_callback,
-                cancel_callback=cancel_callback
+                cancel_callback=cancel_callback,
+                limit=limit
             )
 
         symbol = target.symbol
@@ -501,71 +547,85 @@ class LossDealerClient(BaseDealerClient):
         order_id = int(order.order_id)
         symbol = order.symbol
 
-        try:
-            detail = self.user.get_order(symbol, order_id)
-        except Exception as e:
-            if 'record invalid' not in str(e):
-                raise e
-            else:
-                if not order.finished:
-                    order.update([OrderSQL.order_id==order.order_id], {'finished': 1})
-                return
-
-        if order_id in self.user.orders:
-            summary = self.user.orders[order_id]
-        else:
+        if order_id < 0:
             summary = OrderSummary(order_id, symbol, order.direction, order.date)
-            self.user.orders[order_id] = summary
+            summary.limit = True
+            summary.created_price = summary.aver_price = order.aver_price
+            summary.created_amount = summary.amount = order.amount
+            summary.created_ts = summary.ts = order.tm
+            summary.status = 3
+            summary.vol = order.vol
+            summary.fee = 0
             if order.direction == 'buy':
-                self.user.buy_id.append(order_id)
+                target.set_buy(summary.vol, summary.amount)
             else:
-                self.user.sell_id.append(order_id)
-        
-        if 'market' in detail.type:
-            summary.limit = False
-            summary.created_price = 0
+                target.set_sell(summary.amount)
         else:
-            summary.created_price = detail.price
-        
+            try:
+                detail = self.user.get_order(symbol, order_id)
+            except Exception as e:
+                if 'record invalid' not in str(e):
+                    raise e
+                else:
+                    if not order.finished:
+                        order.update([OrderSQL.order_id==order.order_id], {'finished': 1})
+                    return
 
-        if detail.type in ['buy-limit', 'sell-limit', 'sell-market']:
-            summary.created_amount = detail.amount
-            summary.remain = summary.created_amount - summary.amount
-
-        elif detail.type in ['buy-market']:
-            summary.created_vol = detail.amount
-            summary.remain = summary.created_vol - summary.vol
-        summary.created_ts = detail.created_at / 1000
-        summary.ts = max(detail.created_at, detail.finished_at, detail.canceled_at) / 1000
-        status = {
-            'submitted': 1,
-            'partial-filled': 2,
-            'filled': 3,
-            'canceled': 4,
-            'partial-canceled': 4,
-            'NEW': 1,
-            'PARTIALLY_FILLED': 2,
-            'FILLED': 3,
-            'CANCELED': 4,
-            'REJECTED': 0,
-            'EXPIRED': 4
-        }[detail.state]
-
-        if (detail.filled_amount != summary.amount
-            or detail.filled_cash_amount != summary.vol
-            or status != summary.status
-        ):
-            if order.direction == 'buy':
-                target.set_sell(summary.amount, summary.vol)
-                target.set_buy(detail.filled_cash_amount, detail.filled_amount)
+            if order_id in self.user.orders:
+                summary = self.user.orders[order_id]
             else:
-                target.set_sell(detail.filled_amount - summary.amount)
+                summary = OrderSummary(order_id, symbol, order.direction, order.date)
+                self.user.orders[order_id] = summary
+                if order.direction == 'buy':
+                    self.user.buy_id.append(order_id)
+                else:
+                    self.user.sell_id.append(order_id)
+            
+            if 'market' in detail.type:
+                summary.limit = False
+                summary.created_price = 0
+            else:
+                summary.created_price = detail.price
+            
 
-            summary.status = status
-            summary.amount = detail.filled_amount
-            summary.vol = detail.filled_cash_amount
-            summary.aver_price = summary.vol / summary.amount if summary.amount else summary.created_price
-            summary.fee = summary.vol * self.user.fee_rate
+            if detail.type in ['buy-limit', 'sell-limit', 'sell-market']:
+                summary.created_amount = detail.amount
+                summary.remain = summary.created_amount - summary.amount
+
+            elif detail.type in ['buy-market']:
+                summary.created_vol = detail.amount
+                summary.remain = summary.created_vol - summary.vol
+            summary.created_ts = detail.created_at / 1000
+            summary.ts = max(detail.created_at, detail.finished_at, detail.canceled_at) / 1000
+            status = {
+                'submitted': 1,
+                'partial-filled': 2,
+                'filled': 3,
+                'canceled': 4,
+                'partial-canceled': 4,
+                'NEW': 1,
+                'PARTIALLY_FILLED': 2,
+                'FILLED': 3,
+                'CANCELED': 4,
+                'REJECTED': 0,
+                'EXPIRED': 4
+            }[detail.state]
+
+            if (detail.filled_amount != summary.amount
+                or detail.filled_cash_amount != summary.vol
+                or status != summary.status
+            ):
+                if order.direction == 'buy':
+                    target.set_sell(summary.amount, summary.vol)
+                    target.set_buy(detail.filled_cash_amount, detail.filled_amount)
+                else:
+                    target.set_sell(detail.filled_amount - summary.amount)
+
+                summary.status = status
+                summary.amount = detail.filled_amount
+                summary.vol = detail.filled_cash_amount
+                summary.aver_price = summary.vol / summary.amount if summary.amount else summary.created_price
+                summary.fee = summary.vol * self.user.fee_rate
 
         return summary
 
@@ -695,127 +755,215 @@ class LossDealerClient(BaseDealerClient):
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
 
+    def fake_trade(self, target: Target, data: dict, direction: str):
+        now = data['T']
+        trans_amount = data['z']
+        trans_vol = data['Z']
+        if direction == 'sell':
+            id = int(f'-{now}{self.user.account_id}{0}')
+            target.set_sell(trans_amount)
+        elif direction == 'buy':
+            id = int(f'-{now}{self.user.account_id}{1}')
+            target.set_buy(trans_vol, trans_amount)
+            
+        summary = OrderSummary(id, target.symbol, direction, target.date)
+        summary.update(data)
+        OrderSQL.add_order(summary, target.date, self.user.account_id)
 
     def fake_trans(self, target: Target, new_target: Target, price: float):
         new_target_amount = new_target.init_buy_amount / price
         new_target_need_amount = max(new_target_amount - new_target.own_amount, 0)
         trans_amount = target.check_amount(min(new_target_need_amount, target.own_amount))
         if trans_amount > 0.1 ** target.amount_precision:
+            logger.info(f'{target.symbol} overlaps, transfer {trans_amount} from {target.date} to {new_target.date} with price {price}')
             now = datetime.time2ts()
-            sell_summary = OrderSummary(-1, target.symbol, 'sell', target.date)
-            OrderSQL.add_order(sell_summary, target.date, self.user.account_id)
-            target.set_sell(trans_amount)
-
-            buy_summary = OrderSummary(-1, new_target.symbol, 'buy', new_target.date)
-            OrderSQL.add_order(buy_summary, new_target.date, self.user.account_id)
-            new_target.set_buy(trans_amount * price, trans_amount)
-
+            trans_vol = trans_amount * price
+            data = {
+                'from': 'binance',
+                'T': round(now * 1000),
+                'z': trans_amount,
+                'Z': trans_vol,
+                'X': 'FILLED'
+            }
+            self.fake_trade(target, data, 'sell')
+            self.fake_trade(new_target, data, 'buy')
 
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
-        def clear_buy():
-            for target in self.targets.get(date, {}).values():
+        def clear_buy(yesterday):
+            for target in self.targets.get(yesterday, {}).values():
                 self.cancel_target(target, 'buy')
         
-        def clear_today_targets(level=4):
-            for target in self.targets.get(date, {}).values():
+        def clear_yesterday_targets(targets: 'list[Target]', limit=True, level=4):
+            for target in targets:
                 if not target.own or target.own_amount < target.sell_market_min_order_amt:
                     target.own = False
                     continue
 
-                logger.info(f'Sell {target.symbol} of {target.date}(yestoday)')
+                logger.info(f'Sell {target.symbol} of {target.date}(yesterday)')
                 market_price = target.now_price * (1-SELL_UP_RATE)
                 sell_price = max(target.clear_price, market_price)
-                self.cancel_and_sell_limit_target(target, sell_price, level)
+                self.cancel_and_sell_target(target, sell_price, level, limit=limit)
 
-        def long_sell_today_targets(level=5):
-            for target in self.targets.get(date, {}).values():
+        def long_sell_yesterday_targets(targets: 'list[Target]', limit=True, level=5):
+            for target in targets:
                 if not target.own or target.own_amount < target.sell_market_min_order_amt:
                     target.own = False
                     continue
                 
-                logger.info(f'Long sell {target.symbol} of {target.date}(yestoday)')
-                self.cancel_and_sell_limit_target(target, target.long_sell_price, level)
+                logger.info(f'Long sell {target.symbol} of {target.date}(yesterday)')
+                self.cancel_and_sell_target(target, target.long_sell_price, level)
 
-        def clear_old_targets(level=6):
+        def clear_old_targets(targets: 'list[Target]', limit=True, level=6):
             tickers = self.market.get_market_tickers()
-            for ticker in tickers:
-                now_price = ticker.close
-                symbol = ticker.symbol
-                for target in clear_targets.get(symbol, []):
-                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                        target.own = False
-                        continue
+            for target in targets:
+                target.update_price(tickers)
+                symbol = target.symbol
+                now_price = target.now_price
+                if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                    target.own = False
+                    continue
+                    
+                if symbol in self.targets[self.date]:
+                    new_target = self.targets[self.date][symbol]
+                    if new_target.own_amount == 0:
+                        self.fake_trans(target, new_target, now_price)
+                        if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                            target.own = False
+                            continue
                     
                     logger.info(f'Finally sell {target.symbol} of {target.date}')
                     market_price = now_price * (1-SELL_UP_RATE)
-                    self.cancel_and_sell_limit_target(target, market_price, level)
+                    self.cancel_and_sell_target(target, market_price, level)
 
-        logger.info('Start to sell')
-        date = date or self.date
-        clear_date = datetime.ts2date(datetime.date2ts(date) - (MAX_DAY-1) * 86400)
-        clear_targets = {}
-        for day, targets in self.targets.items():
-            for symbol, target in targets.items():
-                if (
-                    day <= clear_date and target.own and 
-                    target.own_amount > target.sell_market_min_order_amt
-                ):
-                    clear_targets.setdefault(symbol, []).append(target)
+        def get_targets(clear_date, yesterday):
+            sell_vol = 0
+            old_targets = []
+            clear_targets = []
+            long_sell_targets = []
+            tickers = self.market.get_market_tickers()
 
-        Timer(0, clear_buy).start()
-       
-        clear_symbols = ",".join(clear_targets.keys())
-        logger.info(f'Clear old: {clear_date}. targets are {clear_symbols}')
-        Timer(0, clear_old_targets, args=[6]).start()
-        Timer(15, clear_old_targets, args=[6.1]).start()
-        Timer(30, clear_old_targets, args=[6.2]).start()
-
-        symbols = ','.join(self.targets.get(date, {}).keys())
-        logger.info(f'Clear yesterday: {date}. targets are {symbols}')
-        Timer(0, clear_today_targets, args=[4]).start()
-        Timer(15, clear_today_targets, args=[4.1]).start()
-        Timer(30, clear_today_targets, args=[4.2]).start()
-
-        Timer(120, long_sell_today_targets, args=[5]).start()
-
+            for day, targets in self.targets.items():
+                for target in targets.values():
+                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                        target.own = False
+                        continue
+                        
+                    target.update_price(tickers)
+                    if day <= clear_date:
+                        old_targets.append(target)
+                        sell_vol += target.own_amount * target.now_price
+                    elif day == yesterday:
+                        if target.now_price <= target.clear_price:
+                            long_sell_targets.append(target)
+                        else:
+                            clear_targets.append(target)
+                            sell_vol += target.own_amount * target.now_price
+            
+            return sell_vol, old_targets, clear_targets, long_sell_targets
         
+        clear_date = datetime.ts2date(datetime.date2ts(date) - (MAX_DAY-1) * 86400)
+        yesterday = date or self.date
 
-    def buy_targets(self, end=0):
-        logger.info('Start to find today new targets')
-        targets, date = self.find_targets(end=end)
-        targets = self.filter_targets(targets)
-        self.targets[date] = targets
+        logger.info('Cancel all buy orders')
+        clear_buy(yesterday)
+        time.sleep(10)
+
+        logger.info('Find new target and check old')
+
+        targets, new_date = self.find_targets()
+        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, yesterday)
+        targets = self.filter_targets(targets, vol=sell_vol)
+        self.targets[new_date] = targets
         self.date = max(self.targets.keys())
 
-        for target in self.targets[self.date].values():
-            self.buy_target(target, target.init_price)
+        logger.info('Start to sell')
+        old_symbols = ",".join(set([target.symbol for target in old_targets]))
+        logger.info(f'Clear old before {clear_date}. targets are {old_symbols}')
+        symbols = ','.join(set([target.symbol for target in yesterday_targets]))
+        logger.info(f'Clear yesterday {date}. targets are {symbols}')
 
-    def update_targets(self, end=1):
-        def cancel(target):
-            logger.info(f'Too long time, stop to buy {target.symbol}')
-            order_id_list = list(self.user.orders.keys())
-            for order_id in order_id_list:
-                summary = self.user.orders[order_id]
-                if (summary.symbol == target.symbol and summary.order_id in self.user.buy_id 
-                    and summary.label == target.date and summary.status in [1, 2]
-                ):
-                    try:
-                        self.user.cancel_order(summary.symbol, summary.order_id)
-                        logger.info(f'Cancel open buy order for {target.symbol}')
-                    except Exception as e:
-                        logger.error(f'{summary.order_id} {summary.status} {summary.symbol} {e}')
+        Timer(0, clear_old_targets, kwargs={'targets': old_targets, 'level': 6}).start()
+        Timer(15, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.1}).start()
+        Timer(30, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.2}).start()
+        Timer(45, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.3}).start()
+        Timer(90, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.5, 'limit': False}).start()
 
-        logger.info('Start to update today\'s targets')
+        Timer(0, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4}).start()
+        Timer(15, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.1}).start()
+        Timer(30, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.2}).start()
+        Timer(45, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.3}).start()
+        Timer(90, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.5, 'limit': False}).start()
+
+        Timer(90, long_sell_yesterday_targets, kwargs={'targets': long_sell_targets, 'level': 4}).start()
+
+    # def buy_targets(self, end=0):
+    #     logger.info('Start to find today new targets')
+    #     targets, date = self.find_targets(end=end)
+    #     targets = self.filter_targets(targets)
+    #     self.targets[date] = targets
+    #     self.date = max(self.targets.keys())
+
+    #     for target in self.targets[self.date].values():
+    #         self.buy_target(target, target.init_price)
+
+    def update_and_buy_targets(self, end=1):
+        def get_buy_vol(own_vols, target_num, total_vol, min_vol):
+            left_vol = total_vol
+            own_num = len(own_vols)
+            for i, own_vol in enumerate(own_vols):
+                last_vol = own_vols[i-1] if i else 0
+                vol_diff = own_vol - last_vol
+                num = target_num - own_num + i
+                if num * vol_diff > left_vol:
+                    buy_vol = left_vol / num + last_vol
+                    break
+                else:
+                    left_vol -= num * vol_diff
+            else:
+                buy_vol = left_vol / target_num + own_vols[-1]
+                
+            buy_num = target_num
+            for own_vol in reversed(own_vols):
+                if own_vol > buy_vol:
+                    buy_num -= 1
+                    continue
+                
+                new_vol = buy_vol - own_vol
+                if new_vol < min_vol:
+                    buy_num -= 1
+                    if buy_num > 0:
+                        buy_vol += new_vol / buy_num
+
+            return max(min_vol, buy_vol)
+        
+        logger.info('Start to update and buy today\'s targets')
         date = datetime.ts2date(time.time()-end*86400)
-        symbols = self.targets[date].keys()
-        targets, _ = self.find_targets(symbols=symbols, end=end)
-        targets = self.filter_targets(targets, symbols)
-        for symbol, target in targets.items():
-            now_target = self.targets[date].setdefault(symbol, target)
-            now_target.set_mark_price(target.init_price)
-            self.cancel_and_buy_limit_target(now_target, target.init_price)
-            
+
+        self.update_targets(end)
+        targets = self.targets[date]
+
+        usdt_amount = self.user.get_amount('usdt', available=True, check=False)
+        min_usdt_amount = self.user.min_usdt_amount
+        own_vols = sorted([target.buy_vol for target in targets if target.buy_vol])
+        target_num = len(targets)
+        buy_vol = get_buy_vol(own_vols, target_num, usdt_amount, min_usdt_amount)
+
+        order_targets = sorted(
+            [target for target in targets.values()],
+            key=lambda x: (-x.buy_vol, x.close > x.boll, -x.vol)
+        )
+
+        for target in order_targets:
+            now_target = self.targets[date][target.symbol]
+            add_vol = buy_vol - now_target.buy_vol
+            if usdt_amount < min_usdt_amount or add_vol < min_usdt_amount or add_vol > usdt_amount:
+                now_target.init_buy_amount = now_target.buy_vol
+            else:
+                now_target.init_buy_amount = buy_vol
+                usdt_amount -= add_vol
+                self.cancel_and_buy_target(now_target, target.init_price)
+
     def update_asset(self, limit=1):
         if limit > 1:
             limit = min(limit, 30)

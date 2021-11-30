@@ -61,10 +61,10 @@ def dealer(user, args):
         kill_all_threads()
         return
 
-    user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
-    user.scheduler.add_job(client.update_targets, 'cron', hour=0, minute=0, second=10)
+    # user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
+    user.scheduler.add_job(client.update_and_buy_targets, 'cron', hour=0, minute=0, second=10)
     user.scheduler.add_job(client.update_asset, 'cron', hour=0, minute=1, second=0)
-    user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=0)
+    user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=30)
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
