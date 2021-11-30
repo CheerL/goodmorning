@@ -76,7 +76,8 @@ class OrderSummary:
         self.status = OrderSummaryStatus.CREATED
         self.report()
 
-    def update(self, data):
+    def update(self, data, fee_rate=None):
+        fee_rate = self.fee_rate if fee_rate == None else fee_rate
         if isinstance(data, OrderUpdate):
             ts = data.tradeTime / 1000
             new_price = float(data.tradePrice)
@@ -85,7 +86,7 @@ class OrderSummary:
             self.ts = ts
             self.amount += new_amount
             self.vol += new_vol
-            self.fee = self.vol * self.fee_rate
+            self.fee = self.vol * fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
             if 'partial-filled' == data.orderStatus:
                 self.status = OrderSummaryStatus.PARTIAL_FILLED
@@ -102,7 +103,7 @@ class OrderSummary:
 
             self.amount = float(data['z'])
             self.vol = float(data['Z'])
-            self.fee = self.vol * self.fee_rate
+            self.fee = self.vol * fee_rate
             self.aver_price = self.vol / self.amount if self.amount else 0
             self.ts = ts
 

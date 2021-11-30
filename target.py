@@ -147,17 +147,18 @@ class LossTarget(BaseTarget):
         self.long_sell_price = price * (1+sell_rate)
         logger.info(f'{self.symbol} of {self.date} price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
 
-    def set_buy(self, vol, amount, clear_rate=CLEAR_RATE):
+    def set_buy(self, vol, amount, clear_rate=CLEAR_RATE, fee_rate=None):
         if vol <= 0 or amount <= 0:
             return
+        fee_rate = self.fee_rate if fee_rate == None else fee_rate
 
         own_vol = self.own_amount * self.buy_price
         self.own = True
-        self.own_amount += amount * (1 - self.fee_rate)
+        self.own_amount += amount * (1 - fee_rate)
         self.buy_vol += vol
         if self.own_amount:
             self.real_buy_price = (own_vol+vol) / self.own_amount 
-            self.buy_price = self.real_buy_price * (1 - self.fee_rate)
+            self.buy_price = self.real_buy_price * (1 - fee_rate)
             self.clear_price = self.buy_price * (1+clear_rate)
 
     def set_sell(self, amount, vol=0):

@@ -71,6 +71,7 @@ class BaseUser:
         self.available_balance: dict[str, float] = {}
         self.balance_update_time: dict[str, float] = {}
         self.orders: dict[int, OrderSummary] = {}
+        self.fake_orders: dict[int, OrderSummary] = {}
         self.wxuid = wxuid.split(';')
 
         self.buy_id = []

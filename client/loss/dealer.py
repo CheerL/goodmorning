@@ -115,7 +115,7 @@ class LossDealerClient(BaseDealerClient):
         for date, targets in self.targets.items():
             date_symbols = [
                 summary.symbol for summary
-                in self.user.orders.values()
+                in list(self.user.orders.values()) + list(self.user.fake_orders.values())
                 if summary.label == date
             ]
             for symbol, target in targets.copy().items():
@@ -556,8 +556,9 @@ class LossDealerClient(BaseDealerClient):
             summary.status = 3
             summary.vol = order.vol
             summary.fee = 0
+            self.user.fake_orders[order_id] = summary
             if order.direction == 'buy':
-                target.set_buy(summary.vol, summary.amount)
+                target.set_buy(summary.vol, summary.amount, fee_rate=0)
             else:
                 target.set_sell(summary.amount)
         else:
@@ -764,10 +765,11 @@ class LossDealerClient(BaseDealerClient):
             target.set_sell(trans_amount)
         elif direction == 'buy':
             id = int(f'-{now}{self.user.account_id}{1}')
-            target.set_buy(trans_vol, trans_amount)
+            target.set_buy(trans_vol, trans_amount, fee_rate=0)
             
         summary = OrderSummary(id, target.symbol, direction, target.date)
-        summary.update(data)
+        summary.update(data, fee_rate=0)
+        self.user.fake_orders[id] = summary
         OrderSQL.add_order(summary, target.date, self.user.account_id)
 
     def fake_trans(self, target: Target, new_target: Target, price: float):
