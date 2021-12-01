@@ -291,7 +291,6 @@ class BinanceUser(BaseUser):
             timestamp=now,
             newOrderRespType='ACK'
         )
-        # order_id = -1
 
         try:
             logger.debug(f'Buy {vol} {symbol[:-4]} with price {str_price}')

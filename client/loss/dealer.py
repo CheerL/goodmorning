@@ -1,6 +1,8 @@
 import time
+import math
 import hashlib
 from retry import retry
+from sqlalchemy.sql.expression import true
 from target import LossTarget as Target
 from utils import config, logger, user_config, get_rate, datetime, parallel
 from order import OrderSummary, OrderSummaryStatus
@@ -26,6 +28,7 @@ MIN_PRICE = config.getfloat('loss', 'MIN_PRICE')
 MAX_PRICE = config.getfloat('loss', 'MAX_PRICE')
 MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
 SPECIAL_SYMBOLS = config.get('loss', 'SPECIAL_SYMBOLS')
+SPLIT_RATE = config.getfloat('loss', 'SPLIT_RATE')
 
 
 class LossDealerClient(BaseDealerClient):
@@ -367,7 +370,7 @@ class LossDealerClient(BaseDealerClient):
             else:
                 raise e
 
-    def buy_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True):
+    def buy_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True, random=True):
         @retry(tries=5, delay=0.05)
         def _filled_callback(summary):
             if summary.aver_price <=0:
@@ -401,7 +404,10 @@ class LossDealerClient(BaseDealerClient):
             price = target.init_price
 
         if limit:
-            random_rate = (int(hashlib.sha1(target.date.encode()).hexdigest(), 16)%10) * 0.0001 - 0.0005
+            if random:
+                random_rate = (int(hashlib.sha1(target.date.encode()).hexdigest(), 16)%10) * 0.0001 - 0.0005
+            else:
+                random_rate = 0
             # random_rate = float(str(hash(target.date))[-1]) / 10000 - 0.0005
             summary = self.user.buy_limit(target, vol, price * (1+limit_rate+random_rate))
         else:
@@ -466,7 +472,7 @@ class LossDealerClient(BaseDealerClient):
                 if direction == 'sell' and target.selling != 0:
                     target.set_sell(summary.amount)
                     target.selling = 0
-                else:
+                elif direction == 'buy':
                     target.set_buy(summary.vol, summary.amount)
 
             if sell:
@@ -504,18 +510,41 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-    def cancel_and_buy_target(self, target: Target, price=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True):
+    def cancel_and_buy_target(self, target: Target, price=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True, split_rate=0):
         @retry(tries=5, delay=0.05)
         def cancel_and_buy_callback(summary=None):
             if summary:
                 target.set_buy(summary.vol, summary.amount)
 
-            self.buy_target(
-                target, price, None, limit_rate,
-                filled_callback=filled_callback,
-                cancel_callback=cancel_callback,
-                limit=limit
-            )
+            vol = float(target.init_buy_amount) - target.buy_vol
+            if vol <= self.user.min_usdt_amount:
+                self.buy_target(
+                    target, price, vol, limit_rate,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=False
+                )
+            elif split_rate > 0 and vol * split_rate > self.user.min_usdt_amount:
+                self.buy_target(
+                    target, price, vol * split_rate, 0,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=limit, random=False
+                )
+                self.buy_target(
+                    target, price, vol * (1-split_rate), limit_rate,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=limit
+                )
+            else:
+                self.buy_target(
+                    target, price, vol, limit_rate,
+                    filled_callback=filled_callback,
+                    cancel_callback=cancel_callback,
+                    limit=limit
+                )
+                
 
         symbol = target.symbol
         is_canceled = False
@@ -797,46 +826,56 @@ class LossDealerClient(BaseDealerClient):
                 self.cancel_target(target, 'buy')
         
         def clear_yesterday_targets(targets: 'list[Target]', limit=True, level=4):
-            for target in targets:
-                if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                    target.own = False
-                    continue
+            try:
+                for target in targets:
+                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                        target.own = False
+                        continue
 
-                logger.info(f'Sell {target.symbol} of {target.date}(yesterday)')
-                market_price = target.now_price * (1-SELL_UP_RATE)
-                sell_price = max(target.clear_price, market_price)
-                self.cancel_and_sell_target(target, sell_price, level, limit=limit)
+                    logger.info(f'Sell {target.symbol} of {target.date}(yesterday)')
+                    market_price = target.now_price * (1-SELL_UP_RATE)
+                    sell_price = max(target.clear_price, market_price)
+                    self.cancel_and_sell_target(target, sell_price, level, limit=limit)
+            except Exception as e:
+                logger.error(e)
 
         def long_sell_yesterday_targets(targets: 'list[Target]', limit=True, level=5):
-            for target in targets:
-                if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                    target.own = False
-                    continue
-                
-                logger.info(f'Long sell {target.symbol} of {target.date}(yesterday)')
-                self.cancel_and_sell_target(target, target.long_sell_price, level)
+            try:
+                for target in targets:
+                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                        target.own = False
+                        continue
+                    
+                    logger.info(f'Long sell {target.symbol} of {target.date}(yesterday)')
+                    self.cancel_and_sell_target(target, target.long_sell_price, level)
+            except Exception as e:
+                logger.error(e)
 
         def clear_old_targets(targets: 'list[Target]', limit=True, level=6):
-            tickers = self.market.get_market_tickers()
-            for target in targets:
-                target.update_price(tickers)
-                symbol = target.symbol
-                now_price = target.now_price
-                if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                    target.own = False
-                    continue
-                    
-                if symbol in self.targets[self.date]:
-                    new_target = self.targets[self.date][symbol]
-                    if new_target.own_amount == 0:
-                        self.fake_trans(target, new_target, now_price)
-                        if not target.own or target.own_amount < target.sell_market_min_order_amt:
-                            target.own = False
-                            continue
-                    
+            try:
+                tickers = self.market.get_market_tickers()
+                for target in targets:
+                    target.update_price(tickers)
+                    symbol = target.symbol
+                    now_price = target.now_price
+                    print(target, target.own)
+                    if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                        target.own = False
+                        continue
+                        
+                    if symbol in self.targets[self.date]:
+                        new_target = self.targets[self.date][symbol]
+                        if new_target.own_amount == 0:
+                            self.fake_trans(target, new_target, now_price)
+                            if not target.own or target.own_amount < target.sell_market_min_order_amt:
+                                target.own = False
+                                continue
+                        
                     logger.info(f'Finally sell {target.symbol} of {target.date}')
                     market_price = now_price * (1-SELL_UP_RATE)
                     self.cancel_and_sell_target(target, market_price, level)
+            except Exception as e:
+                logger.error(e)
 
         def get_targets(clear_date, yesterday):
             sell_vol = 0
@@ -864,8 +903,9 @@ class LossDealerClient(BaseDealerClient):
             
             return sell_vol, old_targets, clear_targets, long_sell_targets
         
+        date = date or self.date
         clear_date = datetime.ts2date(datetime.date2ts(date) - (MAX_DAY-1) * 86400)
-        yesterday = date or self.date
+        yesterday = date
 
         logger.info('Cancel all buy orders')
         clear_buy(yesterday)
@@ -883,7 +923,8 @@ class LossDealerClient(BaseDealerClient):
         old_symbols = ",".join(set([target.symbol for target in old_targets]))
         logger.info(f'Clear old before {clear_date}. targets are {old_symbols}')
         symbols = ','.join(set([target.symbol for target in yesterday_targets]))
-        logger.info(f'Clear yesterday {date}. targets are {symbols}')
+        logger.info(f'Clear yesterday {yesterday}. targets are {symbols}')
+        logger.info(f'After sell will get {sell_vol}U')
 
         Timer(0, clear_old_targets, kwargs={'targets': old_targets, 'level': 6}).start()
         Timer(15, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.1}).start()
@@ -923,7 +964,7 @@ class LossDealerClient(BaseDealerClient):
                 else:
                     left_vol -= num * vol_diff
             else:
-                buy_vol = left_vol / target_num + own_vols[-1]
+                buy_vol = left_vol / target_num + max(own_vols+[0])
                 
             buy_num = target_num
             for own_vol in reversed(own_vols):
@@ -937,7 +978,7 @@ class LossDealerClient(BaseDealerClient):
                     if buy_num > 0:
                         buy_vol += new_vol / buy_num
 
-            return max(min_vol, buy_vol)
+            return math.floor(max(min_vol, buy_vol))
         
         logger.info('Start to update and buy today\'s targets')
         date = datetime.ts2date(time.time()-end*86400)
@@ -946,10 +987,12 @@ class LossDealerClient(BaseDealerClient):
         targets = self.targets[date]
 
         usdt_amount = self.user.get_amount('usdt', available=True, check=False)
+        logger.info(f'Now available {usdt_amount}U')
         min_usdt_amount = self.user.min_usdt_amount
-        own_vols = sorted([target.buy_vol for target in targets if target.buy_vol])
+        own_vols = sorted([target.buy_vol for target in targets.values() if target.buy_vol])
         target_num = len(targets)
         buy_vol = get_buy_vol(own_vols, target_num, usdt_amount, min_usdt_amount)
+        logger.info(f'Each buy {buy_vol}U')
 
         order_targets = sorted(
             [target for target in targets.values()],
@@ -958,13 +1001,13 @@ class LossDealerClient(BaseDealerClient):
 
         for target in order_targets:
             now_target = self.targets[date][target.symbol]
-            add_vol = buy_vol - now_target.buy_vol
+            add_vol = math.floor(buy_vol - now_target.buy_vol)
             if usdt_amount < min_usdt_amount or add_vol < min_usdt_amount or add_vol > usdt_amount:
                 now_target.init_buy_amount = now_target.buy_vol
             else:
                 now_target.init_buy_amount = buy_vol
                 usdt_amount -= add_vol
-                self.cancel_and_buy_target(now_target, target.init_price)
+                self.cancel_and_buy_target(now_target, target.init_price, split_rate=SPLIT_RATE)
 
     def update_asset(self, limit=1):
         if limit > 1:
