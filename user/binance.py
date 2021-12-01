@@ -258,6 +258,7 @@ class BinanceUser(BaseUser):
             
             return order_summary
         except Exception as e:
+            logger.error(order)
             logger.error(e)
             # if order_id in self.orders:
             #     del self.orders[order_id]
@@ -310,6 +311,7 @@ class BinanceUser(BaseUser):
             
             return order_summary
         except Exception as e:
+            logger.error(order)
             logger.error(e)
             # if order_id in self.orders:
             #     del self.orders[order_id]
@@ -348,7 +350,7 @@ class BinanceUser(BaseUser):
             
             return order_summary
         except Exception as e:
-            # order_summary.error(e)
+            logger.error(order)
             logger.error(e)
             raise Exception(e)
 
@@ -395,6 +397,7 @@ class BinanceUser(BaseUser):
             self.sell_id.append(order_id)
             return order_summary
         except Exception as e:
+            logger.error(order)
             logger.error(e)
             raise Exception(e)
 
