@@ -68,7 +68,7 @@ def dealer(user, args):
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
-    client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
+    # client.report_scheduler.add_job(client.report, 'cron', hour='0,8,12,16,20', minute=2, kwargs={'force': True})
     
     client.report(True, args.report)
     client.wait_state(10)
