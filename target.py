@@ -9,6 +9,7 @@ HIGH_RATE = config.getfloat('loss', 'HIGH_RATE')
 LOW_RATE = config.getfloat('loss', 'LOW_RATE')
 SELL_RATE = config.getfloat('loss', 'SELL_RATE')
 CLEAR_RATE = config.getfloat('loss', 'CLEAR_RATE')
+HIGH_BACK_RATE = config.getfloat('loss', 'HIGH_BACK_RATE')
 WITHDRAW_RATE = config.getfloat('loss', 'WITHDRAW_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 AVER_INTERVAL_LENGTH = config.getfloat('loss', 'AVER_INTERVAL_LENGTH')
@@ -134,12 +135,12 @@ class LossTarget(BaseTarget):
         self.fee_rate = fee_rate
 
     def set_mark_price(self, price,
-        high_rate=HIGH_RATE, low_rate=LOW_RATE,
+        high_rate=HIGH_RATE, low_rate=LOW_RATE, high_back_rate=HIGH_BACK_RATE,
         low_back_rate=WITHDRAW_RATE, sell_rate=SELL_RATE, clear_rate=CLEAR_RATE
     ):
         self.init_price = price
         self.high_mark_price = max(price * (1+high_rate), (self.open+price)/2)
-        self.high_mark_back_price = (price + self.high_mark_price) / 2
+        self.high_mark_back_price = (self.high_mark_price - price) * high_back_rate + price
         self.low_mark_price = price * (1+low_rate)
         self.low_mark_back_price = price * (1+low_back_rate)
         self.clear_price = price * (1+clear_rate)

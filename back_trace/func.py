@@ -409,25 +409,29 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
             else:
                 klines = base_klines_dict.dict(symbol)
                 i = np.where(klines['id']==cont_loss['id'])[0][0]
-                for day_kline in klines[i+2:i+param.max_hold_days+1]:
-                    if day_kline['high'] > final_price and day_kline['low'] <= stop_loss_price:
-                        sell_price, sell_time = sell_detailed_next_back_trace(
-                            symbol, day_kline['id'], final_price, stop_loss_price, interval=interval
-                        )
-                        break
-                    elif day_kline['low'] <= stop_loss_price:
-                        sell_price = min(stop_loss_price, day_kline['open'])
-                        sell_time = day_kline['id']+86340
-                        # print('~', sell_price, datetime.ts2time(sell_time))
-                        break
-                    elif day_kline['high'] > final_price:
-                        sell_price = final_price
-                        sell_time = day_kline['id']+86340
-                        break
+                if i+2 >= len(klines):
+                    sell_price = klines[-1]['close']
+                    sell_time = klines[-1]['id']+86340
                 else:
-                    sell_price = day_kline['close']
-                    sell_time = day_kline['id']+86340
-
+                    for day_kline in klines[i+2:i+param.max_hold_days+1]:
+                        if day_kline['high'] > final_price and day_kline['low'] <= stop_loss_price:
+                            sell_price, sell_time = sell_detailed_next_back_trace(
+                                symbol, day_kline['id'], final_price, stop_loss_price, interval=interval
+                            )
+                            break
+                        elif day_kline['low'] <= stop_loss_price:
+                            sell_price = min(stop_loss_price, day_kline['open'])
+                            sell_time = day_kline['id']+86340
+                            # print('~', sell_price, datetime.ts2time(sell_time))
+                            break
+                        elif day_kline['high'] > final_price:
+                            sell_price = final_price
+                            sell_time = day_kline['id']+86340
+                            break
+                    else:
+                        sell_price = day_kline['close']
+                        sell_time = day_kline['id']+86340
+                    
         else:
             start_time = cont_loss['id2']
             # sell_price, sell_time = sell_detailed_back_trace(
@@ -451,51 +455,86 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
     start_ts = int(datetime.date2ts(start_date))
     end_ts = int(datetime.date2ts(end_date))
 
+    special_symbols = [b'AAVEUPUSDT', b'SXPUPUSDT', b'YFIUPUSDT']
     cont_loss_list_path = f'{ROOT}/back_trace/npy/cont_list.npy'
     klines_dict_path = f'{ROOT}/back_trace/npy/base_klines_dict.npy'
     # cont_loss_csv_path = f'{ROOT}/test/csv/cont_loss_{start_date}_{end_date}.csv'
     if klines_dict:
         max_ts = klines_dict.data['id'].max()
+        symbols = []
     elif load and os.path.exists(klines_dict_path):
         klines_dict = BaseKlineDict.load(klines_dict_path)
         max_ts = klines_dict.data['id'].max()
+        dict_symbols = klines_dict.dict()
+        market = Global.user.market
+        all_symbols = market.all_symbol_info.keys()
+        symbols = [
+            each for each in all_symbols
+            if each.encode() not in dict_symbols
+        ]
+        
+        for each in dict_symbols:
+            max_ts = klines_dict.dict(each)['id'].max()
+            # min_ts = klines_dict.dict(each)['id'].min()
+            if end_ts > max_ts and each not in special_symbols:
+                symbols.append(each.decode())
+
     else:
         klines_dict = BaseKlineDict()
         max_ts = 0
+        market = Global.user.market
+        symbols = market.all_symbol_info.keys()
 
-    if max_ts < end_ts:
+    if len(symbols):
         def worker(symbol):
             try:
                 klines = market.get_candlestick(symbol, '1day', start_ts=start_ts, end_ts=end_ts+86400)
+                klines_dict.load_from_raw(symbol, klines)
             except Exception as e:
                 print(e)
-                return
 
-            klines_dict.load_from_raw(symbol, klines)
-
-        market = Global.user.market
-        symbols = market.all_symbol_info.keys()
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)
         klines_dict.data = np.unique(klines_dict.data)
-        klines_dict.data.sort(order=['symbol', 'id'])
+        klines_dict.data.sort(order=['symbol', 'id', 'vol'])
+        pos_list = np.array([], dtype=int)
+        for symbol in klines_dict.dict():
+            data = klines_dict.dict(symbol)
+            for each in data[np.where(np.diff(data['id'])==0)[0]]:
+                ts = each['id']
+                max_vol = data[data['id']==ts]['vol'].max()
+                pos = list(np.where(
+                    (klines_dict.data['id']==ts)&
+                    (klines_dict.data['symbol']==symbol)&
+                    (klines_dict.data['vol']<max_vol)
+                )[0])
+                pos_list += pos
+
+        klines_dict.data = np.delete(klines_dict.data, pos_list)
         klines_dict.save(klines_dict_path)
     
     if cont_loss_list:
         max_ts = cont_loss_list.data['id'].max()
         min_ts = cont_loss_list.data['id'].min()
+        symbols = []
     elif load and os.path.exists(cont_loss_list_path):
         cont_loss_list = ContLossList.load(cont_loss_list_path)
-        max_ts = cont_loss_list.data['id'].max()
-        min_ts = cont_loss_list.data['id'].min()
+        symbols = []
+        for symbol in klines_dict.dict():
+            data = klines_dict.dict(symbol)
+            max_ts = data['id'].max()
+            min_ts = data['id'].min()
+            if end_ts > max_ts and symbol not in special_symbols:
+                # print(symbol, datetime.ts2time(min_ts),  datetime.ts2time(start_ts))
+                symbols.append(symbol)
     else:
         cont_loss_list = ContLossList()
         max_ts = 0
         min_ts = now
+        symbols = klines_dict.dict()
 
-    if max_ts < end_ts or min_ts > start_ts:
-        cont_loss_list = ContLossList()
+    if len(symbols):
         temp_list = []
-        for symbol in klines_dict.dict():
+        for symbol in symbols:
             data = klines_dict.dict(symbol)
             rate_list = data['close']/data['open'] - 1
 
@@ -520,7 +559,6 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
                     date, rate, cont_loss_days, cont_loss_rate, is_max_loss,
                     *get_boll(i, data['close']), i
                 ))
-            
         cont_loss_list.data = np.unique(np.concatenate([
             cont_loss_list.data,
             np.array(temp_list, dtype=ContLossList.dtype)

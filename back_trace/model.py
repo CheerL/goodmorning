@@ -239,6 +239,7 @@ class BaseKlineDict(NumpyData):
         ) for kline in klines]
         data = np.array(temp_list, dtype=self.dtype)
         self.data = np.concatenate([self.data, data])
+        # print(symbol, len(self.data))
 
     @classmethod
     def load_from_pkl(cls, filename):
