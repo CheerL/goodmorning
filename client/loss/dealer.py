@@ -991,7 +991,8 @@ class LossDealerClient(BaseDealerClient):
         min_usdt_amount = self.user.min_usdt_amount
         own_vols = sorted([target.buy_vol for target in targets.values() if target.buy_vol])
         target_num = len(targets)
-        buy_vol = get_buy_vol(own_vols, target_num, usdt_amount, min_usdt_amount)
+        left_vol = total_vol = usdt_amount * min(target_num/ MIN_NUM,  1)
+        buy_vol = get_buy_vol(own_vols, target_num, total_vol, min_usdt_amount)
         logger.info(f'Each buy {buy_vol}U')
 
         order_targets = sorted(
@@ -1002,11 +1003,11 @@ class LossDealerClient(BaseDealerClient):
         for target in order_targets:
             now_target = self.targets[date][target.symbol]
             add_vol = math.floor(buy_vol - now_target.buy_vol)
-            if usdt_amount < min_usdt_amount or add_vol < min_usdt_amount or add_vol > usdt_amount:
+            if left_vol < min_usdt_amount or add_vol < min_usdt_amount or add_vol > left_vol:
                 now_target.init_buy_amount = now_target.buy_vol
             else:
                 now_target.init_buy_amount = buy_vol
-                usdt_amount -= add_vol
+                left_vol -= add_vol
                 self.cancel_and_buy_target(now_target, target.init_price, split_rate=SPLIT_RATE)
 
     def update_asset(self, limit=1):
