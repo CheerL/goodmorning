@@ -46,7 +46,8 @@ class Param:
         'min_cont_rate',
         'break_cont_rate',
         'up_cont_rate',
-        'min_close_rate'
+        'min_close_rate',
+        'up_near_rate'
     ]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -70,6 +71,7 @@ class Param:
         self.break_cont_rate=-0.3
         self.up_cont_rate=-0.1
         self.min_close_rate=0
+        self.up_near_rate=0.95
 
         for i, value in enumerate(args):
             self.__setattr__(self.orders[i], value)
@@ -152,12 +154,12 @@ class NumpyData:
     def __init__(self):
         self.data = np.array([], dtype=self.dtype)
 
-    def load_from_raw(self, *args, **kwargs):
-        pass
+    # def load_from_raw(self, *args, **kwargs):
+    #     pass
 
-    @classmethod
-    def load_from_pkl(self, filename):
-        pass
+    # @classmethod
+    # def load_from_pkl(self, filename):
+    #     pass
 
     @classmethod
     def load(cls, filename):
@@ -171,15 +173,15 @@ class NumpyData:
         if self.data.size:
             np.save(filename, arr=self.data)
 
-    @classmethod
-    def trans_all(cls, from_dir, to_dir, filter_func=None):
-        if not filter_func:
-            filter_func = lambda _: True
+    # @classmethod
+    # def trans_all(cls, from_dir, to_dir, filter_func=None):
+    #     if not filter_func:
+    #         filter_func = lambda _: True
         
-        for filename in os.listdir(from_dir):
-            if filter_func(filename):
-                data = cls.load_from_pkl(os.path.join(from_dir, filename))
-                data.save(os.path.join(to_dir, filename.replace('pkl', 'npy')))
+    #     for filename in os.listdir(from_dir):
+    #         if filter_func(filename):
+    #             data = cls.load_from_pkl(os.path.join(from_dir, filename))
+    #             data.save(os.path.join(to_dir, filename.replace('pkl', 'npy')))
 
 class Klines(NumpyData):
     dtype = np.dtype([
@@ -200,16 +202,16 @@ class Klines(NumpyData):
         self.data = np.concatenate([self.data, np.array(temp_list, dtype=self.dtype)])
         self.data.sort(order='id')
 
-    @classmethod
-    def load_from_pkl(cls, filename):
-        if os.path.exists(filename):
-            with open(filename, 'rb') as f:
-                klines = pickle.load(f)
+    # @classmethod
+    # def load_from_pkl(cls, filename):
+    #     if os.path.exists(filename):
+    #         with open(filename, 'rb') as f:
+    #             klines = pickle.load(f)
 
-            symbol = filename.split('/')[-1].split('_')[0]
-            self = cls()
-            self.load_from_raw(symbol, klines)
-            return self
+    #         symbol = filename.split('/')[-1].split('_')[0]
+    #         self = cls()
+    #         self.load_from_raw(symbol, klines)
+    #         return self
 
 class BaseKlineDict(NumpyData):
     dtype = np.dtype([
@@ -241,16 +243,16 @@ class BaseKlineDict(NumpyData):
         self.data = np.concatenate([self.data, data])
         # print(symbol, len(self.data))
 
-    @classmethod
-    def load_from_pkl(cls, filename):
-        if os.path.exists(filename):
-            with open(filename, 'rb') as f:
-                base_klines_dict = pickle.load(f)
+    # @classmethod
+    # def load_from_pkl(cls, filename):
+    #     if os.path.exists(filename):
+    #         with open(filename, 'rb') as f:
+    #             base_klines_dict = pickle.load(f)
 
-        self = cls()
-        for symbol, klines in base_klines_dict.items():
-            self.load_from_raw(symbol, klines)
-        return self
+    #     self = cls()
+    #     for symbol, klines in base_klines_dict.items():
+    #         self.load_from_raw(symbol, klines)
+    #     return self
 
     @classmethod
     def load(cls, filename):
@@ -280,42 +282,48 @@ class ContLossList(NumpyData):
         ('boll', 'f4'),
         ('bollup', 'f4'),
         ('bolldown', 'f4'),
+        ('bollmidup', 'f4'),
+        ('bollmiddown', 'f4'),
+        ('bollfake1', 'f4'),
+        ('bollfake2', 'f4'),
+        ('bollfake3', 'f4'),
+        ('bollfake4', 'f4'),
         ('index', 'i4')
     ])
 
-    def load_from_raw(self, cont_loss_list: 'list[ContLoss]'):
-        temp_list = []
-        for cont_loss in cont_loss_list:
-            temp_item = [
-                cont_loss.symbol,  cont_loss.date, cont_loss.kline.id,
-                cont_loss.kline.open, cont_loss.kline.close, 
-                cont_loss.kline.high, cont_loss.kline.low, cont_loss.kline.vol, 
-                cont_loss.rate, cont_loss.cont_loss_days, cont_loss.cont_loss_rate,
-                cont_loss.is_big_loss, cont_loss.is_max_loss, 
-                cont_loss.boll, cont_loss.bollup, cont_loss.bolldown,
-                0,0,0,0,0,0,0
-            ]
-            try:
-                kline2 = cont_loss.more_klines[0]
-                temp_item[-7:] = [
-                    kline2.id,kline2.open,kline2.close,
-                    kline2.high,kline2.low,kline2.vol,1
-                ]
-            except IndexError:
-                pass
-            temp_list.append((*temp_item,))
+    # def load_from_raw(self, cont_loss_list: 'list[ContLoss]'):
+    #     temp_list = []
+    #     for cont_loss in cont_loss_list:
+    #         temp_item = [
+    #             cont_loss.symbol,  cont_loss.date, cont_loss.kline.id,
+    #             cont_loss.kline.open, cont_loss.kline.close, 
+    #             cont_loss.kline.high, cont_loss.kline.low, cont_loss.kline.vol, 
+    #             cont_loss.rate, cont_loss.cont_loss_days, cont_loss.cont_loss_rate,
+    #             cont_loss.is_big_loss, cont_loss.is_max_loss, 
+    #             cont_loss.boll, cont_loss.bollup, cont_loss.bolldown,
+    #             0,0,0,0,0,0,0
+    #         ]
+    #         try:
+    #             kline2 = cont_loss.more_klines[0]
+    #             temp_item[-7:] = [
+    #                 kline2.id,kline2.open,kline2.close,
+    #                 kline2.high,kline2.low,kline2.vol,1
+    #             ]
+    #         except IndexError:
+    #             pass
+    #         temp_list.append((*temp_item,))
 
-        self.data = np.concatenate([self.data, np.array(temp_list, dtype=self.dtype)])
+    #     self.data = np.concatenate([self.data, np.array(temp_list, dtype=self.dtype)])
 
-    @classmethod
-    def load_from_pkl(cls, filename):
-        if os.path.exists(filename):
-            with open(filename, 'rb') as f:
-                cont_loss_list = pickle.load(f)
+    # @classmethod
+    # def load_from_pkl(cls, filename):
+    #     if os.path.exists(filename):
+    #         with open(filename, 'rb') as f:
+    #             cont_loss_list = pickle.load(f)
 
-        self = cls()
-        self.load_from_raw(cont_loss_list)
-        return self
+    #     self = cls()
+    #     self.load_from_raw(cont_loss_list)
+    #     return self
 
 class ContLoss:
     def __init__(self, symbol, kline, rate, cont_loss_days, cont_loss_rate, is_big_loss, is_max_loss):

@@ -1,26 +1,22 @@
 import os
 import time
 import math
-from typing_extensions import final
 import numpy as np
-
 from retry import retry
-
 from utils.parallel import run_thread_pool
 from utils import get_rate, datetime, logger
-
 from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record, Global
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-def get_boll(i, close, n=20, m=2):
+def get_boll(i, close, n=20, m=[2,-2]):
     price = close[i-n+1:i+1]
     if not price.size:
-        return 0, 0, 0
+        return [0] * (len(m)+1)
 
     sma = price.mean()
     std = price.std()
-    return sma, sma+m*std, sma-m*std
+    return [sma]+[sma+k*std for k in m]
 
 def back_trace(
         cont_loss_list, base_klines_dict, param: Param,
@@ -48,6 +44,7 @@ def back_trace(
         elif each['rate'] < param.min_close_rate and cont_loss_days > 0:
             start_i = i-cont_loss_days
             cont_loss_days+=1
+            # cont_loss = data[start_i:i+1]['rate'].sum()
             cont_loss=each['close']/data[start_i]['open']-1
             is_max_loss=data[start_i:i+1]['rate'].min()>=each['rate']
         else:
@@ -102,6 +99,8 @@ def back_trace(
         up_targets = targets[targets['close']>targets['boll']]
         low_targets = targets[targets['close']<=targets['boll']]
         targets_num = len(targets)
+        
+        # print(date, targets)
 
         if targets_num:
             buy_num = int(min(max(targets_num, param.min_num), param.max_num))
@@ -114,6 +113,8 @@ def back_trace(
                 buy_vol -= 0.001
 
             total_buy_vol = 0
+            # if date=='2021-12-03':
+            #     print(buy_num, targets['symbol'], np.concatenate((low_targets, up_targets))['symbol'][:buy_num])
             for cont_loss in np.concatenate([low_targets, up_targets])[:buy_num]:
                 if not cont_loss['id2']:
                     continue
@@ -122,7 +123,7 @@ def back_trace(
                     continue
 
                 buy_price, buy_time = get_buy_price_and_time(
-                    cont_loss, param, date, interval
+                    cont_loss, param, date, interval, 1
                 )
                 
                 if buy_time == 0:
@@ -331,7 +332,14 @@ def sell_detailed_next_back_trace(symbol, start_time, stop_profit_price, stop_lo
     # print(end_ts, high_back_ts, low_back_ts, stop_loss_ts)
     return result_dict[min(stop_profit_ts, stop_loss_ts)]
 
-def get_buy_price_and_time(cont_loss, param: Param, date, interval):
+def get_buy_price_and_time(cont_loss, param: Param, date, interval, version=1):
+    if version == 1:
+        return get_buy_price_and_time_v1(cont_loss, param, date, interval)
+    elif version == 2:
+        return get_buy_price_and_time_v2(cont_loss, param, date, interval)
+
+    
+def get_buy_price_and_time_v1(cont_loss, param: Param, date, interval):
     symbol = cont_loss['symbol'].decode()
     params_key = ''.join([
         f'{each:.4f}' for each in
@@ -348,6 +356,57 @@ def get_buy_price_and_time(cont_loss, param: Param, date, interval):
     else:
         close = cont_loss['close']
         buy_price = close * (1 + param.buy_rate)
+        low_price = close * (1 + param.low_rate)
+        start_time = cont_loss['id2']
+        _, buy_time = buy_detailed_back_trace(
+            symbol, start_time, buy_price, low_price, param.max_buy_ts, interval=interval
+        )
+
+        Global.sell_dict[key] = (buy_price, buy_time)
+        return buy_price, buy_time
+    
+def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
+    symbol = cont_loss['symbol'].decode()
+    params_key = ''.join([
+        f'{each:.4f}' for each in
+        [
+            param.max_buy_ts,
+            param.buy_rate,
+            param.low_rate
+        ]
+    ])
+    key = f'{symbol}{date}{interval}{params_key}'
+    if key in Global.buy_dict:
+        return Global.buy_dict[key]
+
+    else:
+        close = cont_loss['close']
+        mark_price = np.array([
+            cont_loss['bollup'],
+            cont_loss['bollfake1'],
+            cont_loss['bollmidup'],
+            cont_loss['bollfake2'],
+            cont_loss['boll'],
+            cont_loss['bollfake3'],
+            cont_loss['bollmiddown'],
+            cont_loss['bollfake4'],
+            cont_loss['bolldown']
+        ])
+        close_pos = mark_price[mark_price>close].size
+        if close_pos <= 0:
+            buy_price = mark_price[0]
+        elif close_pos >= mark_price.size:
+            buy_price = close
+        elif cont_loss['boll'] > cont_loss['open'] > close:
+            buy_price = cont_loss['bolldown']
+        else:
+            up_price = mark_price[close_pos-1]
+            down_price = mark_price[close_pos]
+            if (close - down_price) / (up_price - down_price) > param.up_near_rate and close_pos % 2:
+                buy_price = close
+            else:
+                buy_price = down_price
+
         low_price = close * (1 + param.low_rate)
         start_time = cont_loss['id2']
         _, buy_time = buy_detailed_back_trace(
@@ -386,6 +445,7 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
         # )
         high_price = close * (1+param.high_rate)
         high_back_price = (1-param.high_back_rate) * close + param.high_back_rate * high_price
+        # print(high_price, high_back_price, close)
         # print(param.high_back_rate, close, high_back_price)
         # high_back_price = close * (1 + 3*low_back_rate)
         low_price = close * (1 + param.low_rate)
@@ -507,8 +567,9 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
                     (klines_dict.data['symbol']==symbol)&
                     (klines_dict.data['vol']<max_vol)
                 )[0])
-                pos_list += pos
+                pos_list = np.concatenate((pos_list,pos))
 
+        pos_list = np.unique(pos_list)
         klines_dict.data = np.delete(klines_dict.data, pos_list)
         klines_dict.save(klines_dict_path)
     
@@ -557,7 +618,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
                 temp_list.append((
                     *data[i], id2, open2, close2, high2, low2, vol2,
                     date, rate, cont_loss_days, cont_loss_rate, is_max_loss,
-                    *get_boll(i, data['close']), i
+                    *get_boll(i, data['close'], m=[2,-2,1,-1,1.5,0.5,-0.5,-1.5]), i
                 ))
         cont_loss_list.data = np.unique(np.concatenate([
             cont_loss_list.data,

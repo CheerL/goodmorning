@@ -253,7 +253,11 @@ class LossDealerClient(BaseDealerClient):
 
         kline = klines[0]
         rate = cont_loss_list[0]
-        cont_loss = sum(cont_loss_list)
+        # cont_loss = sum(cont_loss_list)
+        cont_loss = 1
+        for each in cont_loss_list:
+            cont_loss *= 1+each
+        cont_loss = cont_loss-1
         max_loss = min(cont_loss_list)
         boll = sum([kline.close for kline in klines[:20]]) / 20
         if (
