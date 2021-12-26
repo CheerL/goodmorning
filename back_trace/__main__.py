@@ -95,14 +95,14 @@ if __name__ == '__main__':
     parser.add_argument('--search_storage', default='postgresql://linchenran:lcr0717@cai.math.cuhk.edu.hk:54321/params')
 
     parser.add_argument('--min_price_list', default='0')
-    parser.add_argument('--max_price_list', default='1')
+    parser.add_argument('--max_price_list', default='2')
     parser.add_argument('--max_hold_days_list', default='2:10')
     parser.add_argument('--min_buy_vol_list', default='1000000:10000000:1000000')
     parser.add_argument('--max_buy_vol_list', default='1e11')
     parser.add_argument('--min_num_list', default='3')
     parser.add_argument('--max_num_list', default='5:20')
     parser.add_argument('--max_buy_ts_list', default='86300')
-    parser.add_argument('--buy_rate_list', default='-0.025:0')
+    parser.add_argument('--buy_rate_list', default='0')
     parser.add_argument('--high_rate_list', default='0.091:0.35')
     parser.add_argument('--high_back_rate_list', default='0.1:0.8')
     parser.add_argument('--high_hold_time_list', default='86400:86400')
@@ -116,6 +116,8 @@ if __name__ == '__main__':
     parser.add_argument('--break_cont_rate_list', default='-0.4:-0.15')
     parser.add_argument('--up_cont_rate_list', default='-0.2:-0.05')
     parser.add_argument('--min_close_rate_list', default='-0.03:0.03')
+    parser.add_argument('--up_near_rate_list', default='0.5:1')
+    parser.add_argument('--low_near_rate_list', default='0:0.5')
 
     parser.add_argument('--min_price', default=0, type=float)
     parser.add_argument('--max_price', default=2, type=float)
@@ -138,6 +140,10 @@ if __name__ == '__main__':
     parser.add_argument('--break_cont_rate', default=-0.30, type=float)
     parser.add_argument('--up_cont_rate', default=-0.10, type=float)
     parser.add_argument('--min_close_rate', default=0, type=float)
+    parser.add_argument('--up_near_rate', default=0.9, type=float)
+    parser.add_argument('--low_near_rate', default=0.3, type=float)
+
+
 
 
     args = parser.parse_args()
@@ -174,7 +180,9 @@ if __name__ == '__main__':
                 min_cont_rate = trial.suggest_float('min_cont_rate', *str2range(args.min_cont_rate_list)),
                 break_cont_rate = trial.suggest_float('break_cont_rate', *str2range(args.break_cont_rate_list)),
                 up_cont_rate = trial.suggest_float('up_cont_rate', *str2range(args.up_cont_rate_list)),
-                min_close_rate = trial.suggest_float('min_close_rate', *str2range(args.min_close_rate_list))
+                min_close_rate = trial.suggest_float('min_close_rate', *str2range(args.min_close_rate_list)),
+                up_near_rate = trial.suggest_float('up_near_rate', *str2range(args.up_near_rate_list)),
+                low_near_rate = trial.suggest_float('low_near_rate', *str2range(args.low_near_rate_list))
             )
             mean_total_money, mean_profit_rate, mean_back_rate = sub_back_trace(param)
             return mean_total_money

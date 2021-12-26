@@ -7,10 +7,17 @@ from utils.parallel import run_thread_pool
 from utils import get_rate, datetime, logger
 from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record, Global
 
+BUY_ALGO_VERSION = 2
+SELL_ALGO_VERSION = 2
+SELL_AS_BUY = False
+BOLL_N = 20
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-def get_boll(i, close, n=20, m=[2,-2]):
+def get_boll(i, close, n=BOLL_N, m=[2,-2]):
     price = close[i-n+1:i+1]
+    return get_boll_pure(price, m)
+
+def get_boll_pure(price, m=[2,-2]):
     if not price.size:
         return [0] * (len(m)+1)
 
@@ -123,14 +130,14 @@ def back_trace(
                     continue
 
                 buy_price, buy_time = get_buy_price_and_time(
-                    cont_loss, param, date, interval, 1
+                    cont_loss, param, date, interval, BUY_ALGO_VERSION
                 )
                 
                 if buy_time == 0:
                     continue
 
                 sell_price, sell_time = get_sell_price_and_time(
-                    cont_loss, base_klines_dict, param, date, interval, buy_time
+                    cont_loss, base_klines_dict, param, date, interval, buy_price, buy_time, SELL_ALGO_VERSION
                 )
                 record = Record(
                     cont_loss['symbol'].decode(), buy_price, buy_time, buy_vol, fee_rate=fee_rate
@@ -381,6 +388,7 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
 
     else:
         close = cont_loss['close']
+        low = cont_loss['low']
         mark_price = np.array([
             cont_loss['bollup'],
             cont_loss['bollfake1'],
@@ -404,6 +412,8 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
             down_price = mark_price[close_pos]
             if (close - down_price) / (up_price - down_price) > param.up_near_rate and close_pos % 2:
                 buy_price = close
+            elif low < down_price and (close - down_price) / (up_price - down_price) > param.low_near_rate and close_pos % 2:
+                buy_price = close
             else:
                 buy_price = down_price
 
@@ -416,7 +426,13 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
         Global.sell_dict[key] = (buy_price, buy_time)
         return buy_price, buy_time
 
-def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, interval, buy_time):
+def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, interval, buy_price, buy_time, version=1):
+    if version == 1:
+        return get_sell_price_and_time_v1(cont_loss, base_klines_dict, param, date, interval, buy_price, buy_time)
+    elif version == 2:
+        return get_sell_price_and_time_v2(cont_loss, base_klines_dict, param, date, interval, buy_price, buy_time)
+
+def get_sell_price_and_time_v1(cont_loss, base_klines_dict, param: Param, date, interval, buy_price, buy_time):
     symbol = cont_loss['symbol'].decode()
     params_key = ''.join([
         f'{each:.4f}' for each in
@@ -438,7 +454,10 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
         return Global.sell_dict[key]
 
     else:
-        close = cont_loss['close']
+        if SELL_AS_BUY:
+            close = buy_price
+        else:
+            close = cont_loss['close']
         # high_price = max(
         #     (cont_loss['open'] + cont_loss['close']) / 2,
         #     close * (1 + high_rate)
@@ -507,6 +526,115 @@ def get_sell_price_and_time(cont_loss, base_klines_dict, param: Param, date, int
 
         Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time
+
+def get_sell_price_and_time_v2(cont_loss, base_klines_dict, param: Param, date, interval, buy_price, buy_time):
+    symbol = cont_loss['symbol'].decode()
+    params_key = ''.join([
+        f'{each:.4f}' for each in
+        [
+            param.max_hold_days,
+            param.high_rate,
+            param.high_back_rate,
+            param.high_hold_time,
+            param.low_rate,
+            param.low_back_rate,
+            param.clear_rate,
+            param.final_rate,
+            param.stop_loss_rate,
+            buy_time
+        ]
+    ])
+    key = f'{symbol}{date}{interval}{params_key}'
+    if key in Global.sell_dict:
+        return Global.sell_dict[key]
+
+    else:
+        if SELL_AS_BUY:
+            close = buy_price
+        else:
+            close = cont_loss['close']
+        # high_price = max(
+        #     (cont_loss['open'] + cont_loss['close']) / 2,
+        #     close * (1 + high_rate)
+        # )
+        high_price = close * (1+param.high_rate)
+        high_back_price = (1-param.high_back_rate) * close + param.high_back_rate * high_price
+        # print(high_price, high_back_price, close)
+        # print(param.high_back_rate, close, high_back_price)
+        # high_back_price = close * (1 + 3*low_back_rate)
+        low_price = close * (1 + param.low_rate)
+        # low_price = (cont_loss['open'] + cont_loss['close']) / 2
+        # low_price = min(
+        #     (cont_loss['open'] + cont_loss['close']) / 2,
+        #     close * (1 + low_rate)
+        # )
+        low_back_price = close * (1 + param.low_back_rate)
+        # low_back_price = (close + low_price) / 2
+        clear_price = close * (1 + param.clear_rate)
+        # final_price = close * (1 + param.final_rate)
+        stop_loss_price = close * (1 + param.stop_loss_rate)
+        
+        # sell_price = cont_loss['close2']
+        # sell_time = cont_loss['id2']+86340
+        if cont_loss['high2'] < low_price and cont_loss['low2'] > 0:
+            if cont_loss['close2'] >= clear_price:
+                sell_price = cont_loss['close2']
+                sell_time = cont_loss['id2']+86340
+            else:
+                klines = base_klines_dict.dict(symbol)
+                i = np.where(klines['id']==cont_loss['id'])[0][0]
+                if i+2 >= len(klines):
+                    sell_price = klines[-1]['close']
+                    sell_time = klines[-1]['id']+86340
+                else:
+                    # for day_kline in klines[i+2:i+param.max_hold_days+1]:
+                    for j in range(i+2, min(i+param.max_hold_days+1, klines.size)):
+                        day_kline = klines[j]
+                        open_price = day_kline['open']
+                        price = np.append(klines[j-BOLL_N+1:j]['close'],klines[j]['open'])
+                        boll = np.sort(np.array(get_boll_pure(price, m=[2,1,-1,-2])))[::-1]
+                        pos = max(0, boll[boll>open_price].size-1)
+                        final_price = boll[pos]
+                        if final_price/open_price-1 < param.final_rate:
+                            diff = boll[0]-boll[1]
+                            # print(final_price, final_price+diff)
+                            final_price += diff
+                        # print(boll, open_price, final_price, close * (1 + param.final_rate))
+                        if day_kline['high'] > final_price and day_kline['low'] <= stop_loss_price:
+                            sell_price, sell_time = sell_detailed_next_back_trace(
+                                symbol, day_kline['id'], final_price, stop_loss_price, interval=interval
+                            )
+                            break
+                        elif day_kline['low'] <= stop_loss_price:
+                            sell_price = min(stop_loss_price, day_kline['open'])
+                            sell_time = day_kline['id']+86340
+                            # print('~', sell_price, datetime.ts2time(sell_time))
+                            break
+                        elif day_kline['high'] > final_price:
+                            sell_price = final_price
+                            sell_time = day_kline['id']+86340
+                            break
+                    else:
+                        sell_price = day_kline['close']
+                        sell_time = day_kline['id']+86340
+                    # print(sell_price)
+                    
+        else:
+            start_time = cont_loss['id2']
+            # sell_price, sell_time = sell_detailed_back_trace(
+            #     symbol, start_time, buy_time,
+            #     high_price, param.high_back_rate, param.high_hold_time,
+            #     low_price, low_back_price, 0, interval=interval
+            # )
+            sell_price, sell_time = sell_detailed_back_trace_high_fix(
+                symbol, start_time, buy_time,
+                high_price, high_back_price,
+                low_price, low_back_price, 0, interval=interval
+            )
+
+        Global.sell_dict[key] = (sell_price, sell_time)
+        return sell_price, sell_time
+
 
 def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_loss_list=None, filter_=True):
     now = time.time()
