@@ -30,6 +30,7 @@ MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
 SPECIAL_SYMBOLS = config.get('loss', 'SPECIAL_SYMBOLS')
 SPLIT_RATE = config.getfloat('loss', 'SPLIT_RATE')
 
+BAN_LIST = ['SLPUSDT']
 
 class LossDealerClient(BaseDealerClient):
     def __init__(self, user: User):
@@ -287,7 +288,7 @@ class LossDealerClient(BaseDealerClient):
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if symbol in ori_symbols or self.is_buy(klines, symbol):
+            if symbol not in BAN_LIST and (symbol in ori_symbols or self.is_buy(klines, symbol)):
                 kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 target.boll = sum([kline.close for kline in klines[:20]]) / 20
