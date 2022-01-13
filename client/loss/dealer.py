@@ -30,6 +30,7 @@ MIN_BEFORE_DAYS = config.getint('loss', 'MIN_BEFORE_DAYS')
 SPECIAL_SYMBOLS = config.get('loss', 'SPECIAL_SYMBOLS')
 SPLIT_RATE = config.getfloat('loss', 'SPLIT_RATE')
 
+BAN_LIST = ['SLPUSDT']
 
 class LossDealerClient(BaseDealerClient):
     def __init__(self, user: User):
@@ -287,7 +288,7 @@ class LossDealerClient(BaseDealerClient):
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if symbol in ori_symbols or self.is_buy(klines, symbol):
+            if symbol not in BAN_LIST and (symbol in ori_symbols or self.is_buy(klines, symbol)):
                 kline = klines[0]
                 target = Target(symbol, datetime.ts2date(kline.id), kline.open, kline.close, kline.vol)
                 target.boll = sum([kline.close for kline in klines[:20]]) / 20
@@ -445,15 +446,13 @@ class LossDealerClient(BaseDealerClient):
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
         sell_amount = sell_amount or self.get_sell_amount(target)
+        
+        if sell_amount * price < target.min_order_value:
+            logger.error(f'At least sell {target.min_order_value / price} but now {sell_amount}')
+            return
         if limit:
-            if sell_amount * price < target.min_order_value:
-                logger.error(f'At least sell {target.min_order_value / price} but now {sell_amount}')
-                return
             summary = self.user.sell_limit(target, sell_amount, price)
         else:
-            if sell_amount < target.sell_market_min_order_amt:
-                logger.error(f'At least market sell {target.sell_market_min_order_amt} but now {sell_amount}')
-                return
             summary = self.user.sell(target, sell_amount)
 
         if summary != None:
@@ -688,7 +687,7 @@ class LossDealerClient(BaseDealerClient):
             if order_id not in self.user.orders:
                 continue
 
-            if summary.amount != order.amount or summary.vol != order.vol:
+            if summary.amount != order.amount:
                 amount = summary.amount - order.amount
                 vol = summary.vol - order.vol
                 price = vol / amount
