@@ -48,7 +48,10 @@ class Param:
         'up_cont_rate',
         'min_close_rate',
         'up_near_rate',
-        'low_near_rate'
+        'low_near_rate',
+        'up_small_cont_rate',
+        'up_small_loss_rate',
+        'up_break_cont_rate'
     ]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -74,6 +77,9 @@ class Param:
         self.min_close_rate=0
         self.up_near_rate=0.90
         self.low_near_rate=0.3
+        self.up_small_cont_rate=-0.15
+        self.up_small_loss_rate=-0.03
+        self.up_break_cont_rate=-0.25
 
         for i, value in enumerate(args):
             self.__setattr__(self.orders[i], value)
@@ -88,12 +94,17 @@ class Param:
             self.low_back_rate < 0.85 * self.low_rate
             and self.clear_rate < self.low_rate
             and self.stop_loss_rate < self.clear_rate
-            and self.break_cont_rate < self.min_cont_rate
+            and self.break_cont_rate + 0.025 < self.min_cont_rate
             and self.low_rate < self.high_rate
             and self.min_price < self.max_price
             and self.min_buy_vol < self.max_buy_vol
             and self.min_num < self.max_num
-            and self.break_cont_rate < self.up_cont_rate
+            # and self.break_cont_rate < self.up_cont_rate
+            # and self.up_small_cont_rate < self.up_cont_rate
+            and self.up_small_cont_rate < 2.5 * self.up_small_loss_rate
+            and self.up_break_cont_rate + 0.025 < self.up_cont_rate
+            and self.up_break_cont_rate + 0.025 < self.up_small_cont_rate
+            and self.low_back_rate < self.high_rate * self.high_back_rate
         )
 
     def to_csv(self):
@@ -281,18 +292,34 @@ class ContLossList(NumpyData):
         ('cont_loss_days', 'i2'),
         ('cont_loss_rate', 'f4'),
         ('is_max_loss', 'b'),
+        ('is_min_loss', 'b'),
         ('boll', 'f4'),
         ('bollup', 'f4'),
-        ('bolldown', 'f4'),
-        ('bollmidup', 'f4'),
-        ('bollmiddown', 'f4'),
         ('bollfake1', 'f4'),
+        ('bollmidup', 'f4'),
         ('bollfake2', 'f4'),
         ('bollfake3', 'f4'),
+        ('bollmiddown', 'f4'),
         ('bollfake4', 'f4'),
+        ('bolldown', 'f4'),
+        ('boll_tmr', 'f4'),
+        ('bollup_tmr', 'f4'),
+        ('bollfake1_tmr', 'f4'),
+        ('bollmidup_tmr', 'f4'),
+        ('bollfake2_tmr', 'f4'),
+        ('bollfake3_tmr', 'f4'),
+        ('bollmiddown_tmr', 'f4'),
+        ('bollfake4_tmr', 'f4'),
+        ('bolldown_tmr', 'f4'),
         ('index', 'i4')
     ])
 
+    def dict(self, symbol=''):
+        if not symbol:
+            return np.unique(self.data['symbol'])
+        else:
+            symbol = symbol.encode() if isinstance(symbol, str) else symbol
+            return self.data[self.data['symbol']==symbol]
     # def load_from_raw(self, cont_loss_list: 'list[ContLoss]'):
     #     temp_list = []
     #     for cont_loss in cont_loss_list:
@@ -328,7 +355,7 @@ class ContLossList(NumpyData):
     #     return self
 
 class ContLoss:
-    def __init__(self, symbol, kline, rate, cont_loss_days, cont_loss_rate, is_big_loss, is_max_loss):
+    def __init__(self, symbol, kline, rate, cont_loss_days, cont_loss_rate, is_big_loss, is_max_loss, is_min_loss):
         self.symbol = symbol
         self.kline = kline
         self.date = datetime.ts2date(kline.id)
@@ -337,6 +364,7 @@ class ContLoss:
         self.cont_loss_rate = cont_loss_rate
         self.is_big_loss = is_big_loss
         self.is_max_loss = is_max_loss
+        self.is_min_loss = is_min_loss
         self.close_back_kline = None
         self.close_back_profit = 0
         self.close_back_days = 0
