@@ -7,14 +7,15 @@ from utils.parallel import run_process_pool
 import numpy as np
 import optuna
 import random
+import time
 
 RANDOM_ALL_NUM = 10
 BACK_COFF_1 = -0.1
 BACK_COFF_2 = -0.15
 
 
-# np.random.seed(0)
-# random.seed(0)
+# np.random.seed(time.time())
+# random.seed(time.time())
 
 def str2list(string, t=float, sep=','):
     return [t(each) for each in string.split(sep)]
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--search_show', default=False, action='store_true')
     parser.add_argument('--node_trials', default=1000, type=int)
     parser.add_argument('--search_algo', default='tpe')
-    parser.add_argument('--search_storage', default='postgresql://linchenran:lcr0717@cai.math.cuhk.edu.hk:54321/params')
+    parser.add_argument('--search_storage', default='postgresql://chenran:lcr0717@ai.math.cuhk.edu.hk:54321/params')
 
     parser.add_argument('--min_price_list', default='0')
     parser.add_argument('--max_price_list', default='2')
@@ -66,14 +67,14 @@ if __name__ == '__main__':
     parser.add_argument('--min_num_list', default='3')
     parser.add_argument('--max_num_list', default='10')
     parser.add_argument('--max_buy_ts_list', default='86300')
-    parser.add_argument('--buy_rate_list', default='-0.05:0')
+    parser.add_argument('--buy_rate_list', default='0')
     parser.add_argument('--high_rate_list', default='0.091:0.4')
     parser.add_argument('--high_back_rate_list', default='0.1:0.8')
     parser.add_argument('--high_hold_time_list', default='86400')
     # parser.add_argument('--high_hold_time_list', default='3600:86400:1800')
     parser.add_argument('--low_rate_list', default='0.005:0.09')
     parser.add_argument('--low_back_rate_list', default='0:0.089')
-    parser.add_argument('--clear_rate_list', default='-0.03:0.03')
+    parser.add_argument('--clear_rate_list', default='-0.03:0.0')
     parser.add_argument('--final_rate_list', default='0:0.10')
     parser.add_argument('--stop_loss_rate_list', default='-1')
     parser.add_argument('--min_cont_rate_list', default='-0.25:-0.05')
@@ -81,10 +82,10 @@ if __name__ == '__main__':
     parser.add_argument('--up_cont_rate_list', default='-0.2:-0.05')
     parser.add_argument('--min_close_rate_list', default='0')
     parser.add_argument('--up_near_rate_list', default='0.6:1')
-    parser.add_argument('--low_near_rate_list', default='0:0.4')
+    parser.add_argument('--low_near_rate_list', default='0')
     parser.add_argument('--up_small_cont_rate_list', default='-0.25:-0.08')
     parser.add_argument('--up_small_loss_rate_list', default='-0.05:0')
-    parser.add_argument('--up_break_cont_rate_list', default='-0.4:-0.15')
+    parser.add_argument('--up_break_cont_rate_list', default='-0.4:-0.08')
 
     parser.add_argument('--min_price', default=0, type=float)
     parser.add_argument('--max_price', default=2, type=float)

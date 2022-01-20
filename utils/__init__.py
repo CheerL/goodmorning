@@ -4,6 +4,7 @@ import threading
 import time
 import os
 
+import numpy as np
 import requests
 from huobi.connection.impl.restapi_invoker import session
 from huobi.connection.impl.websocket_manage import websocket_connection_handler
@@ -100,3 +101,11 @@ def kill_all_threads():
 
     for thread in threading.enumerate():
         kill_thread(thread)
+
+def get_boll(price, m):
+    if not len(price):
+        return [0] * len(m)
+
+    sma = np.mean(price) #price.mean()
+    std = np.std(price)  #price.std()
+    return [sma+k*std for k in m]

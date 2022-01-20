@@ -4,14 +4,20 @@ import math
 import numpy as np
 from retry import retry
 from utils.parallel import run_thread_pool
-from utils import get_rate, datetime, logger
+from utils import get_rate, datetime
 from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record, Global
 
-BUY_ALGO_VERSION = 1
-SELL_ALGO_VERSION = 1
+BUY_ALGO_VERSION = 2
+SELL_ALGO_VERSION = 2
 SELL_AS_BUY = False
 BOLL_N = 20
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SPECIAL_SYMBOLS = [
+    b'AAVEUPUSDT', b'SXPUPUSDT', b'YFIUPUSDT',
+    b'BCHUPUSDT', b'BZRXUSDT', b'EOSUPUSDT', b'FILUPUSDT',
+    b'SUSHIUPUSDT', b'UNIUPUSDT', b'XLMUPUSDT', b'BTTUSDT',
+    b'LOKAUSDT'
+]
 
 def get_boll(price, m=[2,-2]):
     if not price.size:
@@ -60,7 +66,7 @@ def back_trace(
     data = data[
         (param.min_buy_vol <= data['vol']) & (data['vol'] <= param.max_buy_vol) &
         (param.min_price <= data['close']) & (data['close'] <= param.max_price) &
-        (data['rate'] < param.min_close_rate) &
+        # (data['rate'] < param.min_close_rate) &
         # (data['low2']/data['close']-1 <= -0.002) &
         (
             (
@@ -113,7 +119,6 @@ def back_trace(
         low_targets = targets[targets['close']<=targets['boll_tmr']]
         targets_num = len(targets)
         
-        # print(date, targets)
 
         if targets_num:
             buy_num = int(min(max(targets_num, param.min_num), param.max_num))
@@ -126,8 +131,6 @@ def back_trace(
                 buy_vol -= 0.001
 
             total_buy_vol = 0
-            # if date=='2021-12-03':
-            #     print(buy_num, targets['symbol'], np.concatenate((low_targets, up_targets))['symbol'][:buy_num])
             for cont_loss in np.concatenate([low_targets, up_targets])[:buy_num]:
                 if not cont_loss['id2']:
                     continue
@@ -387,19 +390,19 @@ def get_buy_price_and_time_v1(cont_loss, param: Param, date, interval):
     
 def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
     symbol = cont_loss['symbol'].decode()
-    params_key = ''.join([
-        f'{each:.4f}' for each in
-        [
-            param.max_buy_ts,
-            param.buy_rate,
-            param.low_rate
-        ]
-    ])
-    key = f'{symbol}{date}{interval}{params_key}'
-    if key in Global.buy_dict:
-        return Global.buy_dict[key]
+    # params_key = ''.join([
+    #     f'{each:.4f}' for each in
+    #     [
+    #         param.max_buy_ts,
+    #         param.buy_rate,
+    #         param.low_rate
+    #     ]
+    # ])
+    # key = f'{symbol}{date}{interval}{params_key}'
+    # if key in Global.buy_dict:
+    #     return Global.buy_dict[key]
 
-    else:
+    if True:
         close = cont_loss['close']
         low = cont_loss['low']
         mark_price = np.array([
@@ -451,7 +454,7 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval):
             symbol, start_time, buy_price, low_price, param.max_buy_ts, interval=interval
         )
 
-        Global.sell_dict[key] = (buy_price, buy_time)
+        # Global.sell_dict[key] = (buy_price, buy_time)
         return buy_price, buy_time
 
 def get_sell_price_and_time(cont_loss, cont_loss_list, param: Param, date, interval, buy_price, buy_time, version=1):
@@ -557,26 +560,26 @@ def get_sell_price_and_time_v1(cont_loss, cont_loss_list, param: Param, date, in
 
 def get_sell_price_and_time_v2(cont_loss, cont_loss_list, param: Param, date, interval, buy_price, buy_time):
     symbol = cont_loss['symbol'].decode()
-    params_key = ''.join([
-        f'{each:.4f}' for each in
-        [
-            param.max_hold_days,
-            param.high_rate,
-            param.high_back_rate,
-            param.high_hold_time,
-            param.low_rate,
-            param.low_back_rate,
-            param.clear_rate,
-            param.final_rate,
-            param.stop_loss_rate,
-            buy_time
-        ]
-    ])
-    key = f'{symbol}{date}{interval}{params_key}'
-    if key in Global.sell_dict:
-        return Global.sell_dict[key]
+    # params_key = ''.join([
+    #     f'{each:.4f}' for each in
+    #     [
+    #         param.max_hold_days,
+    #         param.high_rate,
+    #         param.high_back_rate,
+    #         param.high_hold_time,
+    #         param.low_rate,
+    #         param.low_back_rate,
+    #         param.clear_rate,
+    #         param.final_rate,
+    #         param.stop_loss_rate,
+    #         buy_time
+    #     ]
+    # ])
+    # key = f'{symbol}{date}{interval}{params_key}'
+    # if key in Global.sell_dict:
+    #     return Global.sell_dict[key]
 
-    else:
+    if True:
         if SELL_AS_BUY:
             close = buy_price
         else:
@@ -668,7 +671,7 @@ def get_sell_price_and_time_v2(cont_loss, cont_loss_list, param: Param, date, in
                 low_price, low_back_price, stop_loss_price, interval=interval
             )
 
-        Global.sell_dict[key] = (sell_price, sell_time)
+        # Global.sell_dict[key] = (sell_price, sell_time)
         return sell_price, sell_time
 
 
@@ -679,7 +682,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
     start_ts = int(datetime.date2ts(start_date))
     end_ts = int(datetime.date2ts(end_date))
 
-    special_symbols = [b'AAVEUPUSDT', b'SXPUPUSDT', b'YFIUPUSDT']
+    special_symbols = SPECIAL_SYMBOLS 
     cont_loss_list_path = f'{ROOT}/back_trace/npy/cont_list_{BOLL_N}.npy'
     klines_dict_path = f'{ROOT}/back_trace/npy/base_klines_dict.npy'
     # cont_loss_csv_path = f'{ROOT}/test/csv/cont_loss_{start_date}_{end_date}.csv'
@@ -695,6 +698,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         symbols = [
             each for each in all_symbols
             if each.encode() not in dict_symbols
+            and each.encode() not in special_symbols
         ]
         
         for each in dict_symbols:
@@ -709,7 +713,9 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
         market = Global.user.market
         symbols = market.all_symbol_info.keys()
 
+    
     if len(symbols):
+        print(symbols)
         def worker(symbol):
             try:
                 klines = market.get_candlestick(symbol, '1day', start_ts=start_ts, end_ts=end_ts+86400)
@@ -718,6 +724,7 @@ def get_data(days=365, end=2, load=True, min_before=180, klines_dict=None, cont_
                 print(e)
 
         run_thread_pool([(worker, (symbol,)) for symbol in symbols], True, 4)
+        time.sleep(30)
         klines_dict.data = np.unique(klines_dict.data)
         klines_dict.data.sort(order=['symbol', 'id', 'vol'])
         pos_list = np.array([], dtype=int)
