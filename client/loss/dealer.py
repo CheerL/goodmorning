@@ -567,7 +567,7 @@ class LossDealerClient(BaseDealerClient):
                 target.set_buy(summary.vol, summary.amount)
 
             vol = float(target.init_buy_amount) - target.buy_vol
-            if vol <= self.user.min_usdt_amount:
+            if vol < self.user.min_usdt_amount:
                 self.buy_target(
                     target, price, vol, limit_rate,
                     filled_callback=filled_callback,
