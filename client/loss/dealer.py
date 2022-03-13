@@ -486,9 +486,10 @@ class LossDealerClient(BaseDealerClient):
             target.set_sell(summary.amount)
 
         if target.selling >= selling_level:
+            print(target.selling, selling_level)
             return
         elif target.selling != 0:
-            return self.cancel_and_sell_target(target, price, selling_level)
+            return self.cancel_and_sell_target(target, price, selling_level, limit=limit)
 
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
