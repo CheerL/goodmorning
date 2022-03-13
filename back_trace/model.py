@@ -51,7 +51,9 @@ class Param:
         'low_near_rate',
         'up_small_cont_rate',
         'up_small_loss_rate',
-        'up_break_cont_rate'
+        'up_break_cont_rate',
+        'buy_algo_version',
+        'sell_algo_version'
     ]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -62,10 +64,11 @@ class Param:
         self.max_buy_vol=10000000000
         self.min_num=3
         self.max_num=10
-        self.max_buy_ts=3600
+        self.max_buy_ts=86400
         self.buy_rate=-0.01
         self.high_rate=0.25
         self.high_back_rate=0.6
+        self.high_hold_time=86400
         self.low_rate=0.06
         self.low_back_rate=0.02
         self.clear_rate=-0.01
@@ -80,6 +83,8 @@ class Param:
         self.up_small_cont_rate=-0.15
         self.up_small_loss_rate=-0.03
         self.up_break_cont_rate=-0.25
+        self.buy_algo_version = 2
+        self.sell_algo_version = 2
 
         for i, value in enumerate(args):
             self.__setattr__(self.orders[i], value)
@@ -87,25 +92,29 @@ class Param:
         for key, value in kwargs.items():
             if key in self.orders:
                 self.__setattr__(key, value)
+                
+        
 
     def check(self):
-        return (
-            # self.low_back_rate < self.low_rate
-            self.low_back_rate < 0.85 * self.low_rate
-            and self.clear_rate < self.low_rate
-            and self.stop_loss_rate < self.clear_rate
-            and self.break_cont_rate < self.min_cont_rate
-            and self.low_rate < self.high_rate
-            and self.min_price < self.max_price
-            and self.min_buy_vol < self.max_buy_vol
-            and self.min_num < self.max_num
-            # and self.break_cont_rate < self.up_cont_rate
-            # and self.up_small_cont_rate < self.up_cont_rate
-            and self.up_small_cont_rate < 2.5 * self.up_small_loss_rate
-            and self.up_break_cont_rate < self.up_cont_rate
-            and self.up_break_cont_rate < self.up_small_cont_rate
-            and self.low_back_rate < self.high_rate * self.high_back_rate
-        )
+        if self.buy_algo_version in [1, 2]:
+            return (
+                # self.low_back_rate < self.low_rate
+                self.low_back_rate < 0.85 * self.low_rate
+                and self.clear_rate < self.low_rate
+                and self.stop_loss_rate < self.clear_rate
+                and self.break_cont_rate < self.min_cont_rate
+                and self.low_rate < self.high_rate
+                and self.min_price < self.max_price
+                and self.min_buy_vol < self.max_buy_vol
+                and self.min_num < self.max_num
+                # and self.break_cont_rate < self.up_cont_rate
+                # and self.up_small_cont_rate < self.up_cont_rate
+                and self.up_small_cont_rate < 2.5 * self.up_small_loss_rate
+                and self.up_break_cont_rate < self.up_cont_rate
+                and self.up_break_cont_rate < self.up_small_cont_rate
+                and self.low_back_rate < self.high_rate * self.high_back_rate
+            )
+        return True
 
     def to_csv(self):
         return ','.join([str(self.__getattribute__(key)) for key in self.orders])
@@ -124,15 +133,25 @@ class Record:
         self.profit = 0
         self.rate = 0
         self.fee = 0
+        self.now_price = 0
+        self.now_rate = 0
+
+    def __repr__(self) -> str:
+        return f'<{self.symbol} {datetime.ts2time(self.buy_time)} {datetime.ts2time(self.sell_time)}>'
+
+    def buy(self, buy_price, buy_time, buy_vol):
+        self.buy_time = buy_time
+        self.buy_price = buy_price
+        self.buy_vol = buy_vol
+        self.amount = self.buy_vol / buy_price * (1 - self.fee_rate)
 
     def sell(self, sell_price, sell_time):
-        if self.sell_time == 0:
-            self.sell_price = sell_price
-            self.sell_time = sell_time
-            self.sell_vol = self.amount * sell_price * (1 - self.fee_rate)
-            self.fee = (self.buy_vol + self.amount * sell_price) * self.fee_rate
-            self.profit = self.sell_vol - self.buy_vol
-            self.rate = self.profit / self.buy_vol
+        self.sell_price = sell_price
+        self.sell_time = sell_time
+        self.sell_vol = self.amount * sell_price * (1 - self.fee_rate)
+        self.fee = (self.buy_vol + self.amount * sell_price) * self.fee_rate
+        self.profit = self.sell_vol - self.buy_vol
+        self.rate = self.profit / self.buy_vol
 
     def to_csv(self):
         items = [
@@ -287,6 +306,7 @@ class ContLossList(NumpyData):
         ('high2', 'f4'),
         ('low2', 'f4'),
         ('vol2', 'f4'),
+        ('vol-1', 'f4'),
         ('date', 'S20'),
         ('rate', 'f4'),
         ('cont_loss_days', 'i2'),
@@ -311,6 +331,9 @@ class ContLossList(NumpyData):
         ('bollmiddown_tmr', 'f4'),
         ('bollfake4_tmr', 'f4'),
         ('bolldown_tmr', 'f4'),
+        ('boll_real', 'f4'),
+        ('bollup_real', 'f4'),
+        ('bollfake1_real', 'f4'),
         ('index', 'i4')
     ])
 
@@ -320,39 +343,6 @@ class ContLossList(NumpyData):
         else:
             symbol = symbol.encode() if isinstance(symbol, str) else symbol
             return self.data[self.data['symbol']==symbol]
-    # def load_from_raw(self, cont_loss_list: 'list[ContLoss]'):
-    #     temp_list = []
-    #     for cont_loss in cont_loss_list:
-    #         temp_item = [
-    #             cont_loss.symbol,  cont_loss.date, cont_loss.kline.id,
-    #             cont_loss.kline.open, cont_loss.kline.close, 
-    #             cont_loss.kline.high, cont_loss.kline.low, cont_loss.kline.vol, 
-    #             cont_loss.rate, cont_loss.cont_loss_days, cont_loss.cont_loss_rate,
-    #             cont_loss.is_big_loss, cont_loss.is_max_loss, 
-    #             cont_loss.boll, cont_loss.bollup, cont_loss.bolldown,
-    #             0,0,0,0,0,0,0
-    #         ]
-    #         try:
-    #             kline2 = cont_loss.more_klines[0]
-    #             temp_item[-7:] = [
-    #                 kline2.id,kline2.open,kline2.close,
-    #                 kline2.high,kline2.low,kline2.vol,1
-    #             ]
-    #         except IndexError:
-    #             pass
-    #         temp_list.append((*temp_item,))
-
-    #     self.data = np.concatenate([self.data, np.array(temp_list, dtype=self.dtype)])
-
-    # @classmethod
-    # def load_from_pkl(cls, filename):
-    #     if os.path.exists(filename):
-    #         with open(filename, 'rb') as f:
-    #             cont_loss_list = pickle.load(f)
-
-    #     self = cls()
-    #     self.load_from_raw(cont_loss_list)
-    #     return self
 
 class ContLoss:
     def __init__(self, symbol, kline, rate, cont_loss_days, cont_loss_rate, is_big_loss, is_max_loss, is_min_loss):
