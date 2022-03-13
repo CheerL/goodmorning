@@ -711,7 +711,7 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force, send=True):
         now = time.time()
-        start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 60) * 86400)
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
             OrderSQL.date >= start_date,
