@@ -14,6 +14,7 @@ def dealer(user, args):
     user.start()
     client = DClient(user)
     client.resume()
+    client.sell_targets()
     
     if args.update_asset:
         client.update_asset(args.update_asset)
