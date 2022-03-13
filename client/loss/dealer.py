@@ -486,7 +486,6 @@ class LossDealerClient(BaseDealerClient):
             target.set_sell(summary.amount)
 
         if target.selling >= selling_level:
-            print(target.selling, selling_level)
             return
         elif target.selling != 0:
             return self.cancel_and_sell_target(target, price, selling_level, limit=limit)
@@ -501,7 +500,6 @@ class LossDealerClient(BaseDealerClient):
         if limit:
             summary = self.user.sell_limit(target, sell_amount, price)
         else:
-            print('???')
             summary = self.user.sell(target, sell_amount)
 
         if summary != None:
