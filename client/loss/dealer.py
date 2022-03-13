@@ -56,7 +56,7 @@ class LossDealerClient(BaseDealerClient):
         self.date = datetime.ts2date(now - 86400)
         self.targets[self.date] = {}
 
-        start_date = datetime.ts2date(now - (MAX_DAY + 2) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 3) * 86400)
         clear_date = datetime.ts2date(now - (MAX_DAY + 1) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
