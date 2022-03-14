@@ -527,3 +527,19 @@ def get_holding_symbol():
         data = session.query(holding_symbol).all()
         res = [each.symbol for each in data]
         return res
+
+def get_binance_users(binance_id=None):
+    with get_session() as session:
+        users = Table('users', Base.metadata, autoload=True, autoload_with=session.bind)
+        data = session.query(users)
+        if binance_id:
+            data = data.filter(users.c.bn_account == binance_id)
+        data = data.all()
+        res = [{
+            'key': index,
+            'id': item.id,
+            'name': item.name,
+            'bn_account': item.bn_account,
+            'fee': item.fee
+        } for index, item in enumerate(data)]
+        return res

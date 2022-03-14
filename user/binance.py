@@ -8,6 +8,7 @@ from target import BaseTarget as Target
 from order import OrderSummary
 from user.base import BaseUser, BaseMarketClient
 from user.binance_model import ListenKey, Candlestick, Symbol, OrderDetail, Ticker
+from dataset.pgsql import get_binance_users
 
 import re
 import time
@@ -111,6 +112,7 @@ class BinanceUser(BaseUser):
 
         for id, user in zip(ids, users):
             user.account_id = id
+            user.username = get_binance_users(id)[0]['name']
         return users
 
     def get_amount(self, currency: str, available=False, check=True):
