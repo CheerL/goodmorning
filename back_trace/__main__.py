@@ -45,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--end', default='10', type=str)
     parser.add_argument('--weight', default='1', type=str)
 
+    parser.add_argument('--level', default='1day', type=str)
     parser.add_argument('--buy_algo_version', default=2, type=int)
     parser.add_argument('--sell_algo_version', default=2, type=int)
 
@@ -62,33 +63,33 @@ if __name__ == '__main__':
     parser.add_argument('--search_storage', default='postgresql://linchenran:lcr0717@cai.math.cuhk.edu.hk:54321/params')
 
     parser.add_argument('--min_price_list', default='0')
-    parser.add_argument('--max_price_list', default='1:1000')
-    parser.add_argument('--max_hold_days_list', default='2')
-    parser.add_argument('--min_buy_vol_list', default='1000000:10000000:1000000')
+    parser.add_argument('--max_price_list', default='1')
+    parser.add_argument('--max_hold_days_list', default='2:24:1')
+    parser.add_argument('--min_buy_vol_list', default='100000:50000000:100000')
     # parser.add_argument('--min_buy_vol_list', default='3000000')
     parser.add_argument('--max_buy_vol_list', default='1e12')
     parser.add_argument('--min_num_list', default='3')
     parser.add_argument('--max_num_list', default='10')
     parser.add_argument('--max_buy_ts_list', default='86300')
     parser.add_argument('--buy_rate_list', default='0')
-    parser.add_argument('--high_rate_list', default='0.091:0.3')
+    parser.add_argument('--high_rate_list', default='0.03:0.4')
     parser.add_argument('--high_back_rate_list', default='0.1:0.9')
     parser.add_argument('--high_hold_time_list', default='86400')
     # parser.add_argument('--high_hold_time_list', default='3600:86400:1800')
-    parser.add_argument('--low_rate_list', default='0.005:0.09')
-    parser.add_argument('--low_back_rate_list', default='0:0.089')
+    parser.add_argument('--low_rate_list', default='0.005:0.1')
+    parser.add_argument('--low_back_rate_list', default='0:0.1')
     parser.add_argument('--clear_rate_list', default='-0.03:0.03')
     parser.add_argument('--final_rate_list', default='0:0.08')
     parser.add_argument('--stop_loss_rate_list', default='-1')
-    parser.add_argument('--min_cont_rate_list', default='-0.5:-0.05')
-    parser.add_argument('--break_cont_rate_list', default='-0.6:-0.1')
-    parser.add_argument('--up_cont_rate_list', default='-0.3:-0.05')
+    parser.add_argument('--min_cont_rate_list', default='-0.5:-0.03')
+    parser.add_argument('--break_cont_rate_list', default='-0.6:-0.05')
+    parser.add_argument('--up_cont_rate_list', default='-0.3:-0.03')
     parser.add_argument('--min_close_rate_list', default='0')
     parser.add_argument('--up_near_rate_list', default='0.5:1')
     parser.add_argument('--low_near_rate_list', default='0')
-    parser.add_argument('--up_small_cont_rate_list', default='-0.3:-0.05')
+    parser.add_argument('--up_small_cont_rate_list', default='-0.3:-0.03')
     parser.add_argument('--up_small_loss_rate_list', default='-0.05:0.0')
-    parser.add_argument('--up_break_cont_rate_list', default='-0.4:-0.05')
+    parser.add_argument('--up_break_cont_rate_list', default='-0.4:-0.03')
 
     parser.add_argument('--min_price', default=0, type=float)
     parser.add_argument('--max_price', default=1, type=float)
@@ -126,11 +127,10 @@ if __name__ == '__main__':
     if args.generate:
         boll_n = 20
         
-        cont_loss_list = ContLossList.load(f'{ROOT}/back_trace/npy/cont_list_{boll_n}.npy')
+        cont_loss_list = ContLossList.load(f'{ROOT}/back_trace/npy/cont_list_{boll_n}{"" if args.level == "1day" else "_"+args.level}.npy')
         for i in range(10):
             print(i)
-            create_random_cont_loss_list(cont_loss_list, args.search_random, i, boll_n)
-        exit
+            create_random_cont_loss_list(cont_loss_list, args.search_random, i, boll_n, args.level)
 
     # end_list = range(5, 200, 20)
     interval = '1min'
@@ -142,21 +142,22 @@ if __name__ == '__main__':
     [u] = BinanceUser.init_users()
     Global.user = u
     best_params_path = f'{ROOT}/back_trace/csv/{args.param_csv}.csv'
-    cont_loss_list, klines_dict = get_data(days=max(days_list)+max(end_list)+args.min_before, end=min(end_list), min_before=args.min_before, filter_=False)
+    cont_loss_list, klines_dict = get_data(days=max(days_list)+max(end_list)+args.min_before, end=min(end_list), min_before=args.min_before, filter_=False, level=args.level)
     
     if args.search:
         args.random = args.search_random
         
-    random_lists = get_random_cont_loss_list(args.random, RANDOM_ALL_NUM) if args.random  else []
+    random_lists = get_random_cont_loss_list(args.random, RANDOM_ALL_NUM, level=args.level) if args.random  else []
     
     def sub_back_trace(
         param: Param,
         write=True,
         sub_write=False,
         load=True,
-        show=False
+        show=False,
+        level='1day'
         ):
-        def sub_worker(end, days, weight, cont_loss_list):
+        def sub_worker(end, days, weight, cont_loss_list, level):
             total_money, profit_rate, max_back_rate = back_trace(
                 cont_loss_list, param,
                 min_vol=u.min_usdt_amount,
@@ -165,6 +166,7 @@ if __name__ == '__main__':
                 end=end,
                 write=sub_write,
                 interval=interval,
+                level=level
             )
             if args.search:
                 if max_back_rate < BACK_COFF_2:
@@ -185,9 +187,10 @@ if __name__ == '__main__':
                 days, end, load,
                 min_before=args.min_before,
                 klines_dict=klines_dict,
-                cont_loss_list=cont_loss_list
+                cont_loss_list=cont_loss_list,
+                level=level
             )
-            sub_worker(end, days, weight, loss_list)
+            sub_worker(end, days, weight, loss_list, level)
 
             if args.random > 0 and args.random_repeat > 0:
                 # for i in range(args.random_repeat):
@@ -197,9 +200,10 @@ if __name__ == '__main__':
                         days, end, load,
                         min_before=args.min_before,
                         klines_dict=klines_dict,
-                        cont_loss_list=random_lists[i]
+                        cont_loss_list=random_lists[i],
+                        level=level
                     )
-                    sub_worker(end, days, weight, loss_list)
+                    sub_worker(end, days, weight, loss_list, level)
 
         times = len(result)
         mean_total_money = sum([end_result[1] for end_result in result]) / times
@@ -246,7 +250,7 @@ if __name__ == '__main__':
                 up_small_loss_rate = trial.suggest_float('up_small_loss_rate', *str2range(args.up_small_loss_rate_list)),
                 up_break_cont_rate = trial.suggest_float('up_break_cont_rate', *str2range(args.up_break_cont_rate_list)),
             )
-            mean_total_money, mean_profit_rate, mean_back_rate = sub_back_trace(param)
+            mean_total_money, mean_profit_rate, mean_back_rate = sub_back_trace(param, level=args.level)
             return mean_total_money
 
         if args.search_algo == 'tpe':
@@ -302,5 +306,6 @@ if __name__ == '__main__':
             write=False,
             sub_write=True,
             show=True,
-            load=args.load
+            load=args.load,
+            level=args.level
         )
