@@ -56,7 +56,7 @@ class LossDealerClient(BaseDealerClient):
         self.date = datetime.ts2date(now - 86400)
         self.targets[self.date] = {}
 
-        start_date = datetime.ts2date(now - (MAX_DAY + 60) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 3) * 86400)
         clear_date = datetime.ts2date(now - (MAX_DAY + 1) * 86400)
         targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
@@ -711,7 +711,7 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force, send=True):
         now = time.time()
-        start_date = datetime.ts2date(now - (MAX_DAY + 60) * 86400)
+        start_date = datetime.ts2date(now - (MAX_DAY + 3) * 86400)
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
             OrderSQL.date >= start_date,

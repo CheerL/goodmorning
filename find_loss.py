@@ -26,36 +26,39 @@ def dealer(user, args):
         return
     
     if args.buy:
-        targets = client.targets.setdefault(args.manual_date, {})
-        if args.manual_symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
-            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+        # param : date, symbol, price, vol
+        targets = client.targets.setdefault(args.date, {})
+        if args.symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
-        target = targets[args.manual_symbol]
-        client.buy_target(target, args.manual_price, args.manual_amount, limit_rate=0)
+        target = targets[args.symbol]
+        client.buy_target(target, args.price, args.vol, limit_rate=0)
         time.sleep(5)
         kill_all_threads()
         return
 
     if args.sell:
-        targets = client.targets.setdefault(args.manual_date, {})
-        if args.manual_symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
-            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+        # param : date, symbol, price, amount
+        targets = client.targets.setdefault(args.date, {})
+        if args.symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
-        target = targets[args.manual_symbol]
-        client.sell_target(target, args.manual_price, args.manual_amount, 10)
+        target = targets[args.symbol]
+        client.sell_target(target, args.price, args.amount, 10)
         time.sleep(5)
         kill_all_threads()
         return
         
     if args.cancel:
-        targets = client.targets.setdefault(args.manual_date, {})
-        if args.manual_symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.manual_date))/86400)
-            new_target, _ = client.find_targets([args.manual_symbol], end, force=True)
+        # param : date, symbol, cancel_direction
+        targets = client.targets.setdefault(args.date, {})
+        if args.symbol not in targets:
+            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
-        target = targets[args.manual_symbol]
+        target = targets[args.symbol]
         client.cancel_target(target, direction=args.cancel_direction)
         time.sleep(5)
         kill_all_threads()
@@ -97,10 +100,11 @@ if __name__ == '__main__':
     parser.add_argument('--buy', action='store_true', default=False)
     parser.add_argument('--cancel', action='store_true', default=False)
     parser.add_argument('--cancel_direction', default='buy')
-    parser.add_argument('--manual_date', default='')
-    parser.add_argument('--manual_symbol', default='')
-    parser.add_argument('--manual_price', default=0, type=float)
-    parser.add_argument('--manual_amount', default=0, type=float)
+    parser.add_argument('--date', default='')
+    parser.add_argument('--symbol', default='')
+    parser.add_argument('--price', default=0, type=float)
+    parser.add_argument('--amount', default=0, type=float)
+    parser.add_argument('--vol', default=0, type=float)
     parser.add_argument('--show_target', action='store_true', default=False)
     parser.add_argument('--target_end', default=0, type=int)
     parser.add_argument('--update_asset', default=0, type=int)
