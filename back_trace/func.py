@@ -4,7 +4,7 @@ import math
 import numpy as np
 from retry import retry
 from utils.parallel import run_thread_pool
-from utils import get_rate, datetime
+from utils import get_rate, datetime, get_level
 from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record, Global
 
 # np.seterr(all='raise')
@@ -23,21 +23,6 @@ SPECIAL_SYMBOLS = [
     b'LOKAUSDT', b'SCRTUSDT', b'LTCUPUSDT', b'XTZUPUSDT',
     b'NUUSDT', b'NANOUSDT', b'KEEPUSDT'
 ]
-
-def get_level(level):
-    level_coff = {
-        '1day': 1,
-        '24hour': 1,
-        '12hour': 2,
-        '8hour': 3,
-        '6hour': 4,
-        '4hour': 6,
-        '3hour': 8,
-        '2hour': 12,
-        '1hour': 24
-    }[level]
-    level_ts = int(86400 / level_coff)
-    return level_coff, level_ts
 
 def get_real_boll(price, m, eps=1e-5):
     if price.size < BOLL_N-1:
@@ -294,7 +279,7 @@ def back_trace(
                 
                 last = cont_loss_list.data[
                     (cont_loss_list.data['symbol']==cont_loss['symbol']) 
-                    & (cont_loss_list.data['id']==ts-86400)
+                    & (cont_loss_list.data['id']==ts-level_ts)
                 ]
                 if not last.size:
                     continue

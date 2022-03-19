@@ -109,3 +109,18 @@ def get_boll(price, m):
     sma = np.mean(price) #price.mean()
     std = np.std(price)  #price.std()
     return [sma+k*std for k in m]
+
+def get_level(level):
+    level_coff = {
+        '1day': 1,
+        '24hour': 1,
+        '12hour': 2,
+        '8hour': 3,
+        '6hour': 4,
+        '4hour': 6,
+        '3hour': 8,
+        '2hour': 12,
+        '1hour': 24
+    }[level]
+    level_ts = int(86400 / level_coff)
+    return level_coff, level_ts

@@ -1,6 +1,7 @@
 import pytz
 import datetime
 import functools
+import time
 
 TZ_DICT = {
     0: pytz.timezone('UTC'),
@@ -54,5 +55,11 @@ def ts2dt(ts=0):
 def ts2time(ts=0, fmt='%Y-%m-%d %H:%M:%S'):
     return ts2dt(ts).strftime(fmt)
 
+
 def ts2date(ts=0):
     return ts2time(ts, '%Y-%m-%d')
+
+def ts2level_hour(ts=0, level_ts=86400):
+    if ts == 0:
+        ts = time.time()
+    return ts2time(ts // level_ts * level_ts, '%Y-%m-%d-%H')

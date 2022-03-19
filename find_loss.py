@@ -8,6 +8,7 @@ from client.loss import LossDealerClient as DClient, LossWatcherClient as WClien
 
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 EXCHANGE = user_config.get('setting', 'Exchange')
+LEVEL = config.get('loss', 'LEVEL')
 
 def dealer(user, args):
     logger.name = user.username
@@ -29,7 +30,7 @@ def dealer(user, args):
         # param : date, symbol, price, vol
         targets = client.targets.setdefault(args.date, {})
         if args.symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            end = int((datetime.time2ts() - datetime.time2ts(args.date, '%Y-%m-%d-%H'))/client.level_ts)
             new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
         target = targets[args.symbol]
@@ -42,7 +43,7 @@ def dealer(user, args):
         # param : date, symbol, price, amount
         targets = client.targets.setdefault(args.date, {})
         if args.symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            end = int((datetime.time2ts() - datetime.time2ts(args.date, '%Y-%m-%d-%H'))/client.level_ts)
             new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
         target = targets[args.symbol]
@@ -55,7 +56,7 @@ def dealer(user, args):
         # param : date, symbol, cancel_direction
         targets = client.targets.setdefault(args.date, {})
         if args.symbol not in targets:
-            end = int((datetime.date2ts() - datetime.date2ts(args.date))/86400)
+            end = int((datetime.time2ts() - datetime.time2ts(args.date, '%Y-%m-%d-%H'))/client.level_ts)
             new_target, _ = client.find_targets([args.symbol], end, force=True)
             targets.update(new_target)
         target = targets[args.symbol]
@@ -64,10 +65,20 @@ def dealer(user, args):
         kill_all_threads()
         return
 
+    cron_dict = {
+        '1day': (0, 23),
+        '24hour': (0, 23),
+        '8hour': ('0/8', '7/8'),
+        '4hour': ('0/4', '3/4'),
+        '2hour': ('0/2', '1/2'),
+        '1hour': ('*', '*'),
+    }
+    buy_hour, sell_hour = cron_dict[LEVEL]
+
     # user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
-    user.scheduler.add_job(client.update_and_buy_targets, 'cron', hour=0, minute=0, second=10)
+    user.scheduler.add_job(client.update_and_buy_targets, 'cron', hour=buy_hour, minute=0, second=10)
     user.scheduler.add_job(client.update_asset, 'cron', hour=0, minute=1, second=0)
-    user.scheduler.add_job(client.sell_targets, 'cron', hour=23, minute=57, second=30)
+    user.scheduler.add_job(client.sell_targets, 'cron', hour=sell_hour, minute=57, second=30)
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
     client.report_scheduler.add_job(client.report, 'cron', minute='*/5', second=0, kwargs={'force': False})
