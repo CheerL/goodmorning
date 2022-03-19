@@ -168,7 +168,7 @@ class LossDealerClient(BaseDealerClient):
                 if not target.own:
                     continue
 
-                amount = min(self.user.available_balance[target.base_currency], target.own_amount)
+                amount = min(self.user.balance[target.base_currency], target.own_amount)
                 if amount < target.sell_market_min_order_amt:
                     continue
                 
@@ -192,7 +192,7 @@ class LossDealerClient(BaseDealerClient):
                         price=target.clear_price,
                         sell_amount=amount,
                         selling_level=30,
-                        limit=False
+                        limit=True
                     )
 
         logger.info('Finish loading data')

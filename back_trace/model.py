@@ -31,6 +31,8 @@ class Param:
         'max_hold_days',
         'min_buy_vol',
         'max_buy_vol',
+        'min_up_small_buy_vol',
+        'max_buy_vol',
         'min_num',
         'max_num',
         'max_buy_ts',
@@ -62,9 +64,10 @@ class Param:
         self.max_hold_days=2
         self.min_buy_vol=5000000
         self.max_buy_vol=10000000000
+        self.min_up_small_buy_vol=100000
         self.min_num=3
         self.max_num=10
-        self.max_buy_ts=86400
+        self.max_buy_ts=0
         self.buy_rate=-0.01
         self.high_rate=0.25
         self.high_back_rate=0.6

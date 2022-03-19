@@ -58,7 +58,6 @@ class BinanceMarketClient(BaseMarketClient):
             interval = interval.replace('week', 'w')
         elif interval.endswith('mon'):
             interval = interval.replace('mon', 'M')
-        
         if start_ts and end_ts:
             raw_klines = []
             start_time = start_ts * 1000
