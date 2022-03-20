@@ -780,9 +780,8 @@ class LossDealerClient(BaseDealerClient):
                 if summary.ts:
                     update_load['tm'] = datetime.ts2time(summary.ts)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
-            
-                
 
+        logger.info(f'Force:{force},send:{send},{report_info}')
         if not force and not report_info['new_sell'] + report_info['new_buy']:
             return
 
@@ -817,9 +816,10 @@ class LossDealerClient(BaseDealerClient):
                 symbol, amount, buy_price, price, profit, percent, date
             ))
 
+        logger.info(f'{report_info}')
         if not report_info['holding'] + report_info['new_sell'] + report_info['new_buy']:
             return
-
+        
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
@@ -962,7 +962,7 @@ class LossDealerClient(BaseDealerClient):
             return sell_vol, old_targets, clear_targets, long_sell_targets
         
         yesterday = date = date or self.date
-        clear_date = datetime.ts2level_hour(datetime.time2ts(date, '%Y-%m-%d-%H') - (MAX_DAY-1) * self.level, self.level_ts)
+        clear_date = datetime.ts2level_hour(datetime.time2ts(date, '%Y-%m-%d-%H') - (MAX_DAY-1) * self.level_ts, self.level_ts)
 
         logger.info('Cancel all buy orders')
         clear_buy(yesterday)
