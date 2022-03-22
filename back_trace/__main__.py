@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('--up_small_loss_rate_list', default='-0.03:0.0')
     parser.add_argument('--up_break_cont_rate_list', default='-0.4:0.0')
     parser.add_argument('--buy_up_rate_list', default='0:0.02')
-    parser.add_argument('--sell_down_rate_list', default='0:-0.02')
+    parser.add_argument('--sell_down_rate_list', default='-0.02:0')
     parser.add_argument('--final_modify_rate_list', default='0:1')
 
     parser.add_argument('--min_price', default=0, type=float)

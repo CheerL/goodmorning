@@ -969,10 +969,10 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Find new target and check old')
 
         targets, new_date = self.find_targets()
+        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, yesterday)
         targets = self.filter_targets(targets, vol=sell_vol)
         self.targets[new_date] = targets
         self.date = max(self.targets.keys())
-        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, yesterday)
 
         logger.info('Start to sell')
         old_symbols = ",".join(set([target.symbol for target in old_targets]))
