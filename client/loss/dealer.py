@@ -18,6 +18,7 @@ BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 UP_LOSS_RATE = config.getfloat('loss', 'UP_LOSS_RATE')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+MARKET_RATE = config.getfloat('loss', 'MARKET_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 MIN_NUM = config.getint('loss', 'MIN_NUM')
 MAX_NUM = config.getint('loss', 'MAX_NUM')
@@ -34,7 +35,7 @@ UP_STOP_SMALL_LOSS_RATE = config.getfloat('loss', 'UP_STOP_SMALL_LOSS_RATE')
 UP_BREAK_LOSS_RATE = config.getfloat('loss', 'UP_BREAK_LOSS_RATE')
 UP_STOP_SMALL_MIN_VOL = config.getfloat('loss', 'UP_STOP_SMALL_MIN_VOL')
 
-BAN_LIST = ['SLPUSDT']
+BAN_LIST = []
 LEVEL = config.get('loss', 'LEVEL')
 
 class LossDealerClient(BaseDealerClient):
@@ -59,23 +60,21 @@ class LossDealerClient(BaseDealerClient):
         self.date = datetime.ts2level_hour(now - self.level_ts, self.level_ts)
         self.targets[self.date] = {}
 
-        start_date = datetime.ts2level_hour(now - (MAX_DAY + 3) * self.level_ts, self.level_ts)
+        start_date = datetime.ts2level_hour(now - (MAX_DAY + 7) * self.level_ts, self.level_ts)
         clear_date = datetime.ts2level_hour(now - (MAX_DAY + 1) * self.level_ts, self.level_ts)
-        targets: list[TargetSQL] = TargetSQL.get_targets([
+        sql_targets: list[TargetSQL] = TargetSQL.get_targets([
             TargetSQL.date >= start_date,
             TargetSQL.exchange == self.user.user_type
         ])
         infos = self.market.all_symbol_info
 
-        for target in targets:
+        for target in sql_targets:
             date_target_dict = self.targets.setdefault(target.date, {})
             loss_target = Target(
                 target.symbol, target.date, target.open, target.close, target.vol
             )
             klines = self.market.get_candlestick(target.symbol, LEVEL, 20+1)
-            loss_target.his_close = [each.close for each in klines[1:20+1]]
-            loss_target.his_close_tmp = False
-            loss_target.set_boll()
+            loss_target.update_his_close(klines)
 
             loss_target.set_info(infos[target.symbol], self.user.fee_rate)
             loss_target.price = loss_target.now_price = self.market.mark_price[target.symbol]
@@ -98,9 +97,7 @@ class LossDealerClient(BaseDealerClient):
                     loss_target = Target(
                         order.symbol, order.date, kline.open, kline.close, kline.vol
                     )
-                    loss_target.his_close = [each.close for each in klines[1:20+1]]
-                    loss_target.his_close_tmp = False
-                    loss_target.set_boll()
+                    loss_target.update_his_close(klines)
                     loss_target.set_info(infos[order.symbol], self.user.fee_rate)
                     loss_target.price = loss_target.now_price = self.market.mark_price[loss_target.symbol]
                     self.targets[order.date][order.symbol] = loss_target
@@ -174,12 +171,11 @@ class LossDealerClient(BaseDealerClient):
                 amount = min(self.user.balance[target.base_currency], target.own_amount)
                 if amount < target.sell_market_min_order_amt:
                     continue
-                
+
                 if target.date > clear_date:
                     klines = self.market.get_candlestick(target.symbol, LEVEL, 21)
-                    target.his_close = [each.close for each in klines[2:]]
-                    target.update_boll(klines[1].close)
-                    
+                    target.update_his_close(klines)
+                    target.update_sell_price(klines[0].id)
                     logger.info(f'Find {amount} {target.symbol} of {target.date}, long sell with price {target.long_sell_price}')
                     self.sell_target(
                         target,
@@ -188,11 +184,11 @@ class LossDealerClient(BaseDealerClient):
                         selling_level=1,
                         limit=amount * target.now_price > target.min_order_value
                     )
-                else:
+                elif target.date <= clear_date:
                     logger.info(f'Find {amount} {target.symbol} of {target.date}, sell with market price')
                     self.sell_target(
                         target,
-                        price=target.clear_price,
+                        price=1,
                         sell_amount=amount,
                         selling_level=30,
                         limit=True
@@ -282,32 +278,32 @@ class LossDealerClient(BaseDealerClient):
         cont_loss_days = len(cont_loss_list)
         
         price = [klines[0].close] + [kline.close for kline in klines[:20-1]]
-        boll = sum(price) / len(price)
+        next_boll = sum(price) / len(price)
     
         if (MIN_PRICE <= kline.close <= MAX_PRICE) and (
             (
-                kline.close > boll
+                kline.close > next_boll
                 and cont_loss_days==1
                 and cont_loss <= UP_LOSS_RATE
                 and MIN_VOL <= kline.vol <= MAX_VOL
             ) or (
-                kline.close > boll
+                kline.close > next_boll
                 and cont_loss_days > 2
                 and cont_loss <= UP_STOP_CONT_LOSS_RATE
                 # and rate == min_loss
                 and rate >= UP_STOP_SMALL_LOSS_RATE
                 and kline.vol >= UP_STOP_SMALL_MIN_VOL
             ) or (
-                kline.close > boll
+                kline.close > next_boll
                 and cont_loss <= UP_BREAK_LOSS_RATE
                 and cont_loss_days > 1
                 and MIN_VOL <= kline.vol <= MAX_VOL 
             ) or (
-                kline.close <= boll
+                kline.close <= next_boll
                 and cont_loss <= BREAK_LOSS_RATE
                 and MIN_VOL <= kline.vol <= MAX_VOL 
             ) or (
-                kline.close <= boll
+                kline.close <= next_boll
                 and rate == max_loss
                 and cont_loss <= MIN_LOSS_RATE
                 and MIN_VOL <= kline.vol <= MAX_VOL 
@@ -327,18 +323,16 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)[end:]
+                klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
             if symbol not in BAN_LIST and (symbol in ori_symbols or self.is_buy(klines, symbol)):
-                kline = klines[0]
+                kline = klines[end]
                 target = Target(symbol, datetime.ts2level_hour(kline.id, self.level_ts), kline.open, kline.close, kline.vol)
-                target.his_close = [each.close for each in klines[:20]]
-                target.his_close_tmp = (end == 0)
-
-                target.set_boll()
+                target.update_his_close(klines, fake=True)
+                target.update_buy_price(kline.id+self.level_ts)
                 if now - kline.id > self.level_ts and not TEST:
                     TargetSQL.add_target(
                         symbol=symbol,
@@ -362,19 +356,19 @@ class LossDealerClient(BaseDealerClient):
         @retry(tries=5, delay=1)
         def worker(symbol):
             try:
-                klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)[end:]
+                klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            kline = klines[0]
+            kline = klines[end]
             target = self.targets[date][symbol]
             target.vol = kline.vol
             target.set_mark_price(kline.close)
-            if end != 0 and target.his_close_tmp:
-                target.his_close_tmp = False
-                target.his_close[0] = kline.close
-            target.set_boll()
+
+            target.update_his_close(klines)
+            target.update_buy_price(klines[0].id)
+            target.now_price = klines[0].close
             
             if now - kline.id > self.level_ts and not TEST:
                 TargetSQL.add_target(
@@ -715,7 +709,7 @@ class LossDealerClient(BaseDealerClient):
 
     def report(self, force, send=True):
         now = time.time()
-        start_date = datetime.ts2level_hour(now - (MAX_DAY + 3) * self.level_ts, self.level_ts)
+        start_date = datetime.ts2level_hour(now - (MAX_DAY + 7) * self.level_ts, self.level_ts)
         orders: list[OrderSQL] = OrderSQL.get_orders([
             OrderSQL.account==str(self.user.account_id),
             OrderSQL.date >= start_date,
@@ -887,7 +881,7 @@ class LossDealerClient(BaseDealerClient):
                         continue
 
                     logger.info(f'Sell {target.symbol} of {target.date}(yesterday)')
-                    market_price = target.now_price * (1-SELL_UP_RATE)
+                    market_price = target.now_price * (1+MARKET_RATE)
                     sell_price = max(target.clear_price, market_price)
                     self.cancel_and_sell_target(target, sell_price, level, limit=limit)
             except Exception as e:
@@ -900,7 +894,11 @@ class LossDealerClient(BaseDealerClient):
                         target.own = False
                         continue
                     
-                    logger.info(f'Long sell {target.symbol} of {target.date}(yesterday)')
+                    klines = self.market.get_candlestick(target.symbol, LEVEL, 20+1)
+                    target.update_his_close(klines, fake=True)
+                    target.update_sell_price(klines[0].id+self.level_ts)
+
+                    logger.info(f'Long sell {target.symbol} of {target.date}')
                     self.cancel_and_sell_target(
                         target, target.long_sell_price,
                         level, limit=limit
@@ -928,7 +926,7 @@ class LossDealerClient(BaseDealerClient):
                                 continue
                         
                     logger.info(f'Finally sell {target.symbol} of {target.date}')
-                    market_price = now_price * (1-SELL_UP_RATE)
+                    market_price = now_price * (1+MARKET_RATE)
                     self.cancel_and_sell_target(target, market_price, level, limit=limit)
             except Exception as e:
                 logger.error(e)
@@ -950,15 +948,15 @@ class LossDealerClient(BaseDealerClient):
                     if day <= clear_date:
                         old_targets.append(target)
                         sell_vol += target.own_amount * target.now_price
+                    elif clear_date < day < yesterday:
+                        long_sell_targets.append(target)
                     elif day == yesterday:
-                        
                         if target.now_price <= target.clear_price:
-                            target.update_boll(target.now_price)
                             long_sell_targets.append(target)
                         else:
                             clear_targets.append(target)
                             sell_vol += target.own_amount * target.now_price
-            
+
             return sell_vol, old_targets, clear_targets, long_sell_targets
         
         yesterday = date = date or self.date
@@ -971,10 +969,10 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Find new target and check old')
 
         targets, new_date = self.find_targets()
-        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, yesterday)
         targets = self.filter_targets(targets, vol=sell_vol)
         self.targets[new_date] = targets
         self.date = max(self.targets.keys())
+        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, yesterday)
 
         logger.info('Start to sell')
         old_symbols = ",".join(set([target.symbol for target in old_targets]))
@@ -1039,8 +1037,8 @@ class LossDealerClient(BaseDealerClient):
         own_vols = sorted([target.buy_vol for target in targets.values() if target.buy_vol])
         target_num = len(targets)
         left_vol = total_vol = usdt_amount * min(target_num/ MIN_NUM,  1)
-        buy_vol = get_buy_vol(own_vols, target_num, total_vol, min_usdt_amount)
-        logger.info(f'Each buy {buy_vol}U')
+        target_vol = get_buy_vol(own_vols, target_num, total_vol, min_usdt_amount)
+        logger.info(f'Each buy to {target_vol}U')
 
         order_targets = sorted(
             [target for target in targets.values()],
@@ -1049,11 +1047,11 @@ class LossDealerClient(BaseDealerClient):
 
         for target in order_targets:
             now_target = self.targets[date][target.symbol]
-            add_vol = math.floor(buy_vol - now_target.buy_vol)
+            add_vol = math.floor(target_vol - now_target.buy_vol)
             if left_vol < min_usdt_amount or add_vol < min_usdt_amount or add_vol > left_vol:
                 now_target.init_buy_amount = now_target.buy_vol
             else:
-                now_target.init_buy_amount = buy_vol
+                now_target.init_buy_amount = target_vol
                 left_vol -= add_vol
                 self.cancel_and_buy_target(now_target, target.boll_target_buy_price, limit_rate=0)
 

@@ -50,12 +50,16 @@ class Param:
         'up_cont_rate',
         'min_close_rate',
         'up_near_rate',
+        'up_near_rate_fake',
         'low_near_rate',
         'up_small_cont_rate',
         'up_small_loss_rate',
         'up_break_cont_rate',
         'buy_algo_version',
-        'sell_algo_version'
+        'sell_algo_version',
+        'buy_up_rate',
+        'sell_down_rate',
+        'final_modify_rate'
     ]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -82,12 +86,16 @@ class Param:
         self.up_cont_rate=-0.1
         self.min_close_rate=0
         self.up_near_rate=0.90
+        self.up_near_rate_fake=0.90
         self.low_near_rate=0.3
         self.up_small_cont_rate=-0.15
         self.up_small_loss_rate=-0.03
         self.up_break_cont_rate=-0.25
         self.buy_algo_version = 2
         self.sell_algo_version = 2
+        self.buy_up_rate = 0
+        self.sell_down_rate = 0
+        self.final_modify_rate = 1
 
         for i, value in enumerate(args):
             self.__setattr__(self.orders[i], value)

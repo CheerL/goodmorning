@@ -666,15 +666,25 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval, level):
         #     cont_loss['bolldown']
         # ])
         tmr_mark_price = np.array([
+            # pos 0
             cont_loss['bollup_tmr'],
+            # pos 1
             cont_loss['bollfake1_tmr'],
+            # pos 2
             cont_loss['bollmidup_tmr'],
+            # pos 3
             cont_loss['bollfake2_tmr'],
+            # pos 4
             cont_loss['boll_tmr'],
+            # pos 5
             cont_loss['bollfake3_tmr'],
+            # pos 6
             cont_loss['bollmiddown_tmr'],
+            # pos 7
             cont_loss['bollfake4_tmr'],
+            # pos 8
             cont_loss['bolldown_tmr']
+            # pos 9
         ])
         close_pos = tmr_mark_price[tmr_mark_price>close].size
         if close_pos <= 0:
@@ -689,13 +699,18 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval, level):
             up_price = tmr_mark_price[close_pos-1]
             down_price = tmr_mark_price[close_pos]
             
-            if (close - down_price) / (up_price - down_price) > param.up_near_rate and close_pos % 2:
+            if (close - down_price) / (up_price - down_price) > param.up_near_rate_fake and not close_pos % 2:
+                # 2,4,6,8
+                buy_price = close
+            elif (close - down_price) / (up_price - down_price) > param.up_near_rate and close_pos % 2:
+                # 3,5,7,9
                 buy_price = close
             # elif low < mark_price[close_pos] and (close - down_price) / (up_price - down_price) < param.low_near_rate and not close_pos % 2:
             #     buy_price = close
             else:
                 buy_price = down_price
 
+        buy_price = buy_price * (1+param.buy_up_rate)
         low_price = close * (1 + param.low_rate)
         start_time = cont_loss['id']+level_ts
         _, buy_time = buy_detailed_back_trace(
@@ -854,11 +869,16 @@ def get_sell_price_and_time_v2(cont_loss, cont_loss_list, param: Param, date, in
                             yesterday_kline['bollmiddown_tmr'],
                             yesterday_kline['bolldown_tmr'],
                         ])
-                        pos = max(0, boll[boll>open_price].size-1)
-                        final_price = boll[pos]
-                        if final_price/open_price-1 < param.final_rate:
+                        pos = boll[boll>open_price].size
+                        if pos == 0:
+                            final_price = open_price
+                        else:
+                            final_price = boll[pos-1]
                             diff = boll[0]-boll[1]
-                            final_price += diff
+                            if (final_price-open_price)/diff < param.final_rate:
+                                final_price += diff * param.final_modify_rate
+                                
+                        final_price = final_price * (1+param.sell_down_rate)
 
                         if day_kline['high'] > final_price and day_kline['low'] <= stop_loss_price:
                             # 分不清止损后止盈的先后

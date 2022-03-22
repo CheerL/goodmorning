@@ -1,5 +1,5 @@
 import numpy as np
-from utils import config, logger, get_boll
+from utils import config, logger, get_boll, get_level
 
 MIN_STOP_LOSS_HOLD_TIME = config.getfloat('time', 'MIN_STOP_LOSS_HOLD_TIME')
 STOP_LOSS_RATE = config.getfloat('sell', 'STOP_LOSS_RATE')
@@ -8,7 +8,7 @@ STOP_PROFIT_RATE_LOW = config.getfloat('sell', 'STOP_PROFIT_RATE_LOW')
 BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 HIGH_RATE = config.getfloat('loss', 'HIGH_RATE')
 LOW_RATE = config.getfloat('loss', 'LOW_RATE')
-SELL_RATE = config.getfloat('loss', 'SELL_RATE')
+FINAL_RATE = config.getfloat('loss', 'FINAL_RATE')
 CLEAR_RATE = config.getfloat('loss', 'CLEAR_RATE')
 HIGH_BACK_RATE = config.getfloat('loss', 'HIGH_BACK_RATE')
 LOW_BACK_RATE = config.getfloat('loss', 'LOW_BACK_RATE')
@@ -16,8 +16,12 @@ SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
 AVER_INTERVAL_LENGTH = config.getfloat('loss', 'AVER_INTERVAL_LENGTH')
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 UP_NEAR_RATE = config.getfloat('loss', 'UP_NEAR_RATE')
+UP_NEAR_RATE_FAKE = config.getfloat('loss', 'UP_NEAR_RATE_FAKE')
 
 AVER_NUM = int(AVER_INTERVAL_LENGTH // PRICE_INTERVAL)
+
+LEVEL = config.get('loss', 'LEVEL')
+_, LEVEL_TS = get_level(LEVEL)
 
 class BaseTarget:
     def __init__(self, symbol, price, time):
@@ -127,10 +131,8 @@ class LossTarget(BaseTarget):
         self.low_mark = False
         self.low_selling = False
 
-        self.his_close = []
-        self.his_close_tmp = False
+        self.his_close = {}
         self.boll = 0
-        self.bolls = []
         self.boll_target_buy_price = 0
         self.boll_target_sell_price = 0
 
@@ -139,59 +141,67 @@ class LossTarget(BaseTarget):
     def __repr__(self) -> str:
         return f'<LossTarget symbol={self.symbol} date={self.date} close={self.close} high_mark={self.high_mark} low_mark={self.low_mark} own_amount={self.own_amount} buy_price={self.buy_price} buy_vol={self.buy_vol} init_buy_vol={self.init_buy_amount}>'
 
-    def set_boll(self):
-        if self.his_close:
-            old_boll = sum(self.his_close) / len(self.his_close)
-            new_his_close = [self.close] + self.his_close[:19]
-            # new_his_close = self.his_close[:20]
+    def update_his_close(self, klines, fake=False):
+        for kline in klines:
+            self.his_close[kline.id]=kline.close
+        
+        if fake:
+            max_ts = max(self.his_close.keys())
+            self.his_close[max_ts+LEVEL_TS] = self.his_close[max_ts]
 
-            self.bolls = np.array(
-                get_boll(new_his_close, [2, 1.5, 1, 0.5, 0, -0.5, -1, -1.5, -2])
-            )
-            self.boll = self.bolls[4]
-            
-            close_pos = self.bolls[self.bolls>self.close].size
+    def get_boll(self, ts, std_range=[0]):
+        time_list = sorted([time for time in self.his_close.keys() if time <= ts])[-20:]
+        close_list = [self.his_close[time] for time in time_list]
+        bolls = get_boll(close_list, std_range)
+        return bolls, time_list, close_list
+
+    def update_buy_price(self, ts, std_range=[2,1.5,1,0.5,0,-0.5,-1,-1.5,-2]):
+        bolls, time_list, close_list = self.get_boll(ts, std_range)
+        last_ts = time_list[-2]
+        last_open, last_close, close = close_list[-3:]
+        old_bolls, _, _ = self.get_boll(last_ts, [0])
+        if bolls.size and old_bolls.size:
+            self.boll = boll = bolls[int((len(std_range)-1)/2)]
+            last_boll_mid = old_bolls[0]
+
+            close_pos = bolls[bolls>close].size
             if close_pos <= 0:
-                buy_price = self.bolls[0]
-            elif close_pos >= self.bolls.size:
-                buy_price = self.close
+                buy_price = bolls[0]
             elif close_pos == 1:
-                buy_price = self.bolls[1]
-            elif old_boll > self.open > self.close:
-                buy_price = self.bolls[8]
+                buy_price = bolls[1]
+            elif close_pos >= bolls.size:
+                buy_price = self.close
+            elif last_boll_mid > last_open > last_close and boll > close:
+                buy_price = bolls[-1]
             else:
-                up_price = self.bolls[close_pos-1]
-                down_price = self.bolls[close_pos]
+                up_price = bolls[close_pos-1]
+                down_price = bolls[close_pos]
                 
-                if (self.close - down_price) / (up_price - down_price) > UP_NEAR_RATE and close_pos % 2:
-                    buy_price = self.close
-                # elif low < mark_price[close_pos] and (close - down_price) / (up_price - down_price) < param.low_near_rate and not close_pos % 2:
-                #     buy_price = close
+                if (self.close - down_price) / (up_price - down_price) > UP_NEAR_RATE_FAKE and not close_pos % 2:
+                    buy_price = close
+                elif (self.close - down_price) / (up_price - down_price) > UP_NEAR_RATE and close_pos % 2:
+                    buy_price = close
                 else:
                     buy_price = down_price
             
             self.boll_target_buy_price = buy_price
-            
-    def update_boll(self, new_close):
-        if self.his_close:
-            if self.his_close_tmp:
-                self.his_close[0] = new_close
-                self.his_close_tmp = False
-            else:
-                self.his_close = [new_close] + self.his_close[:19]
+            # self.boll_target_buy_price = buy_price * (1+buy_up_rate)
 
-            new_his_close = [new_close] + self.his_close[:19]
-            self.bolls = np.array(
-                get_boll(new_his_close, [2, 1, 0, -1, -2])
-            )
-            pos = max(0, self.bolls[self.bolls>new_close].size-1)
-            self.boll_target_sell_price = self.bolls[pos]
-            
-            if self.boll_target_sell_price < new_close * (1+SELL_RATE):
-                diff = self.bolls[0]-self.bolls[1]
-                self.boll_target_sell_price += diff
-                
-            self.long_sell_price = self.boll_target_sell_price
+    def update_sell_price(self, ts, std_range=[2,1,0,-1,-2]):
+        bolls, _, close_list = self.get_boll(ts, std_range)
+        last_close = close_list[-2]
+        if bolls:
+            pos = bolls[bolls>last_close].size
+            if pos == 0:
+                sell_price = last_close
+            else:
+                sell_price = bolls[pos-1]
+                diff = bolls[0]-bolls[1]
+                if (sell_price-last_close)/diff < FINAL_RATE:
+                    sell_price += diff
+
+            self.long_sell_price = self.boll_target_sell_price = sell_price
+            # self.long_sell_price = self.boll_target_sell_price = sell_price * (1+sell_down_rate)
 
     def set_info(self, info, fee_rate):
         super().set_info(info)
@@ -200,15 +210,13 @@ class LossTarget(BaseTarget):
 
     def set_mark_price(self, price,
         high_rate=HIGH_RATE, low_rate=LOW_RATE, high_back_rate=HIGH_BACK_RATE,
-        low_back_rate=LOW_BACK_RATE, sell_rate=SELL_RATE, clear_rate=CLEAR_RATE
+        low_back_rate=LOW_BACK_RATE, FINAL_RATE=FINAL_RATE, clear_rate=CLEAR_RATE
     ):
         self.init_price = price
         self.high_mark_price = max(price * (1+high_rate), (self.open+price)/2)
         self.high_mark_back_price = (self.high_mark_price - price) * high_back_rate + price
         self.low_mark_price = price * (1+low_rate)
         self.low_mark_back_price = price * (1+low_back_rate)
-        # self.clear_price = price * (1+clear_rate)
-        # self.long_sell_price = price * (1+sell_rate)
         logger.info(f'{self.symbol} of {self.date} price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
 
     def set_buy(self, vol, amount, clear_rate=CLEAR_RATE, fee_rate=None):

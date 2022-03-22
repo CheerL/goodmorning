@@ -104,11 +104,11 @@ def kill_all_threads():
 
 def get_boll(price, m):
     if not len(price):
-        return [0] * len(m)
+        return np.array([])
 
     sma = np.mean(price) #price.mean()
     std = np.std(price)  #price.std()
-    return [sma+k*std for k in m]
+    return np.array([sma+k*std for k in m])
 
 def get_level(level):
     level_coff = {

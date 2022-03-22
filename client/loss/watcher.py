@@ -29,7 +29,7 @@ UP_BREAK_LOSS_RATE = config.getfloat('loss', 'UP_BREAK_LOSS_RATE')
 UP_STOP_SMALL_MIN_VOL = config.getfloat('loss', 'UP_STOP_SMALL_MIN_VOL')
 
 
-BAN_LIST = ['SLPUSDT']
+BAN_LIST = []
 LEVEL = config.get('loss', 'LEVEL')
 
 class LossWatcherClient:
