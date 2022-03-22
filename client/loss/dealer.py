@@ -775,7 +775,7 @@ class LossDealerClient(BaseDealerClient):
                     update_load['tm'] = datetime.ts2time(summary.ts)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
 
-        logger.info(f'Force:{force},send:{send},{report_info}')
+        # logger.info(f'Force:{force},send:{send},{report_info}')
         if not force and not report_info['new_sell'] + report_info['new_buy']:
             return
 
@@ -810,7 +810,7 @@ class LossDealerClient(BaseDealerClient):
                 symbol, amount, buy_price, price, profit, percent, date
             ))
 
-        logger.info(f'{report_info}')
+        # logger.info(f'{report_info}')
         if not report_info['holding'] + report_info['new_sell'] + report_info['new_buy']:
             return
         
