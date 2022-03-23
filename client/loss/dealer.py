@@ -324,13 +324,16 @@ class LossDealerClient(BaseDealerClient):
         def worker(symbol):
             try:
                 klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)
+                kline = klines[end]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            if symbol not in BAN_LIST and (symbol in ori_symbols or self.is_buy(klines, symbol)):
-                kline = klines[end]
-                target = Target(symbol, datetime.ts2level_hour(kline.id, self.level_ts), kline.open, kline.close, kline.vol)
+            if symbol not in BAN_LIST and (symbol in ori_symbols or self.is_buy(klines[end:], symbol)):
+                target = Target(
+                    symbol, datetime.ts2level_hour(kline.id, self.level_ts),
+                    kline.open, kline.close, kline.vol
+                )
                 target.update_his_close(klines, fake=True)
                 target.update_buy_price(kline.id+self.level_ts)
                 if now - kline.id > self.level_ts and not TEST:
