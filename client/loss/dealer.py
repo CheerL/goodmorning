@@ -16,8 +16,7 @@ TEST = user_config.getboolean('setting', 'TEST')
 MIN_LOSS_RATE = config.getfloat('loss', 'MIN_LOSS_RATE')
 BREAK_LOSS_RATE = config.getfloat('loss', 'BREAK_LOSS_RATE')
 UP_LOSS_RATE = config.getfloat('loss', 'UP_LOSS_RATE')
-BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
-SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+# BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 MARKET_RATE = config.getfloat('loss', 'MARKET_RATE')
 MAX_DAY = config.getint('loss', 'MAX_DAY')
 MIN_NUM = config.getint('loss', 'MIN_NUM')
@@ -360,11 +359,11 @@ class LossDealerClient(BaseDealerClient):
         def worker(symbol):
             try:
                 klines = self.market.get_candlestick(symbol, LEVEL, min_before_days*self.level_coff+end+1)
+                kline = klines[end]
             except Exception as e:
                 logger.error(f'[{symbol}]  {e}')
                 raise e
 
-            kline = klines[end]
             target = self.targets[date][symbol]
             target.vol = kline.vol
             target.set_mark_price(kline.close)
@@ -424,7 +423,7 @@ class LossDealerClient(BaseDealerClient):
             else:
                 raise e
 
-    def buy_target(self, target: Target, price=0, vol=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True, random=True):
+    def buy_target(self, target: Target, price=0, vol=0, limit_rate=0, filled_callback=None, cancel_callback=None, limit=True, random=True):
         @retry(tries=5, delay=0.05)
         def _filled_callback(summary):
             if summary.aver_price <=0:
@@ -562,7 +561,7 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-    def cancel_and_buy_target(self, target: Target, price=0, limit_rate=BUY_UP_RATE, filled_callback=None, cancel_callback=None, limit=True, split_rate=0):
+    def cancel_and_buy_target(self, target: Target, price=0, limit_rate=0, filled_callback=None, cancel_callback=None, limit=True, split_rate=0):
         @retry(tries=5, delay=0.05)
         def cancel_and_buy_callback(summary=None):
             if summary:

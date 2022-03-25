@@ -112,14 +112,17 @@ if __name__ == '__main__':
     parser.add_argument('--min_close_rate', default=0, type=float)
     
     parser.add_argument('--break_cont_rate', default=-0.5742, type=float)
-    parser.add_argument('--clear_rate', default=0.0054, type=float)
-    parser.add_argument('--final_rate', default=0.484, type=float)
-    parser.add_argument('--high_rate', default=0.08191, type=float)
+    parser.add_argument('--buy_up_rate', default=0, type=float)
+    parser.add_argument('--clear_rate', default=0.005401, type=float)
+    parser.add_argument('--final_modify_rate', default=1, type=float)
+    parser.add_argument('--final_rate', default=0.4840, type=float)
     parser.add_argument('--high_back_rate', default=0.9496, type=float)
-    parser.add_argument('--low_rate', default=0.05240, type=float)
+    parser.add_argument('--high_rate', default=0.08191, type=float)
     parser.add_argument('--low_back_rate', default=0.04356, type=float)
+    parser.add_argument('--low_rate', default=0.05240, type=float)
     
     parser.add_argument('--min_cont_rate', default=-0.3106, type=float)
+    parser.add_argument('--sell_down_rate', default=0, type=float)
     parser.add_argument('--up_break_cont_rate', default=-0.07088, type=float)
     parser.add_argument('--up_cont_rate', default=-0.06609, type=float)
     parser.add_argument('--up_near_rate', default=0.6207, type=float)
@@ -127,9 +130,6 @@ if __name__ == '__main__':
     parser.add_argument('--up_small_cont_rate', default=-0.04999, type=float)
     parser.add_argument('--up_small_loss_rate', default=-0.01664, type=float)
 
-    parser.add_argument('--buy_up_rate', default=0, type=float)
-    parser.add_argument('--sell_down_rate', default=0, type=float)
-    parser.add_argument('--final_modify_rate', default=1, type=float)
 
     parser.add_argument('--generate', action='store_true', default=False)
 

@@ -688,13 +688,13 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval, level):
         ])
         close_pos = tmr_mark_price[tmr_mark_price>close].size
         if close_pos <= 0:
-            buy_price = tmr_mark_price[0]
+            buy_price = tmr_mark_price[0] * (1+param.buy_up_rate)
         elif close_pos >= tmr_mark_price.size:
             buy_price = close
         elif close_pos == 1:
-            buy_price = tmr_mark_price[1]
+            buy_price = tmr_mark_price[1] * (1+param.buy_up_rate)
         elif cont_loss['boll'] > cont_loss['open'] > close:
-            buy_price = cont_loss['bolldown_tmr']
+            buy_price = cont_loss['bolldown_tmr'] * (1+param.buy_up_rate)
         else:
             up_price = tmr_mark_price[close_pos-1]
             down_price = tmr_mark_price[close_pos]
@@ -705,12 +705,14 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval, level):
             elif (close - down_price) / (up_price - down_price) > param.up_near_rate and close_pos % 2:
                 # 3,5,7,9
                 buy_price = close
+            # elif cont_loss['low'] < down_price:
+            #     buy_price = close
             # elif low < mark_price[close_pos] and (close - down_price) / (up_price - down_price) < param.low_near_rate and not close_pos % 2:
             #     buy_price = close
             else:
-                buy_price = down_price
+                buy_price = down_price * (1+param.buy_up_rate)
 
-        buy_price = buy_price * (1+param.buy_up_rate)
+        # buy_price = buy_price * (1+param.buy_up_rate)
         low_price = close * (1 + param.low_rate)
         start_time = cont_loss['id']+level_ts
         _, buy_time = buy_detailed_back_trace(

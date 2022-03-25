@@ -9,14 +9,16 @@ BUY_RATE = config.getfloat('buy', 'BUY_RATE')
 HIGH_RATE = config.getfloat('loss', 'HIGH_RATE')
 LOW_RATE = config.getfloat('loss', 'LOW_RATE')
 FINAL_RATE = config.getfloat('loss', 'FINAL_RATE')
+FINAL_MODIFY_RATE = config.getfloat('loss', 'FINAL_MODIFY_RATE')
 CLEAR_RATE = config.getfloat('loss', 'CLEAR_RATE')
 HIGH_BACK_RATE = config.getfloat('loss', 'HIGH_BACK_RATE')
 LOW_BACK_RATE = config.getfloat('loss', 'LOW_BACK_RATE')
-SELL_UP_RATE = config.getfloat('loss', 'SELL_UP_RATE')
+BACK_BEFORE_RATE = config.getfloat('loss', 'BACK_BEFORE_RATE')
 AVER_INTERVAL_LENGTH = config.getfloat('loss', 'AVER_INTERVAL_LENGTH')
 PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 UP_NEAR_RATE = config.getfloat('loss', 'UP_NEAR_RATE')
 UP_NEAR_RATE_FAKE = config.getfloat('loss', 'UP_NEAR_RATE_FAKE')
+BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
 
 AVER_NUM = int(AVER_INTERVAL_LENGTH // PRICE_INTERVAL)
 
@@ -166,13 +168,13 @@ class LossTarget(BaseTarget):
 
             close_pos = bolls[bolls>close].size
             if close_pos <= 0:
-                buy_price = bolls[0]
+                buy_price = bolls[0] * (1 + BUY_UP_RATE)
             elif close_pos == 1:
-                buy_price = bolls[1]
+                buy_price = bolls[1] * (1 + BUY_UP_RATE)
             elif close_pos >= bolls.size:
                 buy_price = self.close
             elif last_boll_mid > last_open > last_close and boll > close:
-                buy_price = bolls[-1]
+                buy_price = bolls[-1] * (1 + BUY_UP_RATE)
             else:
                 up_price = bolls[close_pos-1]
                 down_price = bolls[close_pos]
@@ -182,7 +184,7 @@ class LossTarget(BaseTarget):
                 elif (self.close - down_price) / (up_price - down_price) > UP_NEAR_RATE and close_pos % 2:
                     buy_price = close
                 else:
-                    buy_price = down_price
+                    buy_price = down_price * (1 + BUY_UP_RATE)
             
             self.boll_target_buy_price = buy_price
             # self.boll_target_buy_price = buy_price * (1+buy_up_rate)
@@ -190,15 +192,15 @@ class LossTarget(BaseTarget):
     def update_sell_price(self, ts, std_range=[2,1,0,-1,-2]):
         bolls, _, close_list = self.get_boll(ts, std_range)
         last_close = close_list[-2]
-        if bolls:
+        if bolls.size:
             pos = bolls[bolls>last_close].size
             if pos == 0:
                 sell_price = last_close
             else:
                 sell_price = bolls[pos-1]
                 diff = bolls[0]-bolls[1]
-                if (sell_price-last_close)/diff < FINAL_RATE:
-                    sell_price += diff
+                if (sell_price-last_close) / diff < FINAL_RATE:
+                    sell_price += diff * FINAL_MODIFY_RATE
 
             self.long_sell_price = self.boll_target_sell_price = sell_price
             # self.long_sell_price = self.boll_target_sell_price = sell_price * (1+sell_down_rate)
@@ -261,7 +263,7 @@ class LossTarget(BaseTarget):
     def high_check(self, callback=None):
         if (
             self.high_mark and self.own and not self.high_selling and
-            self.price <= self.high_mark_back_price*(1+5*SELL_UP_RATE) 
+            self.price <= self.high_mark_back_price*(1+5*BACK_BEFORE_RATE) 
         ):
             logger.info(f'{self.symbol} reach high back {self.high_mark_back_price}, now price {self.price}')
             self.high_selling = True
@@ -281,7 +283,7 @@ class LossTarget(BaseTarget):
     def low_check(self, callback=None):
         if (
             self.low_mark and self.own and not self.low_selling and
-            self.price <= self.low_mark_back_price*(1+2*SELL_UP_RATE) 
+            self.price <= self.low_mark_back_price*(1+2*BACK_BEFORE_RATE) 
         ):
             self.low_selling = True
             logger.info(f'{self.symbol} reach low back {self.low_mark_back_price}, now price {self.price}')
