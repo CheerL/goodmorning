@@ -187,11 +187,12 @@ class LossTarget(BaseTarget):
                     buy_price = down_price * (1 + BUY_UP_RATE)
             
             self.boll_target_buy_price = buy_price
+            logger.info(f'Boll: {bolls}, close: {close}, sell_price: {buy_price}')
             # self.boll_target_buy_price = buy_price * (1+buy_up_rate)
 
     def update_sell_price(self, ts, std_range=[2,1,0,-1,-2]):
         bolls, _, close_list = self.get_boll(ts, std_range)
-        last_close = close_list[-2]
+        last_close = close_list[-1]
         if bolls.size:
             pos = bolls[bolls>last_close].size
             if pos == 0:
@@ -203,6 +204,7 @@ class LossTarget(BaseTarget):
                     sell_price += diff * FINAL_MODIFY_RATE
 
             self.long_sell_price = self.boll_target_sell_price = sell_price
+            logger.info(f'Boll: {bolls}, close: {last_close}, sell_price: {sell_price}')
             # self.long_sell_price = self.boll_target_sell_price = sell_price * (1+sell_down_rate)
 
     def set_info(self, info, fee_rate):

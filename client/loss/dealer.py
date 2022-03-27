@@ -902,10 +902,10 @@ class LossDealerClient(BaseDealerClient):
                     target_time = datetime.time2ts(target.date, '%Y-%m-%d-%H')
                     level_diff = int((now_time-target_time)/self.level_ts)
                     logger.info(f'Long sell {target.symbol} of {target.date}({level_diff} ago)')
-                    # self.cancel_and_sell_target(
-                    #     target, target.long_sell_price,
-                    #     level+level_diff/10, limit=limit
-                    # )
+                    self.cancel_and_sell_target(
+                        target, target.long_sell_price,
+                        level+level_diff/10, limit=limit
+                    )
             except Exception as e:
                 logger.error(e)
 
