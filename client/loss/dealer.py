@@ -190,7 +190,7 @@ class LossDealerClient(BaseDealerClient):
                         price=1,
                         sell_amount=amount,
                         selling_level=30,
-                        limit=True
+                        limit=False
                     )
 
         logger.info('Finish loading data')
