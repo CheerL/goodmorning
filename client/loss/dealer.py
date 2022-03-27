@@ -871,25 +871,25 @@ class LossDealerClient(BaseDealerClient):
 
     @retry(tries=10, delay=1, logger=logger)
     def sell_targets(self, date=None):
-        def clear_buy(yesterday):
-            for target in self.targets.get(yesterday, {}).values():
+        def clear_buy(last_date):
+            for target in self.targets.get(last_date, {}).values():
                 self.cancel_target(target, 'buy')
         
-        def clear_yesterday_targets(targets: 'list[Target]', limit=True, level=4):
+        def clear_last(targets: 'list[Target]', limit=True, level=4):
             try:
                 for target in targets:
                     if not target.own or target.own_amount < target.sell_market_min_order_amt:
                         target.own = False
                         continue
 
-                    logger.info(f'Sell {target.symbol} of {target.date}(yesterday)')
+                    logger.info(f'Sell {target.symbol} of {target.date}(last_date)')
                     market_price = target.now_price * (1+MARKET_RATE)
                     sell_price = max(target.clear_price, market_price)
                     self.cancel_and_sell_target(target, sell_price, level, limit=limit)
             except Exception as e:
                 logger.error(e)
 
-        def long_sell_targets(targets: 'list[Target]', limit=True, level=5):
+        def long_sell(targets: 'list[Target]', limit=True, level=5):
             try:
                 for target in targets:
                     if not target.own or target.own_amount < target.sell_market_min_order_amt:
@@ -902,14 +902,14 @@ class LossDealerClient(BaseDealerClient):
                     target_time = datetime.time2ts(target.date, '%Y-%m-%d-%H')
                     level_diff = int((now_time-target_time)/self.level_ts)
                     logger.info(f'Long sell {target.symbol} of {target.date}({level_diff} ago)')
-                    self.cancel_and_sell_target(
-                        target, target.long_sell_price,
-                        level+level_diff/10, limit=limit
-                    )
+                    # self.cancel_and_sell_target(
+                    #     target, target.long_sell_price,
+                    #     level+level_diff/10, limit=limit
+                    # )
             except Exception as e:
                 logger.error(e)
 
-        def clear_old_targets(targets: 'list[Target]', limit=True, level=6):
+        def clear_old(targets: 'list[Target]', limit=True, level=6):
             try:
                 tickers = self.market.get_market_tickers()
                 for target in targets:
@@ -919,7 +919,7 @@ class LossDealerClient(BaseDealerClient):
                     if not target.own or target.own_amount < target.sell_market_min_order_amt:
                         target.own = False
                         continue
-                        
+
                     if symbol in self.targets[self.date]:
                         new_target = self.targets[self.date][symbol]
                         if new_target.own_amount == 0:
@@ -934,7 +934,7 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-        def get_targets(clear_date, yesterday):
+        def get_targets(clear_date, last_date):
             sell_vol = 0
             old_targets = []
             clear_targets = []
@@ -951,9 +951,9 @@ class LossDealerClient(BaseDealerClient):
                     if day <= clear_date:
                         old_targets.append(target)
                         sell_vol += target.own_amount * target.now_price
-                    elif clear_date < day < yesterday:
+                    elif clear_date < day < last_date:
                         long_sell_targets.append(target)
-                    elif day == yesterday:
+                    elif day == last_date:
                         if target.now_price <= target.clear_price:
                             long_sell_targets.append(target)
                         else:
@@ -973,7 +973,7 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Find new target and check old')
 
         targets, new_date = self.find_targets()
-        sell_vol, old_targets, yesterday_targets, long_sell_targets = get_targets(clear_date, date)
+        sell_vol, old_targets, last_date_targets, long_sell_targets = get_targets(clear_date, date)
         targets = self.filter_targets(targets, vol=sell_vol)
         self.targets[new_date] = targets
         self.date = max(self.targets.keys())
@@ -981,23 +981,27 @@ class LossDealerClient(BaseDealerClient):
         logger.info('Start to sell')
         old_symbols = ",".join(set([target.symbol for target in old_targets]))
         logger.info(f'Clear old before {clear_date}. targets are {old_symbols}')
-        symbols = ','.join(set([target.symbol for target in yesterday_targets]))
-        logger.info(f'Clear yesterday {date}. targets are {symbols}')
+        
+        symbols = ','.join(set([target.symbol for target in last_date_targets]))
+        logger.info(f'Clear last_date {date}. targets are {symbols}')
         logger.info(f'After sell will get {sell_vol}U')
 
-        Timer(0, clear_old_targets, kwargs={'targets': old_targets, 'level': 6}).start()
-        Timer(15, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.1}).start()
-        Timer(30, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.2}).start()
-        Timer(45, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.3}).start()
-        Timer(90, clear_old_targets, kwargs={'targets': old_targets, 'level': 6.5, 'limit': False}).start()
+        long_sell_symbols = ','.join(set([target.symbol for target in long_sell_targets]))
+        logger.info(f'Long sell targets are {long_sell_symbols}')
 
-        Timer(0, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4}).start()
-        Timer(15, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.1}).start()
-        Timer(30, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.2}).start()
-        Timer(45, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.3}).start()
-        Timer(90, clear_yesterday_targets, kwargs={'targets': yesterday_targets, 'level': 4.5, 'limit': False}).start()
+        Timer(0, clear_old, kwargs={'targets': old_targets, 'level': 6}).start()
+        Timer(15, clear_old, kwargs={'targets': old_targets, 'level': 6.1}).start()
+        Timer(30, clear_old, kwargs={'targets': old_targets, 'level': 6.2}).start()
+        Timer(45, clear_old, kwargs={'targets': old_targets, 'level': 6.3}).start()
+        Timer(90, clear_old, kwargs={'targets': old_targets, 'level': 6.5, 'limit': False}).start()
 
-        Timer(95, long_sell_targets, kwargs={'targets': long_sell_targets, 'level': 4}).start()
+        Timer(0, clear_last, kwargs={'targets': last_date_targets, 'level': 4}).start()
+        Timer(15, clear_last, kwargs={'targets': last_date_targets, 'level': 4.1}).start()
+        Timer(30, clear_last, kwargs={'targets': last_date_targets, 'level': 4.2}).start()
+        Timer(45, clear_last, kwargs={'targets': last_date_targets, 'level': 4.3}).start()
+        Timer(90, clear_last, kwargs={'targets': last_date_targets, 'level': 4.5, 'limit': False}).start()
+
+        Timer(5, long_sell, kwargs={'targets': long_sell_targets, 'level': 4}).start()
 
     def update_and_buy_targets(self, end=1):
         def get_buy_vol(own_vols, target_num, total_vol, min_vol):
