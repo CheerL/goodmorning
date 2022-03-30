@@ -759,7 +759,7 @@ def get_sell_price_and_time_v1(cont_loss, cont_loss_list, param: Param, date, in
         #     close * (1 + high_rate)
         # )
         high_price = close * (1+param.high_rate)
-        high_back_price = (1-param.high_back_rate) * close + param.high_back_rate * high_price
+        high_back_price = close * (1+param.high_back_rate)
         # print(high_price, high_back_price, close)
         # print(param.high_back_rate, close, high_back_price)
         # high_back_price = close * (1 + 3*low_back_rate)
@@ -835,7 +835,7 @@ def get_sell_price_and_time_v2(cont_loss, cont_loss_list, param: Param, date, in
             close = cont_loss['close']
 
         high_price = close * (1+param.high_rate)
-        high_back_price = (1-param.high_back_rate) * close + param.high_back_rate * high_price
+        high_back_price = close * (1 + param.high_back_rate)
         low_price = close * (1 + param.low_rate)
         low_back_price = close * (1 + param.low_back_rate)
         clear_price = buy_price * (1 + param.clear_rate)

@@ -217,8 +217,8 @@ class LossTarget(BaseTarget):
         low_back_rate=LOW_BACK_RATE, FINAL_RATE=FINAL_RATE, clear_rate=CLEAR_RATE
     ):
         self.init_price = price
-        self.high_mark_price = max(price * (1+high_rate), (self.open+price)/2)
-        self.high_mark_back_price = (self.high_mark_price - price) * high_back_rate + price
+        self.high_mark_price = price * (1 + high_rate)
+        self.high_mark_back_price = price * (1 + high_back_rate)
         self.low_mark_price = price * (1+low_rate)
         self.low_mark_back_price = price * (1+low_back_rate)
         logger.info(f'{self.symbol} of {self.date} price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
