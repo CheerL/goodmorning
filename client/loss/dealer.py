@@ -725,6 +725,7 @@ class LossDealerClient(BaseDealerClient):
             'holding': [],
             'summary': []
         }
+        waiting_list = []
 
         for order in orders:
             order_id = int(order.order_id)
@@ -752,12 +753,19 @@ class LossDealerClient(BaseDealerClient):
                     'amount': summary.amount,
                     'vol': summary.vol,
                     'aver_price': summary.aver_price,
-                    'finished': 0 if summary.status in [1, 2] else 1,
+                    'finished': 0 if summary.status in [
+                        OrderSummaryStatus.CREATED,
+                        OrderSummaryStatus.PARTIAL_FILLED
+                    ] else 1,
                     'tm': tm
                 }
-                OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
+                waiting_list.append((order.order_id, update_load))
+                # OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
 
-            elif summary.status in [1, 2]:
+            elif summary.status in [
+                OrderSummaryStatus.CREATED,
+                OrderSummaryStatus.PARTIAL_FILLED
+            ]:
                 symbol = summary.symbol
                 price = summary.created_price
                 amount = summary.remain
@@ -771,19 +779,26 @@ class LossDealerClient(BaseDealerClient):
                     }
                     OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
 
-            elif summary.status in [-1, 3, 4]:
+            elif summary.status in [
+                OrderSummaryStatus.FAILED,
+                OrderSummaryStatus.FILLED,
+                OrderSummaryStatus.CANCELED
+            ]:
                 update_load = {'finished': 1}
                 if summary.ts:
                     update_load['tm'] = datetime.ts2time(summary.ts)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
 
-        # logger.info(f'Force:{force},send:{send},{report_info}')
-        if not force and not report_info['new_sell'] + report_info['new_buy']:
+        logger.info(f'Force:{force}, send:{send}. {report_info}')
+        if len(report_info['new_sell']) + len(report_info['new_buy']) == 0 and not force:
             return
 
         target_info = {}
+        
+        tickers = self.market.get_market_tickers()
         for targets in self.targets.values():
             for target in targets.values():
+                target.update_price(tickers)
                 symbol = target.symbol
                 price = target.price
                 amount = target.own_amount
@@ -792,14 +807,10 @@ class LossDealerClient(BaseDealerClient):
                     target_info.setdefault(symbol, {'amount': 0, 'vol': 0, 'price': 0, 'buy_vol': 0, 'date': target.date})
                     target_info[symbol]['amount'] += amount
                     target_info[symbol]['buy_vol'] += amount * target.real_buy_price
+                    target_info[symbol]['price'] = target.now_price
+                    target_info[symbol]['vol'] = target_info[symbol]['amount'] * target.now_price
+                    
 
-        tickers = self.market.get_market_tickers()
-        for ticker in tickers:
-            if ticker.symbol in target_info:
-                info = target_info[ticker.symbol]
-                info['price'] = ticker.close
-                info['vol'] = info['amount'] * info['price']
-        
         for symbol, info in target_info.items():
             amount = info['amount']
             buy_vol = info['buy_vol']
@@ -813,8 +824,8 @@ class LossDealerClient(BaseDealerClient):
             ))
 
         # logger.info(f'{report_info}')
-        if not report_info['holding'] + report_info['new_sell'] + report_info['new_buy']:
-            return
+        # if len(report_info['holding']) + len(report_info['new_sell']) + len(report_info['new_buy']) == 0:
+        #     return
         
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
@@ -834,6 +845,9 @@ class LossDealerClient(BaseDealerClient):
             logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%}')
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
+        
+        for order_id, update_load in waiting_list:
+            OrderSQL.update([OrderSQL.order_id==order_id], update_load)
 
     def fake_trade(self, target: Target, data: dict, direction: str):
         now = data['T']
