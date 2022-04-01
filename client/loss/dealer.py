@@ -125,7 +125,7 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-        logger.info(f'resumed targets: {self.targets}')
+        # logger.info(f'resumed targets: {self.targets}')
         
         for date, targets in self.targets.items():
             date_symbols = [
