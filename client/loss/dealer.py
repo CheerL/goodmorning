@@ -750,7 +750,7 @@ class LossDealerClient(BaseDealerClient):
                 price = vol / amount
                 # fee = vol * 0.02
                 symbol = summary.symbol
-                tm = datetime.ts2time(summary.ts)
+                tm = datetime.ts2time(summary.ts, tz=8)
                 profit_rate = summary.aver_price  / target.buy_price * (1-summary.fee_rate)**2 - 1
                 profit = summary.amount * target.buy_price * profit_rate
                 report_info[f'new_{order.direction}'].append((
@@ -779,12 +779,12 @@ class LossDealerClient(BaseDealerClient):
                 price = summary.created_price
                 amount = summary.remain
                 report_info['opening'].append((
-                    datetime.ts2time(summary.created_ts), symbol, amount, price, summary.direction
+                    datetime.ts2time(summary.created_ts, tz=8), symbol, amount, price, summary.direction
                 ))
                 if summary.amount == 0 and summary.aver_price != order.aver_price:
                     update_load = {
                         'aver_price': summary.aver_price,
-                        'tm': datetime.ts2time(summary.ts)
+                        'tm': datetime.ts2time(summary.created_ts, tz=8)
                     }
                     OrderSQL.update([OrderSQL.order_id==order.order_id], update_load)
 
@@ -795,7 +795,7 @@ class LossDealerClient(BaseDealerClient):
             ]:
                 update_load = {'finished': 1}
                 if summary.ts:
-                    update_load['tm'] = datetime.ts2time(summary.ts)
+                    update_load['tm'] = datetime.ts2time(summary.ts, tz=8)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
 
         # logger.info(f'Force:{force}, send:{send}. {report_info}')

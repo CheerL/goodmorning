@@ -96,9 +96,7 @@ def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, mo
     float_profit = sum([each[4] for each in report_info['holding']])
     summary = f'{datetime.ts2time()} {user_type} {username} 收益报告 | 当前浮盈{float_profit:.3f}U 已实现收益{all_profit:.3f}U'
     msg = f'''
-### {user_type}用户
-
-{username}
+### {username}
 ''' + ('''
 
 ### 新买入
