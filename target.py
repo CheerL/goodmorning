@@ -122,7 +122,6 @@ class LossTarget(BaseTarget):
         self.buy_price = 0
         self.real_buy_price = 0
         self.clear_price = 0
-        self.long_sell_price = 0
 
         self.high_mark_price = 0
         self.high_mark_back_price = 0
@@ -203,9 +202,8 @@ class LossTarget(BaseTarget):
                 if (sell_price-last_close) / diff < FINAL_RATE:
                     sell_price += diff * FINAL_MODIFY_RATE
 
-            self.long_sell_price = self.boll_target_sell_price = sell_price
+            self.boll_target_sell_price = sell_price
             logger.info(f'Boll: {bolls}, close: {last_close}, sell_price: {sell_price}')
-            # self.long_sell_price = self.boll_target_sell_price = sell_price * (1+sell_down_rate)
 
     def set_info(self, info, fee_rate):
         super().set_info(info)
@@ -214,14 +212,15 @@ class LossTarget(BaseTarget):
 
     def set_mark_price(self, price,
         high_rate=HIGH_RATE, low_rate=LOW_RATE, high_back_rate=HIGH_BACK_RATE,
-        low_back_rate=LOW_BACK_RATE, FINAL_RATE=FINAL_RATE, clear_rate=CLEAR_RATE
+        low_back_rate=LOW_BACK_RATE, final_rate=FINAL_RATE, clear_rate=CLEAR_RATE
     ):
-        self.init_price = price
+        # self.init_price = price
         self.high_mark_price = price * (1 + high_rate)
         self.high_mark_back_price = price * (1 + high_back_rate)
         self.low_mark_price = price * (1+low_rate)
         self.low_mark_back_price = price * (1+low_back_rate)
-        logger.info(f'{self.symbol} of {self.date} price init {self.init_price}, high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.long_sell_price}')
+        self.clear_price = price * (1 + clear_rate)
+        logger.info(f'{self.symbol} of {self.date}: high mark {self.high_mark_price}, high back {self.high_mark_back_price}, low mark {self.low_mark_price}, low back {self.low_mark_back_price}, clear {self.clear_price}, long sell {self.boll_target_sell_price}')
 
     def set_buy(self, vol, amount, clear_rate=CLEAR_RATE, fee_rate=None):
         if vol <= 0 or amount <= 0:
@@ -235,7 +234,7 @@ class LossTarget(BaseTarget):
         if self.own_amount:
             self.real_buy_price = (own_vol+vol) / self.own_amount 
             self.buy_price = self.real_buy_price * (1 - fee_rate)
-            self.clear_price = self.buy_price * (1+clear_rate)
+            self.set_mark_price(self.buy_price)
 
     def set_sell(self, amount, vol=0):
         if amount <= 0:

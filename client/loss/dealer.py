@@ -125,7 +125,8 @@ class LossDealerClient(BaseDealerClient):
             except Exception as e:
                 logger.error(e)
 
-
+        logger.info(f'resumed targets: {self.targets}')
+        
         for date, targets in self.targets.items():
             date_symbols = [
                 summary.symbol for summary
@@ -175,23 +176,30 @@ class LossDealerClient(BaseDealerClient):
                     klines = self.market.get_candlestick(target.symbol, LEVEL, 21)
                     target.update_his_close(klines)
                     target.update_sell_price(klines[0].id)
-                    logger.info(f'Find {amount} {target.symbol} of {target.date}, long sell with price {target.long_sell_price}')
-                    self.sell_target(
-                        target,
-                        price=target.long_sell_price,
-                        sell_amount=amount,
-                        selling_level=1,
-                        limit=amount * target.now_price > target.min_order_value
-                    )
+                    logger.info(f'Find {amount} {target.symbol} of {target.date}, long sell with price {target.boll_target_sell_price}')
+                    try:
+                        self.sell_target(
+                            target,
+                            price=target.boll_target_sell_price,
+                            sell_amount=amount,
+                            selling_level=1,
+                            limit=amount * target.now_price > target.min_order_value
+                        )
+                    except Exception as e:
+                        logger.error(e)
+
                 elif target.date <= clear_date:
                     logger.info(f'Find {amount} {target.symbol} of {target.date}, sell with market price')
-                    self.sell_target(
-                        target,
-                        price=1,
-                        sell_amount=amount,
-                        selling_level=30,
-                        limit=False
-                    )
+                    try:
+                        self.sell_target(
+                            target,
+                            price=1,
+                            sell_amount=amount,
+                            selling_level=30,
+                            limit=False
+                        )
+                    except Exception as e:
+                        logger.error(e)
 
         logger.info('Finish loading data')
 
@@ -366,7 +374,7 @@ class LossDealerClient(BaseDealerClient):
 
             target = self.targets[date][symbol]
             target.vol = kline.vol
-            target.set_mark_price(kline.close)
+            # target.set_mark_price(kline.close)
 
             target.update_his_close(klines)
             target.update_buy_price(klines[0].id)
@@ -406,8 +414,9 @@ class LossDealerClient(BaseDealerClient):
             target.update_price(tickers)
             self.check_target_price(target)
     
+    @retry(tries=3, delay=0.5)
     def get_sell_amount(self, target):
-        @retry(tries=10, delay=0.1)
+        @retry(tries=10, delay=0.2)
         def _get_sell_amount():
             available_amount = self.user.get_amount(target.base_currency, True, False)
             assert_word = f'{target.base_currency} not enough, want {target.own_amount} but only have {available_amount}'
@@ -421,6 +430,7 @@ class LossDealerClient(BaseDealerClient):
                 self.user.update_currency(target.base_currency)
                 return _get_sell_amount()
             else:
+                logger.error(e)
                 raise e
 
     def buy_target(self, target: Target, price=0, vol=0, limit_rate=0, filled_callback=None, cancel_callback=None, limit=True, random=True):
@@ -454,7 +464,7 @@ class LossDealerClient(BaseDealerClient):
             return
 
         if not price:
-            price = target.init_price
+            price = target.boll_target_buy_price
 
         if limit:
             if random:
@@ -475,7 +485,7 @@ class LossDealerClient(BaseDealerClient):
             logger.error(f'Failed to buy {target.symbol}')
         return summary
 
-    def sell_target(self, target: Target, price, sell_amount=0, selling_level=1, filled_callback=None, cancel_callback=None, limit=True):
+    def sell_target(self, target: Target, price, sell_amount, selling_level=1, filled_callback=None, cancel_callback=None, limit=True):
         @retry(tries=5, delay=0.05)
         def _filled_callback(summary):
             target.selling = 0
@@ -493,7 +503,6 @@ class LossDealerClient(BaseDealerClient):
 
         filled_callback = filled_callback or _filled_callback
         cancel_callback = cancel_callback or _cancel_callback
-        sell_amount = sell_amount or self.get_sell_amount(target)
         
         if sell_amount * price < target.min_order_value:
             logger.error(f'At least sell {target.min_order_value / price} but now {sell_amount}')
@@ -917,7 +926,7 @@ class LossDealerClient(BaseDealerClient):
                     level_diff = int((now_time-target_time)/self.level_ts)
                     logger.info(f'Long sell {target.symbol} of {target.date}({level_diff} ago)')
                     self.cancel_and_sell_target(
-                        target, target.long_sell_price,
+                        target, target.boll_target_sell_price,
                         level+level_diff/10, limit=limit
                     )
             except Exception as e:
@@ -968,7 +977,7 @@ class LossDealerClient(BaseDealerClient):
                     elif clear_date < day < last_date:
                         long_sell_targets.append(target)
                     elif day == last_date:
-                        if target.now_price <= target.clear_price:
+                        if target.now_price < target.clear_price:
                             long_sell_targets.append(target)
                         else:
                             clear_targets.append(target)

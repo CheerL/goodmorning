@@ -1,10 +1,6 @@
-from utils import logger, config, datetime, user_config, parallel, get_rate, get_level
+from utils import logger, config, user_config, get_level
 from dataset.pgsql import get_holding_symbol
 from dataset.redis import Redis
-from retry import retry
-from target import LossTarget as Target
-from dataset.pgsql import LossTarget as TargetSQL
-from report import wx_tmr_target_report
 import time
 
 TEST = user_config.getboolean('setting', 'TEST')
