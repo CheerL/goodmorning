@@ -251,7 +251,7 @@ class Order(Base):
                 order_id=str(summary.order_id),
                 symbol=summary.symbol,
                 date=date,
-                tm=datetime.ts2time(summary.ts) if summary.ts else '',
+                tm=datetime.ts2time(summary.ts, tz=8) if summary.ts else '',
                 account=str(account_id),
                 direction=summary.direction,
                 aver_price=summary.aver_price,
