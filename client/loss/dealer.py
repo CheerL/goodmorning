@@ -836,6 +836,9 @@ class LossDealerClient(BaseDealerClient):
         # if len(report_info['holding']) + len(report_info['new_sell']) + len(report_info['new_buy']) == 0:
         #     return
         
+        for order_id, update_load in waiting_list:
+            OrderSQL.update([OrderSQL.order_id==order_id], update_load)
+
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
@@ -855,8 +858,6 @@ class LossDealerClient(BaseDealerClient):
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
         
-        for order_id, update_load in waiting_list:
-            OrderSQL.update([OrderSQL.order_id==order_id], update_load)
 
     def fake_trade(self, target: Target, data: dict, direction: str):
         now = data['T']
