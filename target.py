@@ -228,7 +228,6 @@ class LossTarget(BaseTarget):
         fee_rate = self.fee_rate if fee_rate == None else fee_rate
 
         own_vol = self.own_amount * self.buy_price
-        self.own = True
         self.own_amount += amount * (1 - fee_rate)
         self.buy_vol += vol
         if self.own_amount:
@@ -236,13 +235,16 @@ class LossTarget(BaseTarget):
             self.buy_price = self.real_buy_price * (1 - fee_rate)
             self.set_mark_price(self.buy_price)
 
+        if self.buy_vol >= self.min_order_value:
+            self.own = True
+
     def set_sell(self, amount, vol=0):
         if amount <= 0:
             return
 
         self.own_amount -= amount
         self.buy_vol -= vol
-        if self.own_amount <= self.sell_market_min_order_amt:
+        if self.own_amount * self.price <= self.min_order_value:
             self.own = False
 
     def update_price(self, tickers, num=AVER_NUM):
