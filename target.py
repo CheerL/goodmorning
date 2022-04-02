@@ -266,7 +266,7 @@ class LossTarget(BaseTarget):
     def high_check(self, callback=None):
         if (
             self.high_mark and self.own and not self.high_selling and
-            self.price <= self.high_mark_back_price*(1+5*BACK_BEFORE_RATE) 
+            self.price <= self.high_mark_back_price*(1+1*BACK_BEFORE_RATE) 
         ):
             logger.info(f'{self.symbol} reach high back {self.high_mark_back_price}, now price {self.price}')
             self.high_selling = True
@@ -286,7 +286,7 @@ class LossTarget(BaseTarget):
     def low_check(self, callback=None):
         if (
             self.low_mark and self.own and not self.low_selling and
-            self.price <= self.low_mark_back_price*(1+2*BACK_BEFORE_RATE) 
+            self.price <= self.low_mark_back_price*(1+1*BACK_BEFORE_RATE) 
         ):
             self.low_selling = True
             logger.info(f'{self.symbol} reach low back {self.low_mark_back_price}, now price {self.price}')
