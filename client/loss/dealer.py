@@ -836,11 +836,11 @@ class LossDealerClient(BaseDealerClient):
         # if len(report_info['holding']) + len(report_info['new_sell']) + len(report_info['new_buy']) == 0:
         #     return
         
-        time.sleep((self.user.account_id % 10) * 3)
+        time.sleep((self.user.account_id % 10) * 10)
         for order_id, update_load in waiting_list:
             OrderSQL.update([OrderSQL.order_id==order_id], update_load)
 
-        time.sleep(2)
+        time.sleep(5)
         usdt = self.user.get_amount('usdt', True, False)
         float_profit = sum([each[4] for each in report_info['holding']])
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
