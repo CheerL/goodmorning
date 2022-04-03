@@ -844,6 +844,7 @@ class LossDealerClient(BaseDealerClient):
         day_profit, month_profit, all_profit = OrderSQL.get_profit(self.user.account_id)
 
         if send:
+            time.sleep((self.user.account_id % 10) * 3)
             wx_loss_report(self.user.user_type, self.user.wxuid, self.user.username, report_info, usdt, day_profit, month_profit, all_profit)
 
         logger.info('Summary')
