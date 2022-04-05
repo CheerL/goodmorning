@@ -798,7 +798,7 @@ class LossDealerClient(BaseDealerClient):
                     update_load['tm'] = datetime.ts2time(summary.ts, tz=8)
                 OrderSQL.update([OrderSQL.order_id==order.order_id],update_load)
 
-        # logger.info(f'Force:{force}, send:{send}. {report_info}')
+        logger.info(f'Force:{force}, send:{send}. {report_info}')
         if len(report_info['new_sell']) + len(report_info['new_buy']) == 0 and not force:
             return
 
