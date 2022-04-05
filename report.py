@@ -149,9 +149,9 @@ def wx_loss_report(user_type, wxuid, username, report_info, usdt, day_profit, mo
 
 - 总收益: **{all_profit:.3f} USDT**
 
-- [每日交易详情](https://report.cheerl.space/{hashlib.md5(username.encode()).hexdigest()}/profit)
+- [每日交易详情](https://report.cheerl.space/bottom/profit/{hashlib.md5(username.encode()).hexdigest()})
 
-- [月结单](https://report.cheerl.space/{hashlib.md5(username.encode()).hexdigest()}/month_profit)
+- [月结单](https://report.cheerl.space/bottom/month_profit{hashlib.md5(username.encode()).hexdigest()})
 '''
 
     wx_push(content=msg, uids=wxuid, content_type=3, summary=summary)
