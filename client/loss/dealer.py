@@ -34,6 +34,8 @@ UP_STOP_SMALL_LOSS_RATE = config.getfloat('loss', 'UP_STOP_SMALL_LOSS_RATE')
 UP_BREAK_LOSS_RATE = config.getfloat('loss', 'UP_BREAK_LOSS_RATE')
 UP_STOP_SMALL_MIN_VOL = config.getfloat('loss', 'UP_STOP_SMALL_MIN_VOL')
 
+LOW_RATE = config.getfloat('loss', 'LOW_RATE')
+
 BAN_LIST = []
 LEVEL = config.get('loss', 'LEVEL')
 
@@ -260,6 +262,12 @@ class LossDealerClient(BaseDealerClient):
 
     def is_buy(self, klines, symbol=''):
         if len(klines) <= MIN_BEFORE_DAYS*self.level_coff and symbol not in self.special_symbols:
+            return False
+
+        # BUG: cancle order if today's price higher than low mark
+        today_start = time.time() // 86400 * 86400
+        today_high = max([kline.high for kline in klines if kline.id >= today_start])
+        if today_high >= klines[0].close * (1 + LOW_RATE):
             return False
 
         cont_loss_list = []
@@ -803,7 +811,6 @@ class LossDealerClient(BaseDealerClient):
             return
 
         target_info = {}
-        
         tickers = self.market.get_market_tickers()
         for targets in self.targets.values():
             for target in targets.values():
@@ -818,7 +825,6 @@ class LossDealerClient(BaseDealerClient):
                     target_info[symbol]['buy_vol'] += amount * target.real_buy_price
                     target_info[symbol]['price'] = target.now_price
                     target_info[symbol]['vol'] = target_info[symbol]['amount'] * target.now_price
-                    
 
         for symbol, info in target_info.items():
             amount = info['amount']
@@ -835,7 +841,6 @@ class LossDealerClient(BaseDealerClient):
         # logger.info(f'{report_info}')
         # if len(report_info['holding']) + len(report_info['new_sell']) + len(report_info['new_buy']) == 0:
         #     return
-        
         time.sleep((self.user.account_id % 10) * 10)
         for order_id, update_load in waiting_list:
             OrderSQL.update([OrderSQL.order_id==order_id], update_load)
@@ -859,7 +864,6 @@ class LossDealerClient(BaseDealerClient):
             logger.info(f'Holding: {each[0]}, holding amount {each[1]:.4f}, buy price {each[2]:.6g}U, now price {each[3]:.6g}U, profit {each[4]:.3f}U, {each[5]:.2%}')
         logger.info(f'Holding profit {float_profit:.3f}U, Usable money {usdt:.3f}U')
         logger.info(f'Day profit {day_profit:.3f}U, Month profit {month_profit:.3f}U, All profit: {all_profit:.3f}')
-        
 
     def fake_trade(self, target: Target, data: dict, direction: str):
         now = data['T']

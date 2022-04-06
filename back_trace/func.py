@@ -474,7 +474,10 @@ def buy_detailed_back_trace(
     stop_buy_ts = start_time + min(level_ts, max_buy_ts)
 
     try:
-        low_ts = data[data['high'] >= low_price]['id'][0]
+        low_ts = data[
+            (data['high'] >= low_price) &
+            (data['id'] >= start_time)
+        ]['id'][0]
         stop_buy_ts = min(low_ts, stop_buy_ts)
     except:
         pass

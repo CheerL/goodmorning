@@ -124,8 +124,8 @@ if __name__ == '__main__':
     parser.add_argument('--break_cont_rate', default=-0.574, type=float)
     parser.add_argument('--buy_up_rate', default=0, type=float)
     parser.add_argument('--clear_rate', default=0.005, type=float)
-    parser.add_argument('--final_modify_rate', default=1, type=float)
-    parser.add_argument('--final_rate', default=0.48, type=float)
+    parser.add_argument('--final_modify_rate', default=0.6, type=float)
+    parser.add_argument('--final_rate', default=0.15, type=float)
     parser.add_argument('--high_back_rate', default=0.077, type=float)
     parser.add_argument('--high_rate', default=0.082, type=float)
     parser.add_argument('--low_back_rate', default=0.044, type=float)
@@ -198,7 +198,8 @@ if __name__ == '__main__':
         
         parallel.run_process_pool([(sub_generater, (i,)) for i in range(10)], True, 10)
 
-    random_lists = get_random_cont_loss_list(args.random, RANDOM_ALL_NUM, level=args.level) if args.random  else []
+    if args.random:
+        random_lists = get_random_cont_loss_list(args.random, RANDOM_ALL_NUM, level=args.level) if args.random  else []
     
     def sub_back_trace(
         param: Param,
