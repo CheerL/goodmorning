@@ -73,6 +73,7 @@ def back_trace(
     money_record_path = f'{ROOT}/back_trace/csv/money_{start_date}_{end_date}_{level}.csv'
 
     data = cont_loss_list.data
+    # data = cont_loss_list.dict('RAMPUSDT')
 
     if param.buy_algo_version in [1, 2]:
         symbol=''
@@ -236,6 +237,8 @@ def back_trace(
                 buy_price, buy_time = get_buy_price_and_time(
                     cont_loss, param, date, interval, level, param.buy_algo_version
                 )
+                # print(datetime.ts2time(ts, tz=8), buy_price, datetime.ts2time(buy_time, tz=8))
+                # print(cont_loss)
                 
                 if buy_time == 0:
                     continue
@@ -490,6 +493,7 @@ def buy_detailed_back_trace(
         ]['id'][0]
     except:
         buy_time = 0
+    # print(start_time, stop_buy_ts-start_time, buy_time-start_time)
 
     return buy_price, buy_time
 
@@ -656,18 +660,6 @@ def get_buy_price_and_time_v2(cont_loss, param: Param, date, interval, level):
 
     if True:
         close = cont_loss['close']
-        # low = cont_loss['low']
-        # mark_price = np.array([
-        #     cont_loss['bollup'],
-        #     cont_loss['bollfake1'],
-        #     cont_loss['bollmidup'],
-        #     cont_loss['bollfake2'],
-        #     cont_loss['boll'],
-        #     cont_loss['bollfake3'],
-        #     cont_loss['bollmiddown'],
-        #     cont_loss['bollfake4'],
-        #     cont_loss['bolldown']
-        # ])
         tmr_mark_price = np.array([
             # pos 0
             cont_loss['bollup_tmr'],

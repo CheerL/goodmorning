@@ -416,7 +416,7 @@ class BinanceUser(BaseUser):
     def get_asset_history(self, limit=30):
         asset_his = []
         snapshot = self.api.account_snapshot('SPOT', limit=limit, recvWindow=6000)
-        btc_prices = self.market.get_candlestick('BTCUSDT', '1day', limit=limit)
+        btc_prices = self.market.get_candlestick('BTCUSDT', '1day', limit=min(limit, len(snapshot['snapshotVos'])))
         for day, btc in zip(snapshot['snapshotVos'], reversed(btc_prices)):
             ts = int(day['updateTime']/1000+1)
             asset = float(day['data']['totalAssetOfBtc']) * btc.open
