@@ -77,7 +77,7 @@ def dealer(user, args):
 
     # user.scheduler.add_job(client.buy_targets, 'cron', hour=23, minute=59, second=10)
     user.scheduler.add_job(client.update_and_buy_targets, 'cron', hour=buy_hour, minute=0, second=15)
-    user.scheduler.add_job(client.update_asset, 'cron', hour=0, minute=5, second=0, kwargs={'limit': 5})
+    user.scheduler.add_job(client.update_asset, 'cron', hour=0, minute=5, second=0, kwargs={'limit': 30})
     user.scheduler.add_job(client.sell_targets, 'cron', hour=sell_hour, minute=57, second=30)
     user.scheduler.add_job(client.watch_targets, 'interval', seconds=PRICE_INTERVAL)
 
