@@ -4,7 +4,7 @@ import math
 import numpy as np
 from retry import retry
 from utils.parallel import run_thread_pool
-from utils import get_rate, datetime, get_level
+from utils import get_rate, datetime, get_level, logger
 from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record, Global
 
 # np.seterr(all='raise')
@@ -21,7 +21,7 @@ SPECIAL_SYMBOLS = [
     b'BCHUPUSDT', b'BZRXUSDT', b'EOSUPUSDT', b'FILUPUSDT',
     b'SUSHIUPUSDT', b'UNIUPUSDT', b'XLMUPUSDT', b'BTTUSDT',
     b'LOKAUSDT', b'SCRTUSDT', b'LTCUPUSDT', b'XTZUPUSDT',
-    b'NUUSDT', b'NANOUSDT', b'KEEPUSDT'
+    b'NUUSDT', b'NANOUSDT', b'KEEPUSDT', b'ANYUSDT'
 ]
 
 def get_real_boll(price, m, eps=1e-5):
@@ -186,6 +186,36 @@ def back_trace(
                 )
             )
         ]
+        
+    elif param.buy_algo_version == 5:
+        symbol=''
+        for i, each in enumerate(data):
+            if symbol != each['symbol']:
+                symbol = each['symbol']
+                cont_loss_days = 0
+
+            elif each['low'] > data[i-1]['low']:
+                cont_loss_days += 1
+            else:
+                cont_loss_days = 0
+            
+            each['cont_loss_days']=cont_loss_days
+
+        data = data[
+            (param.min_buy_vol <= data['vol']) & (data['vol'] <= param.max_buy_vol) &
+            (param.min_price <= data['close']) & (data['close'] <= param.max_price) &
+            (data['cont_loss_days'] >= 2) &
+            (data['rate'] > 0) &
+            (
+                (
+                    (data['open'] < data['boll']) & 
+                    (data['high'] < data['boll'])
+                ) | (
+                    (data['open'] >= data['boll']) & 
+                    (data['high'] < data['bollup'])
+                )
+            )
+        ]
 
     max_money = last_money = total_money = money = init_money
     max_back_rate = 0
@@ -203,6 +233,12 @@ def back_trace(
         date = datetime.ts2date(ts)
         # print(ts)
         targets = data[data['id']==ts]
+
+        # not buy if holding
+        if param.buy_algo_version == 5:
+            holding_symbol = [record.symbol for record in holding_list]
+            targets = [target for target in targets if target['symbol'].decode() not in holding_symbol]
+            
         targets_num = len(targets)
         # print(date, targets_num)
         total_buy_vol = 0
@@ -395,6 +431,50 @@ def back_trace(
                 holding_list.append(record)
                 total_buy_vol += buy_vol
 
+        elif param.buy_algo_version == 5:
+            # print(datetime.ts2time(ts), ts)
+            targets = np.sort(targets, order='vol')[::-1]
+            # up_targets = targets[targets['close']>targets['boll_tmr']]
+            # low_targets = targets[targets['close']<=targets['boll_tmr']]
+            
+            buy_num = int(min(max(targets_num, param.min_num), param.max_num))
+            buy_vol = round(money / buy_num, 3)
+            if buy_vol < min_vol:
+                buy_vol = min_vol
+                buy_num = math.floor(money // min_vol)
+            
+            if buy_vol * buy_num > money:
+                buy_vol -= 0.001
+
+            total_buy_vol = 0
+            for cont_loss in targets[:buy_num]:
+                if not cont_loss['id2']:
+                    continue
+                
+                if ((cont_loss['symbol'] == b'COCOSUSDT' and 1611014400-5*86400 <= cont_loss['id'] <= 1611014400+2*86400)
+                or (cont_loss['symbol'] == b'BTCSTUSDT' and 1615766400-5*86400 <= cont_loss['id'] <= 1615766400+2*86400)
+                or (cont_loss['symbol'] == b'DREPUSDT' and 1616976000-5*86400 <= cont_loss['id'] <= 1616976000+2*86400)):
+                    continue
+
+                buy_price, buy_time = get_buy_price_and_time(
+                    cont_loss, param, date, interval, level, param.buy_algo_version
+                )
+                
+                if buy_time == 0:
+                    continue
+
+                sell_price, sell_time = get_sell_price_and_time(
+                    cont_loss, cont_loss_list, param, date, interval,
+                    buy_price, buy_time, level, param.sell_algo_version
+                )
+                record = Record(
+                    cont_loss['symbol'].decode(), buy_price, buy_time, buy_vol, fee_rate=fee_rate
+                )
+                record.sell(sell_price, sell_time)
+                record_list.append(record)
+                holding_list.append(record)
+                total_buy_vol += buy_vol
+
         for each in holding_list.copy():
             if each.sell_time <= ts+level_ts:
                 each.sell(each.sell_price, each.sell_time)
@@ -440,17 +520,62 @@ def back_trace(
                 f.write(','.join([str(e) for e in record])+'\n')
     return total_money, profit_rate, max_back_rate
 
-@retry(tries=10, delay=30)
+@retry(tries=5, logger=logger)
 def get_detailed_klines(symbol, interval, start_time, level):
+    def is_full(symbol, interval):
+        if (
+            (file_start_time == 1618876800)
+            or (file_start_time == 1619308800)
+            or (file_start_time == 1621382400)
+            or (file_start_time == 1628812800)
+            or (file_start_time == 1632873600)
+            or (file_start_time == 1614988800)
+            or (file_start_time == 1608508800)
+            or (file_start_time == 1613001600)
+            or (file_start_time == 1606694400)
+            or (file_start_time == 1608854400)
+            or (file_start_time == 1593302400)
+            or (file_start_time == 1639958400 and symbol == 'BZRXUSDT')
+            or (file_start_time == 1617321600 and symbol == 'DREPUSDT')
+            or (file_start_time == 1583280000 and symbol == 'FETUSDT')
+            or (file_start_time == 1573603200 and symbol == 'HOTUSDT')
+            or (file_start_time == 1623974400 and symbol == 'SUNUSDT')
+            or (file_start_time == 1623974400 and symbol == 'SUSHIUPUSDT')
+            or (file_start_time == 1582070400 and symbol == 'VETUSDT')
+        ):
+            return False
+        return True
+
+    level_coff, _ = get_level(interval)
     file_start_time = int(start_time // 86400 * 86400)
     path = f'{ROOT}/back_trace/npy/detail/{symbol}_{file_start_time}_{interval}.npy'
+    # print(path)
     if os.path.exists(path):
         klines =  Klines.load(path)
+        if len(klines.data) < level_coff:
+            if is_full(symbol, interval):
+                os.remove(path)
+                raise Exception(f'Saved klines {path.split("/")[-1].split(".")[0]} are not enough, hope {level_coff} but have {len(klines.data)}')
+        if klines.data[0]['id'] != file_start_time:
+            os.remove(path)
+            raise Exception(f'Saved klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {klines.data[0]["id"]}')
     else:
-        raw_klines = Global.user.market.get_candlestick(
-            symbol, interval,
-            start_ts=start_time, end_ts=start_time+86400
-        )
+        try:
+            raw_klines = Global.user.market.get_candlestick(
+                symbol, interval,
+                start_ts=file_start_time, end_ts=file_start_time+86400
+            )
+        except Exception as e:
+            time.sleep(30)
+            raise e
+        if file_start_time < time.time() - 86400 and len(raw_klines) < level_coff:
+            if is_full(symbol, interval):
+                time.sleep(3)
+                raise Exception(f'Klines {path.split("/")[-1].split(".")[0]} are not enough, hope {level_coff} but have {len(raw_klines)}')
+        if raw_klines[-1].id != file_start_time:
+            time.sleep(3)
+            raise Exception(f'Klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {raw_klines[-1].id}')
+
         raw_klines.reverse()
         klines = Klines()
         klines.load_from_raw(symbol, raw_klines)
@@ -477,12 +602,19 @@ def buy_detailed_back_trace(
     stop_buy_ts = start_time + min(level_ts, max_buy_ts)
 
     try:
-        low_ts = data[
-            (data['high'] >= low_price) &
-            (data['id'] >= start_time)
-        ]['id'][0]
+        # print(datetime.ts2time(start_time), start_time, datetime.ts2time(int(start_time // 86400 * 86400)), int(start_time // 86400 * 86400), len(data))
+        # print(low_price, data['high'].max(), datetime.ts2time(data['id'][0]))
+        # print(data[(data['high'] >= low_price)])
+        low_kline = data[
+            # (data['id'] >= start_time) &
+            (data['high'] >= low_price)
+        ][0]
+        low_ts = low_kline['id']
+        # print(low_ts, stop_buy_ts)
         stop_buy_ts = min(low_ts, stop_buy_ts)
-    except:
+        # print(stop_buy_ts - start_time)
+    except Exception as e:
+        # print(e)
         pass
 
     try:
@@ -636,7 +768,8 @@ def get_buy_price_and_time(cont_loss, param: Param, date, interval, level, versi
         return get_buy_price_and_time_v2(cont_loss, param, date, interval, level)
     elif version == 3:
         return get_buy_price_and_time_v3(cont_loss, param, date, interval, level)
-
+    elif version == 5:
+        return get_buy_price_and_time_v5(cont_loss, param, date, interval, level)
     
 def get_buy_price_and_time_v1(cont_loss, param: Param, date, interval, level):
     symbol = cont_loss['symbol'].decode()
@@ -731,6 +864,10 @@ def get_buy_price_and_time_v3(cont_loss, param: Param, date, interval, level):
         )
         return buy_price, buy_time
 
+def get_buy_price_and_time_v5(cont_loss, param: Param, date, interval, level):
+    return cont_loss['close'], cont_loss['id2']
+    
+
 def get_sell_price_and_time(cont_loss, cont_loss_list, param: Param, date, interval, buy_price, buy_time, level, version=1):
     if version == 1:
         return get_sell_price_and_time_v1(cont_loss, cont_loss_list, param, date, interval, buy_price, buy_time, level)
@@ -740,6 +877,8 @@ def get_sell_price_and_time(cont_loss, cont_loss_list, param: Param, date, inter
         return get_sell_price_and_time_v3(cont_loss, cont_loss_list, param, date, interval, buy_price, buy_time, level)
     elif version == 4:
         return get_sell_price_and_time_v4(cont_loss, cont_loss_list, param, date, interval, buy_price, buy_time, level)
+    elif version == 5:
+        return get_sell_price_and_time_v5(cont_loss, cont_loss_list, param, date, interval, buy_price, buy_time, level)
 
 def get_sell_price_and_time_v1(cont_loss, cont_loss_list, param: Param, date, interval, buy_price, buy_time, level):
     symbol = cont_loss['symbol'].decode()
@@ -970,6 +1109,27 @@ def get_sell_price_and_time_v4(cont_loss, cont_loss_list, param: Param, date, in
                 sell_time = day_kline['id']+86340
                     
         return sell_price, sell_time
+
+def get_sell_price_and_time_v5(cont_loss, cont_loss_list, param: Param, date, interval, buy_price, buy_time, level):
+    symbol = cont_loss['symbol'].decode()
+    _, level_ts = get_level(level)
+    stop_loss_price = buy_price * (1 + param.stop_loss_rate)
+
+    klines = cont_loss_list.dict(symbol)
+    i = np.where(klines['id']==cont_loss['id'])[0][0]
+    max_num = len(klines)
+    for j in range(i+1, max_num):
+        day_kline = klines[j]
+        if j == max_num - 1:
+            sell_price = day_kline['close']
+            sell_time = day_kline['id'] + level_ts - 60
+        elif (j-i) % 2 == 1 and j != i+1:
+            if day_kline['cont_loss_days'] < 2:
+                sell_price = day_kline['close']
+                sell_time = day_kline['id'] + level_ts - 120
+                break
+
+    return sell_price, sell_time
 
 def get_data(days=365, end=2, load=True, min_before=180, level='1day',
     klines_dict=None, cont_loss_list=None, filter_=True):
@@ -1293,3 +1453,18 @@ def get_random_cont_loss_list(random, num, boll_n=BOLL_N, level='1day'):
         ContLossList.load(f'{ROOT}/back_trace/npy/cont_list_{boll_n}_{random}_{i}{"" if level == "1day" else "_"+level}.npy')
         for i in range(num)
     ]
+
+if __name__ == '__main__':
+    from user.binance import BinanceUser
+    
+    [u] = BinanceUser.init_users()
+    Global.user = u
+    
+    for file in sorted(os.listdir(f'{ROOT}/back_trace/npy/detail')):
+        try:
+            symbol, t, interval = file[:-4].split('_')
+        except:
+            print(file)
+            continue
+
+        get_detailed_klines(symbol, interval, int(t), '')

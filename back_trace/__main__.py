@@ -116,60 +116,60 @@ if __name__ == '__main__':
 
     ############################################# NOW
 
-    # parser.add_argument('--min_price', default=0, type=float)
-    # parser.add_argument('--max_price', default=1, type=float)
-    # parser.add_argument('--max_hold_days', default=5, type=int)
-    # parser.add_argument('--min_buy_vol', default=2700000, type=float)
-    # parser.add_argument('--max_buy_vol', default=1e11, type=float)
-    # parser.add_argument('--min_up_small_buy_vol', default=500000, type=float)
+    parser.add_argument('--min_price', default=0, type=float)
+    parser.add_argument('--max_price', default=1, type=float)
+    parser.add_argument('--max_hold_days', default=5, type=int)
+    parser.add_argument('--min_buy_vol', default=2700000, type=float)
+    parser.add_argument('--max_buy_vol', default=1e11, type=float)
+    parser.add_argument('--min_up_small_buy_vol', default=500000, type=float)
     
-    # parser.add_argument('--break_cont_rate', default=-0.574, type=float)
-    # parser.add_argument('--buy_up_rate', default=0, type=float)
-    # parser.add_argument('--clear_rate', default=0.005, type=float)
-    # parser.add_argument('--final_modify_rate', default=0.6, type=float)
-    # parser.add_argument('--final_rate', default=0.15, type=float)
-    # parser.add_argument('--high_back_rate', default=0.077, type=float)
-    # parser.add_argument('--high_rate', default=0.082, type=float)
-    # parser.add_argument('--low_back_rate', default=0.044, type=float)
-    # parser.add_argument('--low_rate', default=0.052, type=float)
+    parser.add_argument('--break_cont_rate', default=-0.574, type=float)
+    parser.add_argument('--buy_up_rate', default=0, type=float)
+    parser.add_argument('--clear_rate', default=0.005, type=float)
+    parser.add_argument('--final_modify_rate', default=0.6, type=float)
+    parser.add_argument('--final_rate', default=0.15, type=float)
+    parser.add_argument('--high_back_rate', default=0.077, type=float)
+    parser.add_argument('--high_rate', default=0.082, type=float)
+    parser.add_argument('--low_back_rate', default=0.044, type=float)
+    parser.add_argument('--low_rate', default=0.052, type=float)
     
-    # parser.add_argument('--min_cont_rate', default=-0.31, type=float)
-    # parser.add_argument('--sell_down_rate', default=0, type=float)
-    # parser.add_argument('--up_break_cont_rate', default=-0.071, type=float)
-    # parser.add_argument('--up_cont_rate', default=-0.066, type=float)
-    # parser.add_argument('--up_near_rate', default=0.62, type=float)
-    # parser.add_argument('--up_near_rate_fake', default=0.55, type=float)
-    # parser.add_argument('--up_small_cont_rate', default=-0.05, type=float)
-    # parser.add_argument('--up_small_loss_rate', default=-0.016, type=float)
+    parser.add_argument('--min_cont_rate', default=-0.31, type=float)
+    parser.add_argument('--sell_down_rate', default=0, type=float)
+    parser.add_argument('--up_break_cont_rate', default=-0.071, type=float)
+    parser.add_argument('--up_cont_rate', default=-0.066, type=float)
+    parser.add_argument('--up_near_rate', default=0.62, type=float)
+    parser.add_argument('--up_near_rate_fake', default=0.55, type=float)
+    parser.add_argument('--up_small_cont_rate', default=-0.05, type=float)
+    parser.add_argument('--up_small_loss_rate', default=-0.016, type=float)
     
     ###################################### NEW
     
-    parser.add_argument('--min_price', default=0, type=float)
-    parser.add_argument('--max_price', default=1, type=float)
-    parser.add_argument('--max_hold_days', default=4, type=int)
-    parser.add_argument('--min_buy_vol', default=4200000, type=float)
-    parser.add_argument('--max_buy_vol', default=1e11, type=float)
-    parser.add_argument('--min_up_small_buy_vol', default=2000000, type=float)
+    # parser.add_argument('--min_price', default=0, type=float)
+    # parser.add_argument('--max_price', default=1, type=float)
+    # parser.add_argument('--max_hold_days', default=10, type=int)
+    # parser.add_argument('--min_buy_vol', default=2000000, type=float)
+    # parser.add_argument('--max_buy_vol', default=1e11, type=float)
+    # parser.add_argument('--min_up_small_buy_vol', default=4000000, type=float)
     
     
-    parser.add_argument('--break_cont_rate', default=-0.184, type=float)
-    parser.add_argument('--buy_up_rate', default=0.003, type=float)
-    parser.add_argument('--clear_rate', default=0.029, type=float)
-    parser.add_argument('--final_modify_rate', default=0.58, type=float)
-    parser.add_argument('--final_rate', default=0.4, type=float)
-    parser.add_argument('--high_back_rate', default=0.164, type=float)
-    parser.add_argument('--high_rate', default=0.177, type=float)
-    parser.add_argument('--low_back_rate', default=0.071, type=float)
-    parser.add_argument('--low_rate', default=0.076, type=float)
+    # parser.add_argument('--break_cont_rate', default=-0.34, type=float)
+    # parser.add_argument('--buy_up_rate', default=0, type=float)
+    # parser.add_argument('--clear_rate', default=0.024, type=float)
+    # parser.add_argument('--final_modify_rate', default=0.1, type=float)
+    # parser.add_argument('--final_rate', default=0.3, type=float)
+    # parser.add_argument('--high_back_rate', default=0.1, type=float)
+    # parser.add_argument('--high_rate', default=0.16, type=float)
+    # parser.add_argument('--low_back_rate', default=0.066, type=float)
+    # parser.add_argument('--low_rate', default=0.07, type=float)
     
-    parser.add_argument('--min_cont_rate', default=-0.177, type=float)
-    parser.add_argument('--sell_down_rate', default=-0.015, type=float)
-    parser.add_argument('--up_break_cont_rate', default=-0.111, type=float)
-    parser.add_argument('--up_cont_rate', default=-0.104, type=float)
-    parser.add_argument('--up_near_rate', default=0.69, type=float)
-    parser.add_argument('--up_near_rate_fake', default=0.69, type=float)
-    parser.add_argument('--up_small_cont_rate', default=-0.08, type=float)
-    parser.add_argument('--up_small_loss_rate', default=-0.001, type=float)
+    # parser.add_argument('--min_cont_rate', default=-0.244, type=float)
+    # parser.add_argument('--sell_down_rate', default=-0, type=float)
+    # parser.add_argument('--up_break_cont_rate', default=-0.29, type=float)
+    # parser.add_argument('--up_cont_rate', default=-0.178, type=float)
+    # parser.add_argument('--up_near_rate', default=0.75, type=float)
+    # parser.add_argument('--up_near_rate_fake', default=1, type=float)
+    # parser.add_argument('--up_small_cont_rate', default=-0.118, type=float)
+    # parser.add_argument('--up_small_loss_rate', default=-0.033, type=float)
 
 
     parser.add_argument('--generate', action='store_true', default=False)
@@ -222,14 +222,12 @@ if __name__ == '__main__':
                 interval=interval,
                 level=level
             )
-            if args.search:
-                if max_back_rate < BACK_COFF_2:
-                    coff = weight * ((max_back_rate - BACK_COFF_2) * 6 + 1 - BACK_COFF_1 + BACK_COFF_2)
-                else:
-                    coff = weight * (max_back_rate + 1 - BACK_COFF_1)
+            if max_back_rate < BACK_COFF_2:
+                coff = weight * ((max_back_rate - BACK_COFF_2) * 6 + 1 - BACK_COFF_1 + BACK_COFF_2)
             else:
-                coff = 1
-            result.append([end, total_money * coff, profit_rate, max_back_rate])
+                coff = weight * (max_back_rate + 1 - BACK_COFF_1)
+
+            result.append([end, total_money, total_money * coff, profit_rate, max_back_rate])
 
         result = []
         Global.add_num()
@@ -261,16 +259,17 @@ if __name__ == '__main__':
 
         times = len(result)
         mean_total_money = sum([end_result[1] for end_result in result]) / times
-        mean_profit_rate = sum([end_result[2] for end_result in result]) / times
-        mean_back_rate = sum([end_result[3] for end_result in result]) / times
+        mean_weighted_money = sum([end_result[2] for end_result in result]) / times
+        mean_profit_rate = sum([end_result[3] for end_result in result]) / times
+        mean_back_rate = sum([end_result[4] for end_result in result]) / times
 
         if show:
-            print(f'mean result of {times} tries: total_money {mean_total_money}, rate {mean_profit_rate} back {mean_back_rate}')
+            print(f'mean result of {times} tries: total_money {mean_total_money}, weighted money {mean_weighted_money}, rate {mean_profit_rate} back {mean_back_rate}')
 
         if write:
             with open(best_params_path, 'a+') as f:
                 f.write(f'{param.to_csv()},{mean_total_money},{mean_profit_rate},{mean_back_rate}\n')
-        return mean_total_money, mean_profit_rate, mean_back_rate
+        return mean_weighted_money if args.search else mean_total_money, mean_profit_rate, mean_back_rate
 
     datetime.Tz.tz_num = 8
     if args.search:

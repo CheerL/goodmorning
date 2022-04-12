@@ -120,7 +120,11 @@ def get_level(level):
         '4hour': 6,
         '3hour': 8,
         '2hour': 12,
-        '1hour': 24
+        '1hour': 24,
+        '30min': 48,
+        '15min': 96,
+        '5min': 288,
+        '1min': 1440
     }[level]
     level_ts = int(86400 / level_coff)
     return level_coff, level_ts

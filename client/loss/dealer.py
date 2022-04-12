@@ -265,8 +265,9 @@ class LossDealerClient(BaseDealerClient):
             return False
 
         # BUG: cancle order if today's price higher than low mark
-        today_start = time.time() // 86400 * 86400
-        today_high = max([kline.high for kline in klines if kline.id >= today_start])
+        today_start = (time.time() + self.level_ts) // 86400 * 86400
+        today_high_list = [kline.high for kline in klines if kline.id >= today_start]
+        today_high = max(today_high_list) if today_high_list else 0
         if today_high >= klines[0].close * (1 + LOW_RATE):
             return False
 
