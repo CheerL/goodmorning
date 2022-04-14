@@ -9,6 +9,7 @@ from back_trace.model import Param, ContLossList, BaseKlineDict, Klines, Record,
 
 # np.seterr(all='raise')
 
+CHECK_PREVIOUS = False
 SELL_AS_BUY = True
 BOLL_N = 20
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -522,7 +523,7 @@ def back_trace(
 
 @retry(tries=5, logger=logger)
 def get_detailed_klines(symbol, interval, start_time, level):
-    def is_full(symbol, interval):
+    def is_full():
         if (
             (file_start_time == 1618876800)
             or (file_start_time == 1619308800)
@@ -553,12 +554,15 @@ def get_detailed_klines(symbol, interval, start_time, level):
     if os.path.exists(path):
         klines =  Klines.load(path)
         if len(klines.data) < level_coff:
-            if is_full(symbol, interval):
+            if is_full():
                 os.remove(path)
                 raise Exception(f'Saved klines {path.split("/")[-1].split(".")[0]} are not enough, hope {level_coff} but have {len(klines.data)}')
         if klines.data[0]['id'] != file_start_time:
-            os.remove(path)
-            raise Exception(f'Saved klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {klines.data[0]["id"]}')
+            if (
+                not (file_start_time == 1623974400 and symbol == 'SUNUSDT')
+            ):
+                os.remove(path)
+                raise Exception(f'Saved klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {klines.data[0]["id"]}')
     else:
         try:
             raw_klines = Global.user.market.get_candlestick(
@@ -569,12 +573,15 @@ def get_detailed_klines(symbol, interval, start_time, level):
             time.sleep(30)
             raise e
         if file_start_time < time.time() - 86400 and len(raw_klines) < level_coff:
-            if is_full(symbol, interval):
+            if is_full():
                 time.sleep(3)
                 raise Exception(f'Klines {path.split("/")[-1].split(".")[0]} are not enough, hope {level_coff} but have {len(raw_klines)}')
         if raw_klines[-1].id != file_start_time:
-            time.sleep(3)
-            raise Exception(f'Klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {raw_klines[-1].id}')
+            if (
+                not (file_start_time == 1623974400 and symbol == 'SUNUSDT')
+            ):
+                time.sleep(3)
+                raise Exception(f'Klines {path.split("/")[-1].split(".")[0]} are not matched, hope {file_start_time} but start at {raw_klines[-1].id}')
 
         raw_klines.reverse()
         klines = Klines()
@@ -605,10 +612,16 @@ def buy_detailed_back_trace(
         # print(datetime.ts2time(start_time), start_time, datetime.ts2time(int(start_time // 86400 * 86400)), int(start_time // 86400 * 86400), len(data))
         # print(low_price, data['high'].max(), datetime.ts2time(data['id'][0]))
         # print(data[(data['high'] >= low_price)])
-        low_kline = data[
-            # (data['id'] >= start_time) &
-            (data['high'] >= low_price)
-        ][0]
+        if CHECK_PREVIOUS:
+            low_kline = data[
+                (data['id'] >= start_time) &
+                (data['high'] >= low_price)
+            ][0]
+        else:
+            low_kline = data[
+                # (data['id'] >= start_time) &
+                (data['high'] >= low_price)
+            ][0]
         low_ts = low_kline['id']
         # print(low_ts, stop_buy_ts)
         stop_buy_ts = min(low_ts, stop_buy_ts)
@@ -1118,17 +1131,16 @@ def get_sell_price_and_time_v5(cont_loss, cont_loss_list, param: Param, date, in
     klines = cont_loss_list.dict(symbol)
     i = np.where(klines['id']==cont_loss['id'])[0][0]
     max_num = len(klines)
-    for j in range(i+1, max_num):
+    for j in range(i+1, max_num-1):
         day_kline = klines[j]
-        if j == max_num - 1:
-            sell_price = day_kline['close']
-            sell_time = day_kline['id'] + level_ts - 60
-        elif (j-i) % 2 == 1 and j != i+1:
-            if day_kline['cont_loss_days'] < 2:
+        if (j-i) % 2 == 1 and j != i+1 and day_kline['cont_loss_days'] < 2:
                 sell_price = day_kline['close']
                 sell_time = day_kline['id'] + level_ts - 120
-                break
-
+                return sell_price, sell_time
+            
+    day_kline = klines[-1]
+    sell_price = day_kline['close']
+    sell_time = day_kline['id'] + level_ts - 60
     return sell_price, sell_time
 
 def get_data(days=365, end=2, load=True, min_before=180, level='1day',

@@ -80,25 +80,26 @@ if __name__ == '__main__':
     parser.add_argument('--max_num_list', default='10')
     parser.add_argument('--max_buy_ts_list', default='0')
     parser.add_argument('--buy_rate_list', default='0')
-    parser.add_argument('--high_rate_list', default='0.05:0.2:0.001')
-    parser.add_argument('--high_back_rate_list', default='0.03:0.2:0.001')
     parser.add_argument('--high_hold_time_list', default='86400')
-    # parser.add_argument('--high_hold_time_list', default='3600:86400:1800')
-    parser.add_argument('--low_rate_list', default='0:0.07:0.001')
-    parser.add_argument('--low_back_rate_list', default='0:0.07:0.001')
+    parser.add_argument('--high_rate_list', default='0.05:0.2:0.001')
+    parser.add_argument('--high_back_rate_list', default='0.05:0.95:0.05')
+    parser.add_argument('--low_rate_list', default='0.05:0.95:0.05')
+    parser.add_argument('--low_back_rate_list', default='0.05:0.95:0.05')
     parser.add_argument('--clear_rate_list', default='-0.03:0.03:0.001')
     parser.add_argument('--final_rate_list', default='0:0.4:0.01')
     parser.add_argument('--stop_loss_rate_list', default='-1')
-    parser.add_argument('--min_cont_rate_list', default='-0.5:-0.01:0.001')
     parser.add_argument('--break_cont_rate_list', default='-0.6:-0.01:0.001')
-    parser.add_argument('--up_cont_rate_list', default='-0.2:-0.01:0.001')
+    parser.add_argument('--min_cont_rate_list', default='0.05:0.95:0.02')
+    
     parser.add_argument('--min_close_rate_list', default='0')
     parser.add_argument('--up_near_rate_list', default='0.5:1:0.05')
     parser.add_argument('--up_near_rate_fake_list', default='0.5:1:0.05')
     parser.add_argument('--low_near_rate_list', default='0')
-    parser.add_argument('--up_small_cont_rate_list', default='-0.3:0.0:0.001')
-    parser.add_argument('--up_small_loss_rate_list', default='-0.05:-0.001:0.001')
-    parser.add_argument('--up_break_cont_rate_list', default='-0.3:0.0:0.001')
+
+    parser.add_argument('--up_break_cont_rate_list', default='-0.3:-0.001:0.001')
+    parser.add_argument('--up_cont_rate_list', default='0.05:0.95:0.025')
+    parser.add_argument('--up_small_cont_rate_list', default='0.05:0.95:0.025')
+    parser.add_argument('--up_small_loss_rate_list', default='0.01:0.32:0.01')
     # parser.add_argument('--buy_up_rate_list', default='0:0.02:0.001')
     # parser.add_argument('--sell_down_rate_list', default='-0.02:0:0.001')
     parser.add_argument('--buy_up_rate_list', default='0')
@@ -119,28 +120,28 @@ if __name__ == '__main__':
     parser.add_argument('--min_price', default=0, type=float)
     parser.add_argument('--max_price', default=1, type=float)
     parser.add_argument('--max_hold_days', default=5, type=int)
-    parser.add_argument('--min_buy_vol', default=2700000, type=float)
+    parser.add_argument('--min_buy_vol', default=4500000, type=float)
     parser.add_argument('--max_buy_vol', default=1e11, type=float)
     parser.add_argument('--min_up_small_buy_vol', default=500000, type=float)
     
-    parser.add_argument('--break_cont_rate', default=-0.574, type=float)
+    parser.add_argument('--break_cont_rate', default=-0.393, type=float)
     parser.add_argument('--buy_up_rate', default=0, type=float)
-    parser.add_argument('--clear_rate', default=0.005, type=float)
-    parser.add_argument('--final_modify_rate', default=0.6, type=float)
-    parser.add_argument('--final_rate', default=0.15, type=float)
-    parser.add_argument('--high_back_rate', default=0.077, type=float)
-    parser.add_argument('--high_rate', default=0.082, type=float)
-    parser.add_argument('--low_back_rate', default=0.044, type=float)
-    parser.add_argument('--low_rate', default=0.052, type=float)
-    
-    parser.add_argument('--min_cont_rate', default=-0.31, type=float)
+    parser.add_argument('--clear_rate', default=0.028, type=float)
+    parser.add_argument('--final_modify_rate', default=0.95, type=float)
+    parser.add_argument('--final_rate', default=0.11, type=float)
+    parser.add_argument('--high_back_rate', default=0.9, type=float)
+    parser.add_argument('--high_rate', default=0.193, type=float)
+    parser.add_argument('--low_back_rate', default=0.25, type=float)
+    parser.add_argument('--low_rate', default=0.95, type=float)
+
+    parser.add_argument('--min_cont_rate', default=0.53, type=float)
     parser.add_argument('--sell_down_rate', default=0, type=float)
-    parser.add_argument('--up_break_cont_rate', default=-0.071, type=float)
-    parser.add_argument('--up_cont_rate', default=-0.066, type=float)
-    parser.add_argument('--up_near_rate', default=0.62, type=float)
-    parser.add_argument('--up_near_rate_fake', default=0.55, type=float)
-    parser.add_argument('--up_small_cont_rate', default=-0.05, type=float)
-    parser.add_argument('--up_small_loss_rate', default=-0.016, type=float)
+    parser.add_argument('--up_break_cont_rate', default=-0.086, type=float)
+    parser.add_argument('--up_cont_rate', default=0.875, type=float)
+    parser.add_argument('--up_near_rate', default=0.7, type=float)
+    parser.add_argument('--up_near_rate_fake', default=0.9, type=float)
+    parser.add_argument('--up_small_cont_rate', default=0.90, type=float)
+    parser.add_argument('--up_small_loss_rate', default=0.02, type=float)
     
     ###################################### NEW
     
@@ -274,6 +275,19 @@ if __name__ == '__main__':
     datetime.Tz.tz_num = 8
     if args.search:
         def objective(trial: optuna.Trial):
+            # high_rate = trial.suggest_float('high_rate', **str2range(args.high_rate_list))
+            # high_back_rate = high_rate * trial.suggest_float('high_back_rate', **str2range(args.high_back_rate_list))
+            # low_rate = high_back_rate * trial.suggest_float('low_rate', **str2range(args.low_rate_list))
+            # low_back_rate = low_rate * trial.suggest_float('low_back_rate', **str2range(args.low_back_rate_list))
+            
+            # break_cont_rate = trial.suggest_float('break_cont_rate', **str2range(args.break_cont_rate_list))
+            # min_cont_rate = break_cont_rate * trial.suggest_float('min_cont_rate', **str2range(args.min_cont_rate_list))
+            
+            # up_break_cont_rate = trial.suggest_float('up_break_cont_rate', **str2range(args.up_break_cont_rate_list))
+            # up_cont_rate = up_break_cont_rate * trial.suggest_float('up_cont_rate', **str2range(args.up_cont_rate_list))
+            # up_small_cont_rate = up_break_cont_rate * trial.suggest_float('up_small_cont_rate', **str2range(args.up_small_cont_rate_list))
+            # up_small_loss_rate = up_small_cont_rate * trial.suggest_float('up_small_loss_rate', **str2range(args.up_small_loss_rate_list))
+
             param = Param(
                 buy_algo_version = args.buy_algo_version,
                 sell_algo_version = args.sell_algo_version,
@@ -287,28 +301,49 @@ if __name__ == '__main__':
                 # max_num = trial.suggest_int('max_num', **str2range(args.max_num_list, int)),
                 # max_buy_ts = trial.suggest_float('max_buy_ts', **str2range(args.max_buy_ts_list)),
                 # buy_rate = trial.suggest_float('buy_rate', **str2range(args.buy_rate_list)),
-                high_rate = trial.suggest_float('high_rate', **str2range(args.high_rate_list)),
-                high_back_rate = trial.suggest_float('high_back_rate', **str2range(args.high_back_rate_list)),
-                # high_hold_time = trial.suggest_int('high_hold_time', **str2range(args.high_hold_time_list, int)),
-                low_rate = trial.suggest_float('low_rate', **str2range(args.low_rate_list)),
-                low_back_rate = trial.suggest_float('low_back_rate', **str2range(args.low_back_rate_list)),
+                # min_close_rate = trial.suggest_float('min_close_rate', **str2range(args.min_close_rate_list)),
                 clear_rate = trial.suggest_float('clear_rate', **str2range(args.clear_rate_list)),
                 final_rate = trial.suggest_float('final_rate', **str2range(args.final_rate_list)),
-                stop_loss_rate = trial.suggest_float('stop_loss_rate', **str2range(args.stop_loss_rate_list)),
-                min_cont_rate = trial.suggest_float('min_cont_rate', **str2range(args.min_cont_rate_list)),
-                break_cont_rate = trial.suggest_float('break_cont_rate', **str2range(args.break_cont_rate_list)),
-                up_cont_rate = trial.suggest_float('up_cont_rate', **str2range(args.up_cont_rate_list)),
-                # min_close_rate = trial.suggest_float('min_close_rate', **str2range(args.min_close_rate_list)),
+                stop_loss_rate = trial.suggest_float('stop_loss_rate', **str2range(args.stop_loss_rate_list)),# high_hold_time = trial.suggest_int('high_hold_time', **str2range(args.high_hold_time_list, int)),
                 up_near_rate = trial.suggest_float('up_near_rate', **str2range(args.up_near_rate_list)),
                 up_near_rate_fake = trial.suggest_float('up_near_rate_fake', **str2range(args.up_near_rate_fake_list)),
                 # low_near_rate = trial.suggest_float('low_near_rate', **str2range(args.low_near_rate_list)),
-                up_small_cont_rate = trial.suggest_float('up_small_cont_rate', **str2range(args.up_small_cont_rate_list)),
-                up_small_loss_rate = trial.suggest_float('up_small_loss_rate', **str2range(args.up_small_loss_rate_list)),
-                up_break_cont_rate = trial.suggest_float('up_break_cont_rate', **str2range(args.up_break_cont_rate_list)),
                 buy_up_rate = trial.suggest_float('buy_up_rate', **str2range(args.buy_up_rate_list)),
                 sell_down_rate = trial.suggest_float('sell_down_rate', **str2range(args.sell_down_rate_list)),
-                final_modify_rate = trial.suggest_float('final_modify_rate', **str2range(args.final_modify_rate_list))
+                final_modify_rate = trial.suggest_float('final_modify_rate', **str2range(args.final_modify_rate_list)),
+                ################################################################
+                high_rate = trial.suggest_float('high_rate', **str2range(args.high_rate_list)),
+                high_back_rate = trial.suggest_float('high_back_rate', **str2range(args.high_back_rate_list)),
+                low_rate = trial.suggest_float('low_rate', **str2range(args.low_rate_list)),
+                low_back_rate = trial.suggest_float('low_back_rate', **str2range(args.low_back_rate_list)),
+                break_cont_rate = trial.suggest_float('break_cont_rate', **str2range(args.break_cont_rate_list)),
+                min_cont_rate = trial.suggest_float('min_cont_rate', **str2range(args.min_cont_rate_list)),
+                up_break_cont_rate = trial.suggest_float('up_break_cont_rate', **str2range(args.up_break_cont_rate_list)),
+                up_cont_rate = trial.suggest_float('up_cont_rate', **str2range(args.up_cont_rate_list)),
+                up_small_cont_rate = trial.suggest_float('up_small_cont_rate', **str2range(args.up_small_cont_rate_list)),
+                up_small_loss_rate = trial.suggest_float('up_small_loss_rate', **str2range(args.up_small_loss_rate_list)),
+                
+                ################################################################
+                # high_rate = high_rate,
+                # high_back_rate = high_back_rate,
+                # low_rate = low_rate,
+                # low_back_rate = low_back_rate,
+                # break_cont_rate = break_cont_rate,
+                # min_cont_rate = min_cont_rate,
+                # up_break_cont_rate = up_break_cont_rate,
+                # up_cont_rate = up_cont_rate,
+                # up_small_cont_rate = up_small_cont_rate,
+                # up_small_loss_rate = up_small_loss_rate
+                ################################################################
             )
+            # print(param.show())
+            param.high_back_rate = param.high_rate * param.high_back_rate
+            param.low_rate = param.high_back_rate * param.low_rate
+            param.low_back_rate = param.low_rate * param.low_back_rate
+            param.min_cont_rate = param.break_cont_rate * param.min_cont_rate
+            param.up_cont_rate = param.up_break_cont_rate * param.up_cont_rate
+            param.up_small_cont_rate = param.up_break_cont_rate * param.up_small_cont_rate
+            param.up_small_loss_rate = param.up_small_cont_rate * param.up_small_loss_rate
             mean_total_money, mean_profit_rate, mean_back_rate = sub_back_trace(param, level=args.level)
             return mean_total_money
 
@@ -360,6 +395,15 @@ if __name__ == '__main__':
 
     else:
         param = Param(**args.__dict__)
+        param.high_back_rate = param.high_rate * param.high_back_rate
+        param.low_rate = param.high_back_rate * param.low_rate
+        param.low_back_rate = param.low_rate * param.low_back_rate
+        param.min_cont_rate = param.break_cont_rate * param.min_cont_rate
+        param.up_cont_rate = param.up_break_cont_rate * param.up_cont_rate
+        param.up_small_cont_rate = param.up_break_cont_rate * param.up_small_cont_rate
+        param.up_small_loss_rate = param.up_small_cont_rate * param.up_small_loss_rate
+
+        print(param.show())
         sub_back_trace(
             param,
             write=False,

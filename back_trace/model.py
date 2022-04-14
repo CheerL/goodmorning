@@ -111,22 +111,27 @@ class Param:
             return (
                 # self.low_back_rate < self.low_rate
                 self.low_back_rate < 0.95 * self.low_rate
-                and self.clear_rate < self.low_rate
-                and self.stop_loss_rate < self.clear_rate
-                and self.break_cont_rate < self.min_cont_rate
+                and self.high_back_rate < 0.95 * self.high_rate
                 and self.low_rate < self.high_rate
                 and self.low_back_rate < self.high_back_rate
-                and self.high_back_rate < 0.95 * self.high_rate
-                and self.min_price < self.max_price
-                and self.min_buy_vol < self.max_buy_vol
-                and self.min_num < self.max_num
+                ##############
+                and self.clear_rate < self.low_rate
+                and self.stop_loss_rate < self.clear_rate
                 # and self.break_cont_rate < self.up_cont_rate
                 # and self.up_small_cont_rate < self.up_cont_rate
+                and self.break_cont_rate < self.min_cont_rate
                 and self.up_small_cont_rate < 3 * self.up_small_loss_rate
                 and self.up_break_cont_rate < self.up_cont_rate
                 and self.up_break_cont_rate < self.up_small_cont_rate
+                ##############
+                and self.min_price < self.max_price
+                and self.min_buy_vol < self.max_buy_vol
+                and self.min_num < self.max_num
             )
         return True
+
+    def show(self):
+        return '\n'.join([f'{key}: {self.__getattribute__(key)}' for key in self.orders])
 
     def to_csv(self):
         return ','.join([str(self.__getattribute__(key)) for key in self.orders])
