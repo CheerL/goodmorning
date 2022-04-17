@@ -19,6 +19,7 @@ PRICE_INTERVAL = config.getfloat('loss', 'PRICE_INTERVAL')
 UP_NEAR_RATE = config.getfloat('loss', 'UP_NEAR_RATE')
 UP_NEAR_RATE_FAKE = config.getfloat('loss', 'UP_NEAR_RATE_FAKE')
 BUY_UP_RATE = config.getfloat('loss', 'BUY_UP_RATE')
+SELL_DOWN_RATE = config.getfloat('loss', 'SELL_DOWN_RATE')
 
 AVER_NUM = int(AVER_INTERVAL_LENGTH // PRICE_INTERVAL)
 
@@ -202,6 +203,7 @@ class LossTarget(BaseTarget):
                 if (sell_price-last_close) / diff < FINAL_RATE:
                     sell_price += diff * FINAL_MODIFY_RATE
 
+            sell_price *= (1+SELL_DOWN_RATE)
             self.boll_target_sell_price = sell_price
             logger.info(f'Boll: {bolls}, close: {last_close}, sell_price: {sell_price}')
 
